@@ -453,23 +453,33 @@ const startPractice = () => {
                     e.preventDefault(); 
                     if (inputValue.length === 0) return;
 
-                    if (inputValue.trim() === currentWord) {
-                        const newCombo = combo + 1;
-                        const comboBonus = combo * 5;
-                        const earnedScore = currentWord.length * 10 + (currentWord.length > 5 ? 20 : 0) + comboBonus;
-                        
-                        setScore(prev => prev + earnedScore);
-                        setCorrectChars(prev => prev + currentWord.length);
-                        setCombo(newCombo);
-                        setLastEarned(earnedScore);
-                        
-                        playComboSound(newCombo);
-                        setShowSuccess(true);
-                        setTimeout(() => setShowSuccess(false), 500);
-                        
-                        setInputValue('');
-                        pickRandomWord(gameMode);
-                    } else {
+                if (inputValue.trim() === currentWord) {
+    const newCombo = combo + 1;
+    
+    // 1. 기본 점수 (글자당 10점)
+    const baseScore = currentWord.length * 10;
+    
+    // 2. 콤보 보너스 (현재 콤보 × 글자 수 × 2) - 긴 문장일수록 콤보 점수가 폭발!
+    const comboBonus = combo * currentWord.length * 2;
+    
+    // 3. 난이도 보너스 (띄어쓰기가 있는 문장은 80점, 5글자 이상 단어는 20점 추가)
+    const lengthBonus = currentWord.includes(' ') ? 80 : (currentWord.length > 5 ? 20 : 0);
+    
+    // 최종 획득 점수 계산
+    const earnedScore = baseScore + comboBonus + lengthBonus;
+    
+    setScore(prev => prev + earnedScore);
+    setCorrectChars(prev => prev + currentWord.length);
+    setCombo(newCombo);
+    setLastEarned(earnedScore);
+    
+    playComboSound(newCombo);
+    setShowSuccess(true);
+    setTimeout(() => setShowSuccess(false), 500);
+    
+    setInputValue('');
+    pickRandomWord(gameMode);
+} else {
                         setCombo(0);
                         setIsError(true);
                         setTimeout(() => setIsError(false), 400);
