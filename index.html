@@ -159,15 +159,33 @@
             "A rolling stone gathers no moss", "Better late than never", "Don't judge a book by its cover"
         ];
 
+// 🌸 자연스럽게 떨어지는 벚꽃 배경 컴포넌트 🌸
         const CherryBlossomBackground = () => {
-            const petals = Array.from({ length: 25 }).map((_, i) => ({
-                id: i, left: `${Math.random() * 100}%`,
-                animationDuration: `${Math.random() * 5 + 5}s`, animationDelay: `${Math.random() * 5}s`,
-                width: `${Math.random() * 10 + 5}px`, height: `${Math.random() * 10 + 5}px`
-            }));
+            // 화면이 업데이트될 때마다 벚꽃이 새로고침(깜빡임)되는 것을 막기 위해 useMemo 적용
+            const petals = React.useMemo(() => {
+                return Array.from({ length: 30 }).map((_, i) => ({
+                    id: i, 
+                    left: `${Math.random() * 100}%`,
+                    // 10초 ~ 25초 사이로 아주 천천히 떨어지도록 속도 조절
+                    animationDuration: `${Math.random() * 15 + 10}s`, 
+                    // 화면을 켰을 때 이미 벚꽃이 화면 전체에 자연스럽게 퍼져있도록 음수(-) 딜레이 적용
+                    animationDelay: `-${Math.random() * 20}s`, 
+                    width: `${Math.random() * 8 + 6}px`, 
+                    height: `${Math.random() * 8 + 6}px`
+                }));
+            }, []);
+
             return (
                 <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-                    {petals.map(p => <div key={p.id} className="petal" style={{ left: p.left, width: p.width, height: p.height, animationDuration: p.animationDuration, animationDelay: p.animationDelay }} />)}
+                    {petals.map(p => (
+                        <div key={p.id} className="petal" style={{ 
+                            left: p.left, 
+                            width: p.width, 
+                            height: p.height, 
+                            animationDuration: p.animationDuration, 
+                            animationDelay: p.animationDelay 
+                        }} />
+                    ))}
                 </div>
             );
         };
