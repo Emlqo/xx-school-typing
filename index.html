@@ -113,28 +113,50 @@
             measurementId: "G-PFMZNFKKQW"
         };
 
+ // --- 1. 단어장 대폭 확장 ---
         const KOREAN_WORDS = [
+            // 학교 생활 & 과목
             "학교", "선생님", "교과서", "칠판", "체육대회", "수학여행", "중간고사", "기말고사", "쉬는시간", "점심시간",
             "도서관", "과학실", "미술실", "음악실", "동아리", "급식", "친구", "우정", "추억", "졸업식", "정보교과", "인공지능",
             "수행평가", "방학식", "개학식", "학급회의", "동아리활동", "학생회장", "교장선생님", "담임선생님", "진로상담", "봉사활동",
             "국어", "영어", "수학", "사회", "과학", "역사", "도덕", "체육", "음악", "미술", "기술가정", "정보", "한문",
+            
+            // 컴퓨터 & IT 용어
+            "파이썬", "리액트", "자바스크립트", "코딩", "알고리즘", "소프트웨어", "하드웨어", "메인보드", "그래픽카드", "스마트폰",
+            "데이터베이스", "네트워크", "운영체제", "프로그래밍", "웹개발", "클라우드", "서버", "키보드", "마우스", "모니터",
+
+            // 중학생 공감 & 간식
+            "마라탕", "탕후루", "떡볶이", "돈까스", "치킨", "피자", "햄버거", "아이스크림", "콜라", "사이다",
+            "아메리카노", "에이드", "소떡소떡", "버블티", "코인노래방", "네컷사진", "PC방", "웹툰", "유튜브",
+
+            // 짧은 문장 & 속담 & 명언
             "푸른 하늘 은하수 하얀 쪽배에", "계수나무 한 나무 토끼 한 마리", "남산 위에 저 소나무 철갑을 두른 듯", 
             "배움에는 끝이 없다", "연습은 완벽을 만든다", "오늘의 노력이 내일의 실력", "가는 말이 고와야 오는 말이 곱다",
             "시작이 반이다", "천 리 길도 한 걸음부터", "티끌 모아 태산", "말 한마디에 천냥 빚도 갚는다",
             "포기하지 않으면 실패는 없다", "시간은 금이다", "백지장도 맞들면 낫다", "아는 것이 힘이다",
-            "우리는 자랑스러운 풍양중학교 학생이다", "바른 인성과 실력을 갖춘 인재", "꿈을 향해 도전하는 우리들"
+            "우리는 자랑스러운 XX중학교 학생이다", "바른 인성과 실력을 갖춘 인재", "꿈을 향해 도전하는 우리들",
+            "중요한 것은 꺾이지 않는 마음", "별 헤는 밤 하늘을 우러러 한 점 부끄럼이 없기를", "동해 물과 백두산이 마르고 닳도록"
         ];
 
         const ENGLISH_WORDS = [
+            // 기본 영단어
             "apple", "banana", "school", "student", "teacher", "book", "desk", "chair", "notebook", "pencil",
             "library", "science", "music", "art", "history", "math", "english", "friend", "study", "learn",
+            
+            // 컴퓨터 & IT 영단어
             "computer", "keyboard", "mouse", "internet", "coding", "software", "hardware", "network", "program",
+            "python", "react", "javascript", "developer", "server", "database", "algorithm", "variable", "function",
+
+            // 긍정 & 동기부여 영단어
             "future", "dream", "success", "challenge", "passion", "effort", "courage", "wisdom", "health", "peace",
+            "happy", "smile", "laugh", "love", "hope", "believe", "amazing", "awesome", "perfect", "great",
+
+            // 영어 문장 & 속담
             "The quick brown fox jumps over the lazy dog", "Time is gold", "No pain, no gain",
             "Knowledge is power", "Practice makes perfect", "Where there is a will, there is a way",
-            "A rolling stone gathers no moss", "Actions speak louder than words", "Better late than never",
-            "Don't judge a book by its cover", "Honesty is the best policy", "Rome was not built in a day",
-            "To be or not to be, that is the question", "I think, therefore I am", "Seize the day"
+            "Actions speak louder than words", "Honesty is the best policy", "Rome was not built in a day",
+            "To be or not to be, that is the question", "I think, therefore I am", "Seize the day",
+            "A rolling stone gathers no moss", "Better late than never", "Don't judge a book by its cover"
         ];
 
         const CherryBlossomBackground = () => {
