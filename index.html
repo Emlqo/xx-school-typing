@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>XX중학교 타자연습</title>
+    <title>풍양중학교 타자연습</title>
     
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
@@ -23,7 +23,7 @@
         window.serverTimestamp = serverTimestamp;
         window.doc = doc;
         window.updateDoc = updateDoc;
-        window.deleteDoc = deleteDoc; // 삭제 기능 추가
+        window.deleteDoc = deleteDoc;
         window.getAuth = getAuth;
         window.signInAnonymously = signInAnonymously;
         window.onAuthStateChanged = onAuthStateChanged;
@@ -87,6 +87,13 @@
         .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255, 228, 225, 0.5); border-radius: 8px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(244, 114, 182, 0.5); border-radius: 8px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(236, 72, 153, 0.8); }
+
+        .live-badge { animation: pulse-red 1.5s infinite; }
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
     </style>
 </head>
 <body>
@@ -95,39 +102,34 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        // 🔥 선생님의 Firebase 설정값을 여기에 붙여넣으세요! 🔥
-     const firebaseConfig = {
-  apiKey: "AIzaSyBj29ErYiUHN9Q4S0uHASKnSs-QlzLPEWM",
-  authDomain: "dongducheon-c28a0.firebaseapp.com",
-  projectId: "dongducheon-c28a0",
-  storageBucket: "dongducheon-c28a0.firebasestorage.app",
-  messagingSenderId: "523115840407",
-  appId: "1:523115840407:web:60f90dce434c63e29bfad2",
-  measurementId: "G-PFMZNFKKQW"
-};
+        // 선생님의 Firebase 설정값 자동 적용
+        const firebaseConfig = {
+            apiKey: "AIzaSyBj29ErYiUHN9Q4S0uHASKnSs-QlzLPEWM",
+            authDomain: "dongducheon-c28a0.firebaseapp.com",
+            projectId: "dongducheon-c28a0",
+            storageBucket: "dongducheon-c28a0.firebasestorage.app",
+            messagingSenderId: "523115840407",
+            appId: "1:523115840407:web:60f90dce434c63e29bfad2",
+            measurementId: "G-PFMZNFKKQW"
+        };
 
-        // --- 1. 단어장 대폭 추가 ---
         const KOREAN_WORDS = [
-            // 단어
             "학교", "선생님", "교과서", "칠판", "체육대회", "수학여행", "중간고사", "기말고사", "쉬는시간", "점심시간",
             "도서관", "과학실", "미술실", "음악실", "동아리", "급식", "친구", "우정", "추억", "졸업식", "정보교과", "인공지능",
             "수행평가", "방학식", "개학식", "학급회의", "동아리활동", "학생회장", "교장선생님", "담임선생님", "진로상담", "봉사활동",
             "국어", "영어", "수학", "사회", "과학", "역사", "도덕", "체육", "음악", "미술", "기술가정", "정보", "한문",
-            // 문장
             "푸른 하늘 은하수 하얀 쪽배에", "계수나무 한 나무 토끼 한 마리", "남산 위에 저 소나무 철갑을 두른 듯", 
             "배움에는 끝이 없다", "연습은 완벽을 만든다", "오늘의 노력이 내일의 실력", "가는 말이 고와야 오는 말이 곱다",
             "시작이 반이다", "천 리 길도 한 걸음부터", "티끌 모아 태산", "말 한마디에 천냥 빚도 갚는다",
             "포기하지 않으면 실패는 없다", "시간은 금이다", "백지장도 맞들면 낫다", "아는 것이 힘이다",
-            "우리는 자랑스러운 XX중학교 학생이다", "바른 인성과 실력을 갖춘 인재", "꿈을 향해 도전하는 우리들"
+            "우리는 자랑스러운 풍양중학교 학생이다", "바른 인성과 실력을 갖춘 인재", "꿈을 향해 도전하는 우리들"
         ];
 
         const ENGLISH_WORDS = [
-            // 단어
             "apple", "banana", "school", "student", "teacher", "book", "desk", "chair", "notebook", "pencil",
             "library", "science", "music", "art", "history", "math", "english", "friend", "study", "learn",
             "computer", "keyboard", "mouse", "internet", "coding", "software", "hardware", "network", "program",
             "future", "dream", "success", "challenge", "passion", "effort", "courage", "wisdom", "health", "peace",
-            // 문장
             "The quick brown fox jumps over the lazy dog", "Time is gold", "No pain, no gain",
             "Knowledge is power", "Practice makes perfect", "Where there is a will, there is a way",
             "A rolling stone gathers no moss", "Actions speak louder than words", "Better late than never",
@@ -157,6 +159,7 @@
             const [view, setView] = useState('login'); 
             const [rooms, setRooms] = useState([]);
             const [scores, setScores] = useState([]);
+            const [currentTime, setCurrentTime] = useState(Date.now()); // 마감 타이머용 현재 시간
             
             const [nickname, setNickname] = useState('');
             const [selectedRoomId, setSelectedRoomId] = useState('');
@@ -182,8 +185,20 @@
             const [lastEarned, setLastEarned] = useState(0);
             const [isError, setIsError] = useState(false);
 
-            // 오디오 컨텍스트 (효과음용)
+            // 실시간 연동을 위한 상태들
+            const [currentScoreDocId, setCurrentScoreDocId] = useState(null);
+            const latestScoreRef = useRef(0);
+            const latestCharsRef = useRef(0);
+            const lastSyncedScoreRef = useRef(0);
+            const gameInfoRef = useRef({ elapsed: 0 });
+
             const audioCtxRef = useRef(null);
+
+            // 1초마다 현재 시간 업데이트 (입장 마감 체크용)
+            useEffect(() => {
+                const clock = setInterval(() => setCurrentTime(Date.now()), 1000);
+                return () => clearInterval(clock);
+            }, []);
 
             useEffect(() => {
                 const handleFirebaseLoad = () => setIsFirebaseLoaded(true);
@@ -195,7 +210,6 @@
             useEffect(() => {
                 if (!isFirebaseLoaded) return;
                 try {
-                    if (firebaseConfig.apiKey === "YOUR_API_KEY") return;
                     const app = window.firebaseApp(firebaseConfig);
                     const database = window.getFirestore(app);
                     const auth = window.getAuth(app);
@@ -206,6 +220,7 @@
                 } catch (error) { console.error(error); }
             }, [isFirebaseLoaded]);
 
+            // 실시간 DB 데이터 구독
             useEffect(() => {
                 if (!user || !db) return;
                 const roomsRef = window.collection(db, 'artifacts', appId, 'public', 'data', 'typing_rooms');
@@ -224,18 +239,42 @@
                 return () => { unsubscribeRooms(); unsubscribeScores(); };
             }, [user, db]);
 
-            // 오디오 초기화 및 재생 함수 (브라우저 정책상 사용자 상호작용 후 활성화)
+            // 현재 내 점수를 Ref에 저장
+            useEffect(() => {
+                latestScoreRef.current = score;
+                latestCharsRef.current = correctChars;
+            }, [score, correctChars]);
+
+            // 🔥 실시간 동기화 (3초마다 서버에 점수 업데이트)
+            useEffect(() => {
+                if (view !== 'playing' || !currentScoreDocId || !db) return;
+                
+                const syncInterval = setInterval(() => {
+                    const currentScore = latestScoreRef.current;
+                    // 점수가 지난번 동기화 때보다 올랐을 때만 전송
+                    if (currentScore > lastSyncedScoreRef.current) {
+                        const elapsedMin = gameInfoRef.current.elapsed / 60;
+                        const currentCpm = elapsedMin > 0 ? Math.round(latestCharsRef.current / elapsedMin) : 0;
+
+                        const docRef = window.doc(db, 'artifacts', appId, 'public', 'data', 'typing_scores', currentScoreDocId);
+                        window.updateDoc(docRef, {
+                            score: currentScore,
+                            cpm: currentCpm,
+                            updatedAt: window.serverTimestamp() // 업데이트 시간 갱신
+                        }).catch(e => console.error(e));
+                        
+                        lastSyncedScoreRef.current = currentScore;
+                    }
+                }, 3000); 
+                
+                return () => clearInterval(syncInterval);
+            }, [view, currentScoreDocId, db]);
+
             const playComboSound = (comboLevel) => {
                 try {
                     const AudioContext = window.AudioContext || window.webkitAudioContext;
-                    if (!audioCtxRef.current && AudioContext) {
-                        audioCtxRef.current = new AudioContext();
-                    }
-                    if (!audioCtxRef.current) return;
-                    
-                    if (audioCtxRef.current.state === 'suspended') {
-                        audioCtxRef.current.resume();
-                    }
+                    if (!audioCtxRef.current && AudioContext) audioCtxRef.current = new AudioContext();
+                    if (!audioCtxRef.current || audioCtxRef.current.state === 'suspended') return;
 
                     const oscillator = audioCtxRef.current.createOscillator();
                     const gainNode = audioCtxRef.current.createGain();
@@ -243,57 +282,70 @@
                     oscillator.connect(gainNode);
                     gainNode.connect(audioCtxRef.current.destination);
                     
-                    // 콤보가 높을수록 음정이 높아짐 (경쾌한 소리)
                     const frequency = 400 + (Math.min(comboLevel, 20) * 40);
                     oscillator.type = 'sine';
                     oscillator.frequency.setValueAtTime(frequency, audioCtxRef.current.currentTime);
                     
-                    // 피드백을 위한 짧고 부드러운 타격음
                     gainNode.gain.setValueAtTime(0.15, audioCtxRef.current.currentTime);
                     gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtxRef.current.currentTime + 0.1);
                     
                     oscillator.start();
                     oscillator.stop(audioCtxRef.current.currentTime + 0.1);
-                } catch (e) {
-                    console.error("오디오 재생 실패:", e);
-                }
+                } catch (e) { }
             };
 
             const handleCreateRoom = async (e) => {
                 e.preventDefault();
                 if (!newRoomName.trim() || !user || !db) return;
 
+                const durationSec = Number(roomDuration);
+                const expiresAt = Date.now() + (durationSec * 1000); // ⏳ 방 마감 시간 생성
+
                 const roomsRef = window.collection(db, 'artifacts', appId, 'public', 'data', 'typing_rooms');
                 await window.addDoc(roomsRef, {
-                    name: newRoomName.trim(), mode: roomMode, duration: Number(roomDuration),
+                    name: newRoomName.trim(), mode: roomMode, duration: durationSec,
+                    expiresAt: expiresAt, // 마감 시간 저장
                     createdBy: user.uid, createdAt: window.serverTimestamp()
                 });
                 setNewRoomName('');
             };
 
-            // --- 반 삭제 기능 ---
             const handleDeleteRoom = async (roomId, roomName) => {
-                if(!window.confirm(`정말 [${roomName}] 반을 삭제하시겠습니까?\n삭제된 반은 복구할 수 없습니다.`)) return;
+                if(!window.confirm(`정말 [${roomName}] 반을 삭제하시겠습니까?\n기록은 유지되지만 반 목록에서 삭제됩니다.`)) return;
                 try {
                     await window.deleteDoc(window.doc(db, 'artifacts', appId, 'public', 'data', 'typing_rooms', roomId));
                     if (viewingRoomId === roomId) setViewingRoomId('all');
-                    alert('삭제 완료되었습니다.');
-                } catch (e) {
-                    alert('삭제 실패: ' + e.message);
-                }
+                } catch (e) { alert('삭제 실패: ' + e.message); }
             };
 
-            const startGame = () => {
+            const startGame = async () => {
                 if (!nickname.trim()) return alert("닉네임을 입력해주세요.");
                 const room = rooms.find(r => r.id === selectedRoomId);
                 if (!room) return alert("입장할 반을 선택해주세요.");
+
+                // ⏳ 입장 마감 시간 체크
+                if (room.expiresAt && Date.now() > room.expiresAt) {
+                    return alert("이 반은 설정된 시간이 지나 입장이 마감되었습니다!");
+                }
                 
-                // 오디오 권한 획득용 (사용자 클릭 시점)
                 try {
                     const AudioContext = window.AudioContext || window.webkitAudioContext;
                     if (!audioCtxRef.current && AudioContext) audioCtxRef.current = new AudioContext();
                     if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') audioCtxRef.current.resume();
                 } catch(e){}
+
+                // 🔥 게임 시작 즉시 내 이름으로 0점 기록 생성 (실시간 중계용)
+                try {
+                    const scoresRef = window.collection(db, 'artifacts', appId, 'public', 'data', 'typing_scores');
+                    const newDoc = await window.addDoc(scoresRef, {
+                        roomId: selectedRoomId, nickname: nickname, score: 0, cpm: 0,
+                        userId: user.uid, createdAt: window.serverTimestamp(), updatedAt: window.serverTimestamp()
+                    });
+                    setCurrentScoreDocId(newDoc.id);
+                    lastSyncedScoreRef.current = 0;
+                } catch (e) {
+                    alert("서버 연결 지연. 게임을 시작할 수 없습니다."); return;
+                }
 
                 const duration = room.duration || 300;
                 const mode = room.mode || 'mixed';
@@ -315,6 +367,7 @@
                 setCurrentWord(list[randomIndex]);
             };
 
+            // 타이머 업데이트
             useEffect(() => {
                 let timerId;
                 if (view === 'playing' && timeLeft > 0) {
@@ -322,8 +375,9 @@
                 } else if (view === 'playing' && timeLeft === 0) {
                     endGame();
                 }
+                gameInfoRef.current.elapsed = gameDuration - timeLeft;
                 return () => clearInterval(timerId);
-            }, [view, timeLeft]);
+            }, [view, timeLeft, gameDuration]);
 
             const handleKeyDown = (e) => {
                 if (e.key === 'Backspace') setCombo(0);
@@ -343,9 +397,7 @@
                         setCombo(newCombo);
                         setLastEarned(earnedScore);
                         
-                        // 콤보 효과음 재생!
                         playComboSound(newCombo);
-                        
                         setShowSuccess(true);
                         setTimeout(() => setShowSuccess(false), 500);
                         
@@ -361,70 +413,47 @@
 
             const endGame = async () => {
                 setView('result');
-                if (!user || !db) return;
+                if (!user || !db || !currentScoreDocId) return;
 
                 const minutes = gameDuration / 60;
                 const cpm = minutes > 0 ? Math.round(correctChars / minutes) : 0;
 
-                const existingScore = scores.find(s => s.roomId === selectedRoomId && s.nickname === nickname);
-
                 try {
-                    if (existingScore) {
-                        if (score > existingScore.score) {
-                            const docRef = window.doc(db, 'artifacts', appId, 'public', 'data', 'typing_scores', existingScore.id);
-                            await window.updateDoc(docRef, { score: score, cpm: cpm, updatedAt: window.serverTimestamp() });
-                        }
-                    } else {
-                        const scoresRef = window.collection(db, 'artifacts', appId, 'public', 'data', 'typing_scores');
-                        await window.addDoc(scoresRef, {
-                            roomId: selectedRoomId, nickname: nickname, score: score, cpm: cpm,
-                            userId: user.uid, createdAt: window.serverTimestamp()
-                        });
-                    }
-                } catch (error) {
-                    console.error("점수 저장 실패:", error);
-                }
+                    // 종료 시 최종 기록 동기화
+                    const docRef = window.doc(db, 'artifacts', appId, 'public', 'data', 'typing_scores', currentScoreDocId);
+                    await window.updateDoc(docRef, { score: score, cpm: cpm, updatedAt: window.serverTimestamp() });
+                } catch (error) { }
+                setCurrentScoreDocId(null);
             };
 
             const formatTime = (sec) => `${Math.floor(sec/60)}:${(sec%60).toString().padStart(2,'0')}`;
 
-            // --- 명예의 전당 점수 집계 로직 ---
+            // 명예의 전당 로직 (닉네임별 최고 기록)
             const getLeaderboard = () => {
                 const userBest = {};
-                let filteredScores = [];
-
-                if (viewingRoomId === 'all') {
-                    // [학교 전체 전당] 닉네임별 최고 점수
-                    scores.forEach(s => {
-                        // 현재 존재하는 방의 점수만 유효하게 처리 (삭제된 방의 점수는 무시)
-                        if (!rooms.find(r => r.id === s.roomId)) return; 
-                        
-                        if (!userBest[s.nickname] || userBest[s.nickname].score < s.score) {
-                            userBest[s.nickname] = s;
-                        }
-                    });
-                } else {
-                    // [선택한 반 전당] 해당 반 내에서 닉네임별 최고 점수
-                    const roomScores = scores.filter(s => s.roomId === viewingRoomId);
-                    roomScores.forEach(s => {
-                        if (!userBest[s.nickname] || userBest[s.nickname].score < s.score) {
-                            userBest[s.nickname] = s;
-                        }
-                    });
-                }
                 
-                filteredScores = Object.values(userBest);
-                return filteredScores.sort((a, b) => b.score - a.score);
+                scores.forEach(s => {
+                    if (viewingRoomId !== 'all' && s.roomId !== viewingRoomId) return;
+                    if (!rooms.find(r => r.id === s.roomId)) return; 
+                    
+                    if (!userBest[s.nickname] || userBest[s.nickname].score < s.score) {
+                        userBest[s.nickname] = s;
+                    }
+                });
+                
+                return Object.values(userBest).sort((a, b) => b.score - a.score);
             };
 
             
+            if (!isFirebaseLoaded) return null;
+
             if (view === 'login') {
                 return (
                     <div className="min-h-screen spring-bg flex items-center justify-center p-4">
                         <CherryBlossomBackground />
                         <div className="glass-box rounded-3xl p-10 text-center max-w-md w-full z-10 relative">
                             <div className="text-6xl mb-4">🏫🌸</div>
-                            <h1 className="text-3xl font-black text-pink-600 mb-2">XX중학교 타자연습</h1>
+                            <h1 className="text-3xl font-black text-pink-600 mb-2">풍양중학교 타자연습</h1>
                             <p className="text-gray-500 font-medium mb-8">봄날의 타자 대결, 시작해볼까요?</p>
                             
                             <div className="space-y-4">
@@ -469,62 +498,61 @@
                             <div className="glass-box p-6 rounded-3xl flex justify-between items-center">
                                 <div>
                                     <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">🏫 교무실 타자 점수 관리</h1>
-                                    <p className="text-gray-500 mt-1 font-medium">학급을 생성하고 학생들의 기록을 확인하세요.</p>
+                                    <p className="text-gray-500 mt-1 font-medium">실시간으로 학생들의 점수를 확인하세요!</p>
                                 </div>
                                 <button onClick={() => setView('login')} className="px-5 py-2 bg-white border border-gray-200 text-gray-600 rounded-xl font-medium hover:bg-gray-50">로그아웃</button>
                             </div>
 
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                {/* 반 생성 패널 */}
                                 <div className="glass-box p-6 rounded-3xl col-span-1 h-fit">
                                     <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">📝 학급(반) 관리</h2>
                                     <form onSubmit={handleCreateRoom} className="space-y-4 mb-6 border-b border-pink-100 pb-6">
-                                        <div>
-                                            <label className="text-sm text-gray-600 mb-1 block font-medium">반 이름</label>
-                                            <input type="text" value={newRoomName} onChange={(e) => setNewRoomName(e.target.value)} placeholder="예: 1학년 3반" className="w-full px-4 py-3 border border-pink-200 rounded-xl outline-none focus:ring-2 focus:ring-pink-400" required />
-                                        </div>
+                                        <input type="text" value={newRoomName} onChange={(e) => setNewRoomName(e.target.value)} placeholder="예: 1학년 3반" className="w-full px-4 py-3 border border-pink-200 rounded-xl outline-none focus:ring-2 focus:ring-pink-400" required />
                                         <div className="grid grid-cols-2 gap-3">
-                                            <div>
-                                                <label className="text-sm text-gray-600 mb-1 block font-medium">언어 모드</label>
-                                                <select value={roomMode} onChange={(e) => setRoomMode(e.target.value)} className="w-full px-3 py-3 border border-pink-200 rounded-xl outline-none bg-white">
-                                                    <option value="ko">한글 전용</option>
-                                                    <option value="mixed">한글 + 영어</option>
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label className="text-sm text-gray-600 mb-1 block font-medium">제한 시간</label>
-                                                <select value={roomDuration} onChange={(e) => setRoomDuration(e.target.value)} className="w-full px-3 py-3 border border-pink-200 rounded-xl outline-none bg-white">
-                                                    <option value="60">1분</option><option value="120">2분</option><option value="180">3분</option><option value="240">4분</option><option value="300">5분</option>
-                                                </select>
-                                            </div>
+                                            <select value={roomMode} onChange={(e) => setRoomMode(e.target.value)} className="w-full px-3 py-3 border border-pink-200 rounded-xl outline-none bg-white">
+                                                <option value="ko">한글 전용</option>
+                                                <option value="mixed">한글 + 영어</option>
+                                            </select>
+                                            <select value={roomDuration} onChange={(e) => setRoomDuration(e.target.value)} className="w-full px-3 py-3 border border-pink-200 rounded-xl outline-none bg-white">
+                                                <option value="60">1분</option><option value="120">2분</option><option value="180">3분</option><option value="240">4분</option><option value="300">5분</option>
+                                            </select>
                                         </div>
                                         <button type="submit" className="w-full bg-pink-500 hover:bg-pink-600 py-3 rounded-xl font-bold text-white shadow-md">반 만들기</button>
                                     </form>
 
                                     <div className="space-y-2 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
-                                        <div onClick={() => setViewingRoomId('all')} className={`p-3 rounded-xl cursor-pointer transition-all border font-medium flex justify-between items-center ${viewingRoomId === 'all' ? 'bg-pink-50 border-pink-300 text-pink-700' : 'bg-white border-transparent hover:bg-pink-50 text-gray-600'}`}>
-                                            <span>학교 전체 보기</span>
+                                        <div onClick={() => setViewingRoomId('all')} className={`p-3 rounded-xl cursor-pointer transition-all border font-medium ${viewingRoomId === 'all' ? 'bg-pink-50 border-pink-300 text-pink-700' : 'bg-white border-transparent hover:bg-pink-50 text-gray-600'}`}>
+                                            학교 전체 보기
                                         </div>
-                                        {rooms.map(r => (
+                                        {rooms.map(r => {
+                                            const isExpired = r.expiresAt && currentTime > r.expiresAt;
+                                            return (
                                             <div key={r.id} onClick={() => setViewingRoomId(r.id)} className={`p-3 rounded-xl cursor-pointer transition-all border flex flex-col gap-1 ${viewingRoomId === r.id ? 'bg-pink-50 border-pink-300 text-pink-700' : 'bg-white border-gray-100 hover:bg-pink-50 text-gray-600'}`}>
                                                 <div className="flex justify-between items-center">
-                                                    <div>
-                                                        <span className="font-bold">{r.name}</span>
-                                                        <span className="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded-full ml-2">{scores.filter(s => s.roomId === r.id).length}건</span>
-                                                    </div>
-                                                    {/* 반 삭제 버튼 */}
-                                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteRoom(r.id, r.name); }} className="text-red-300 hover:text-red-500 px-2 text-lg transition-colors" title="이 반 삭제하기">🗑️</button>
+                                                    <span className="font-bold">{r.name}</span>
+                                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteRoom(r.id, r.name); }} className="text-gray-300 hover:text-red-500 px-2 text-lg transition-colors" title="이 반 삭제하기">🗑️</button>
                                                 </div>
-                                                <div className="text-[11px] text-gray-400">
-                                                    {r.mode === 'ko' ? '한글' : '한/영'} | {r.duration/60}분
+                                                <div className="text-[11px] font-bold mt-1">
+                                                    <span className="text-gray-400 mr-2">{r.mode === 'ko' ? '한글' : '한/영'} | {r.duration/60}분</span>
+                                                    {isExpired ? 
+                                                        <span className="text-red-400">마감됨</span> : 
+                                                        <span className="text-pink-500 animate-pulse">입장 가능</span>
+                                                    }
                                                 </div>
                                             </div>
-                                        ))}
+                                        )})}
                                     </div>
                                 </div>
 
-                                {/* 랭킹 패널 */}
+                                {/* 실시간 랭킹 패널 */}
                                 <div className="glass-box p-6 rounded-3xl col-span-1 lg:col-span-2">
-                                    <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">🏆 {viewingRoomId === 'all' ? 'XX중학교 전체 명예의 전당' : `[${rooms.find(r => r.id === viewingRoomId)?.name}] 명예의 전당`}</h2>
+                                    <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            🏆 {viewingRoomId === 'all' ? '풍양중학교 전체 명예의 전당' : `[${rooms.find(r => r.id === viewingRoomId)?.name}] 실시간 명예의 전당`}
+                                        </div>
+                                        <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full live-badge font-bold flex items-center gap-1">🔴 LIVE</span>
+                                    </h2>
                                     <div className="overflow-x-auto custom-scrollbar">
                                         <table className="w-full text-left border-collapse">
                                             <thead>
@@ -537,17 +565,23 @@
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {leaderboardScores.length > 0 ? leaderboardScores.map((s, idx) => (
-                                                    <tr key={s.id} className="border-b border-gray-100 hover:bg-white/50 transition-colors">
+                                                {leaderboardScores.length > 0 ? leaderboardScores.map((s, idx) => {
+                                                    // 최근 5초 내 점수가 올랐으면 노란 배경 표시
+                                                    const isRecentlyUpdated = s.updatedAt && (Date.now() - s.updatedAt.toMillis() < 5000);
+                                                    return (
+                                                    <tr key={s.id} className={`border-b border-gray-100 transition-colors ${isRecentlyUpdated ? 'bg-yellow-50' : 'hover:bg-white/50'}`}>
                                                         <td className="py-3 px-4 text-center font-bold">
                                                             {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : <span className="text-gray-400">{idx + 1}</span>}
                                                         </td>
                                                         <td className="py-3 px-4 text-sm text-gray-500">{rooms.find(r => r.id === s.roomId)?.name || '삭제된 반'}</td>
-                                                        <td className="py-3 px-4 font-bold text-gray-800">{s.nickname}</td>
+                                                        <td className="py-3 px-4 font-bold text-gray-800 flex items-center gap-2">
+                                                            {s.nickname} 
+                                                            {isRecentlyUpdated && <span className="text-[10px] bg-green-500 text-white px-1.5 py-0.5 rounded-full animate-bounce">UP!</span>}
+                                                        </td>
                                                         <td className="py-3 px-4 text-right font-black text-pink-500">{s.score.toLocaleString()}</td>
                                                         <td className="py-3 px-4 text-right text-gray-500">{s.cpm}타</td>
                                                     </tr>
-                                                )) : (
+                                                )}) : (
                                                     <tr><td colSpan="5" className="py-8 text-center text-gray-400">아직 등록된 기록이 없습니다.</td></tr>
                                                 )}
                                             </tbody>
@@ -581,7 +615,14 @@
                                     <label className="text-sm font-bold text-gray-600 mb-1 block">입장할 반</label>
                                     <select value={selectedRoomId} onChange={(e) => setSelectedRoomId(e.target.value)} className="w-full px-4 py-4 bg-white border border-pink-200 outline-none focus:ring-2 focus:ring-pink-400 text-gray-800 rounded-2xl appearance-none">
                                         <option value="" disabled>선택해주세요</option>
-                                        {rooms.map(r => <option key={r.id} value={r.id}>{r.name} ({r.mode === 'ko'?'한글':'한/영'}, {r.duration/60}분)</option>)}
+                                        {rooms.map(r => {
+                                            const isExpired = r.expiresAt && currentTime > r.expiresAt;
+                                            return (
+                                                <option key={r.id} value={r.id} disabled={isExpired}>
+                                                    {r.name} ({r.duration/60}분) {isExpired ? '- 마감됨' : ''}
+                                                </option>
+                                            );
+                                        })}
                                     </select>
                                     {rooms.length === 0 && <p className="text-xs text-red-400 mt-2">선생님이 아직 반을 만들지 않았습니다.</p>}
                                 </div>
@@ -599,8 +640,11 @@
                     return currentWord.split('').map((char, index) => {
                         let colorClass = "text-gray-400"; 
                         if (index < inputValue.length) {
-                            if (inputValue[index] === char) colorClass = "text-pink-500 font-black"; 
-                            else colorClass = "text-red-500 bg-red-100 rounded underline decoration-wavy decoration-red-500"; 
+                            if (inputValue[index] === char) {
+                                colorClass = "text-pink-500 font-black"; 
+                            } else {
+                                colorClass = "text-red-500 bg-red-100 rounded underline decoration-wavy decoration-red-500"; 
+                            }
                         }
                         return <span key={index} className={`transition-colors duration-100 ${colorClass}`}>{char}</span>;
                     });
