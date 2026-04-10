@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>풍양중학교 타자연습</title>
+    <title>XX중학교 타자연습</title>
     
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
@@ -102,7 +102,6 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        // 선생님의 Firebase 설정값 자동 적용
         const firebaseConfig = {
             apiKey: "AIzaSyBj29ErYiUHN9Q4S0uHASKnSs-QlzLPEWM",
             authDomain: "dongducheon-c28a0.firebaseapp.com",
@@ -113,23 +112,15 @@
             measurementId: "G-PFMZNFKKQW"
         };
 
- // --- 1. 단어장 대폭 확장 ---
         const KOREAN_WORDS = [
-            // 학교 생활 & 과목
             "학교", "선생님", "교과서", "칠판", "체육대회", "수학여행", "중간고사", "기말고사", "쉬는시간", "점심시간",
             "도서관", "과학실", "미술실", "음악실", "동아리", "급식", "친구", "우정", "추억", "졸업식", "정보교과", "인공지능",
             "수행평가", "방학식", "개학식", "학급회의", "동아리활동", "학생회장", "교장선생님", "담임선생님", "진로상담", "봉사활동",
             "국어", "영어", "수학", "사회", "과학", "역사", "도덕", "체육", "음악", "미술", "기술가정", "정보", "한문",
-            
-            // 컴퓨터 & IT 용어
             "파이썬", "리액트", "자바스크립트", "코딩", "알고리즘", "소프트웨어", "하드웨어", "메인보드", "그래픽카드", "스마트폰",
             "데이터베이스", "네트워크", "운영체제", "프로그래밍", "웹개발", "클라우드", "서버", "키보드", "마우스", "모니터",
-
-            // 중학생 공감 & 간식
             "마라탕", "탕후루", "떡볶이", "돈까스", "치킨", "피자", "햄버거", "아이스크림", "콜라", "사이다",
             "아메리카노", "에이드", "소떡소떡", "버블티", "코인노래방", "네컷사진", "PC방", "웹툰", "유튜브",
-
-            // 짧은 문장 & 속담 & 명언
             "푸른 하늘 은하수 하얀 쪽배에", "계수나무 한 나무 토끼 한 마리", "남산 위에 저 소나무 철갑을 두른 듯", 
             "배움에는 끝이 없다", "연습은 완벽을 만든다", "오늘의 노력이 내일의 실력", "가는 말이 고와야 오는 말이 곱다",
             "시작이 반이다", "천 리 길도 한 걸음부터", "티끌 모아 태산", "말 한마디에 천냥 빚도 갚는다",
@@ -139,19 +130,12 @@
         ];
 
         const ENGLISH_WORDS = [
-            // 기본 영단어
             "apple", "banana", "school", "student", "teacher", "book", "desk", "chair", "notebook", "pencil",
             "library", "science", "music", "art", "history", "math", "english", "friend", "study", "learn",
-            
-            // 컴퓨터 & IT 영단어
             "computer", "keyboard", "mouse", "internet", "coding", "software", "hardware", "network", "program",
             "python", "react", "javascript", "developer", "server", "database", "algorithm", "variable", "function",
-
-            // 긍정 & 동기부여 영단어
             "future", "dream", "success", "challenge", "passion", "effort", "courage", "wisdom", "health", "peace",
             "happy", "smile", "laugh", "love", "hope", "believe", "amazing", "awesome", "perfect", "great",
-
-            // 영어 문장 & 속담
             "The quick brown fox jumps over the lazy dog", "Time is gold", "No pain, no gain",
             "Knowledge is power", "Practice makes perfect", "Where there is a will, there is a way",
             "Actions speak louder than words", "Honesty is the best policy", "Rome was not built in a day",
@@ -159,16 +143,13 @@
             "A rolling stone gathers no moss", "Better late than never", "Don't judge a book by its cover"
         ];
 
-// 🌸 자연스럽게 떨어지는 벚꽃 배경 컴포넌트 🌸
+        // 깜빡임 방지 & 자연스러운 속도 벚꽃 배경
         const CherryBlossomBackground = () => {
-            // 화면이 업데이트될 때마다 벚꽃이 새로고침(깜빡임)되는 것을 막기 위해 useMemo 적용
             const petals = React.useMemo(() => {
                 return Array.from({ length: 30 }).map((_, i) => ({
                     id: i, 
                     left: `${Math.random() * 100}%`,
-                    // 10초 ~ 25초 사이로 아주 천천히 떨어지도록 속도 조절
                     animationDuration: `${Math.random() * 15 + 10}s`, 
-                    // 화면을 켰을 때 이미 벚꽃이 화면 전체에 자연스럽게 퍼져있도록 음수(-) 딜레이 적용
                     animationDelay: `-${Math.random() * 20}s`, 
                     width: `${Math.random() * 8 + 6}px`, 
                     height: `${Math.random() * 8 + 6}px`
@@ -179,11 +160,8 @@
                 <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
                     {petals.map(p => (
                         <div key={p.id} className="petal" style={{ 
-                            left: p.left, 
-                            width: p.width, 
-                            height: p.height, 
-                            animationDuration: p.animationDuration, 
-                            animationDelay: p.animationDelay 
+                            left: p.left, width: p.width, height: p.height, 
+                            animationDuration: p.animationDuration, animationDelay: p.animationDelay 
                         }} />
                     ))}
                 </div>
@@ -196,10 +174,10 @@
             const [db, setDb] = useState(null);
             const appId = 'xx-school-typing-app';
 
-            const [view, setView] = useState('login'); 
+            const [view, setView] = useState('login'); // login, teacherLogin, teacher, studentLobby, waiting, playing, result
             const [rooms, setRooms] = useState([]);
             const [scores, setScores] = useState([]);
-            const [currentTime, setCurrentTime] = useState(Date.now()); // 마감 타이머용 현재 시간
+            const [currentTime, setCurrentTime] = useState(Date.now());
             
             const [nickname, setNickname] = useState('');
             const [selectedRoomId, setSelectedRoomId] = useState('');
@@ -224,10 +202,10 @@
             const [showSuccess, setShowSuccess] = useState(false);
             const [lastEarned, setLastEarned] = useState(0);
             const [isError, setIsError] = useState(false);
+            
+            // 🌟 연습 모드 식별
+            const [isPracticeMode, setIsPracticeMode] = useState(false);
 
-            const [isPracticeMode, setIsPracticeMode] = useState(false); // 🌟 연습 모드 판별용 상태
-
-            // 실시간 연동을 위한 상태들
             const [currentScoreDocId, setCurrentScoreDocId] = useState(null);
             const latestScoreRef = useRef(0);
             const latestCharsRef = useRef(0);
@@ -236,7 +214,6 @@
 
             const audioCtxRef = useRef(null);
 
-            // 1초마다 현재 시간 업데이트 (입장 마감 체크용)
             useEffect(() => {
                 const clock = setInterval(() => setCurrentTime(Date.now()), 1000);
                 return () => clearInterval(clock);
@@ -262,7 +239,6 @@
                 } catch (error) { console.error(error); }
             }, [isFirebaseLoaded]);
 
-            // 실시간 DB 데이터 구독
             useEffect(() => {
                 if (!user || !db) return;
                 const roomsRef = window.collection(db, 'artifacts', appId, 'public', 'data', 'typing_rooms');
@@ -281,28 +257,39 @@
                 return () => { unsubscribeRooms(); unsubscribeScores(); };
             }, [user, db]);
 
-            // 현재 내 점수를 Ref에 저장
+            // 대기실 자동 시작 감지 로직
+            useEffect(() => {
+                if (view === 'waiting' && selectedRoomId) {
+                    const myRoom = rooms.find(r => r.id === selectedRoomId);
+                    if (myRoom && myRoom.status === 'playing') {
+                        const myScoreDoc = scores.find(s => s.id === currentScoreDocId);
+                        const myDifficulty = myScoreDoc?.difficulty === 'hard' ? 'mixed' : myRoom.mode;
+                        
+                        setGameMode(myDifficulty); 
+                        pickRandomWord(myDifficulty);
+                        setView('playing'); 
+                    }
+                }
+            }, [rooms, view, selectedRoomId, scores, currentScoreDocId]);
+
             useEffect(() => {
                 latestScoreRef.current = score;
                 latestCharsRef.current = correctChars;
             }, [score, correctChars]);
 
-            // 🔥 실시간 동기화 (3초마다 서버에 점수 업데이트)
+            // 실시간 동기화
             useEffect(() => {
-                if (view !== 'playing' || !currentScoreDocId || !db) return;
+                if (view !== 'playing' || isPracticeMode || !currentScoreDocId || !db) return;
                 
                 const syncInterval = setInterval(() => {
                     const currentScore = latestScoreRef.current;
-                    // 점수가 지난번 동기화 때보다 올랐을 때만 전송
                     if (currentScore > lastSyncedScoreRef.current) {
                         const elapsedMin = gameInfoRef.current.elapsed / 60;
                         const currentCpm = elapsedMin > 0 ? Math.round(latestCharsRef.current / elapsedMin) : 0;
 
                         const docRef = window.doc(db, 'artifacts', appId, 'public', 'data', 'typing_scores', currentScoreDocId);
                         window.updateDoc(docRef, {
-                            score: currentScore,
-                            cpm: currentCpm,
-                            updatedAt: window.serverTimestamp() // 업데이트 시간 갱신
+                            score: currentScore, cpm: currentCpm, updatedAt: window.serverTimestamp()
                         }).catch(e => console.error(e));
                         
                         lastSyncedScoreRef.current = currentScore;
@@ -310,7 +297,7 @@
                 }, 3000); 
                 
                 return () => clearInterval(syncInterval);
-            }, [view, currentScoreDocId, db]);
+            }, [view, isPracticeMode, currentScoreDocId, db]);
 
             const playComboSound = (comboLevel) => {
                 try {
@@ -336,17 +323,31 @@
                 } catch (e) { }
             };
 
+            const toggleDifficulty = async (scoreId, currentDiff) => {
+                const newDiff = currentDiff === 'normal' ? 'hard' : 'normal';
+                try {
+                    await window.updateDoc(window.doc(db, 'artifacts', appId, 'public', 'data', 'typing_scores', scoreId), { difficulty: newDiff });
+                } catch (e) { console.error(e); }
+            };
+
+            const startRoomGame = async (roomId) => {
+                try {
+                    await window.updateDoc(window.doc(db, 'artifacts', appId, 'public', 'data', 'typing_rooms', roomId), { status: 'playing' });
+                } catch (e) { console.error(e); }
+            };
+
             const handleCreateRoom = async (e) => {
                 e.preventDefault();
                 if (!newRoomName.trim() || !user || !db) return;
 
                 const durationSec = Number(roomDuration);
-                const expiresAt = Date.now() + (durationSec * 1000); // ⏳ 방 마감 시간 생성
+                const expiresAt = Date.now() + (durationSec * 1000); 
 
                 const roomsRef = window.collection(db, 'artifacts', appId, 'public', 'data', 'typing_rooms');
                 await window.addDoc(roomsRef, {
                     name: newRoomName.trim(), mode: roomMode, duration: durationSec,
-                    expiresAt: expiresAt, // 마감 시간 저장
+                    expiresAt: expiresAt, 
+                    status: 'waiting', 
                     createdBy: user.uid, createdAt: window.serverTimestamp()
                 });
                 setNewRoomName('');
@@ -360,12 +361,34 @@
                 } catch (e) { alert('삭제 실패: ' + e.message); }
             };
 
+            const startPractice = () => {
+                if (!nickname.trim()) return alert("닉네임을 입력해주세요.");
+                
+                try {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if (!audioCtxRef.current && AudioContext) audioCtxRef.current = new AudioContext();
+                    if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') audioCtxRef.current.resume();
+                } catch(e){}
+
+                setGameDuration(300);
+                setTimeLeft(300);
+                setGameMode('mixed'); 
+                setScore(0);
+                setCorrectChars(0);
+                setCombo(0);
+                setInputValue('');
+                setIsPracticeMode(true);
+                setCurrentScoreDocId(null);
+                pickRandomWord('mixed');
+                
+                setView('playing');
+            };
+
             const startGame = async () => {
                 if (!nickname.trim()) return alert("닉네임을 입력해주세요.");
                 const room = rooms.find(r => r.id === selectedRoomId);
                 if (!room) return alert("입장할 반을 선택해주세요.");
 
-                // ⏳ 입장 마감 시간 체크
                 if (room.expiresAt && Date.now() > room.expiresAt) {
                     return alert("이 반은 설정된 시간이 지나 입장이 마감되었습니다!");
                 }
@@ -376,56 +399,30 @@
                     if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') audioCtxRef.current.resume();
                 } catch(e){}
 
-                // 🔥 게임 시작 즉시 내 이름으로 0점 기록 생성 (실시간 중계용)
                 try {
                     const scoresRef = window.collection(db, 'artifacts', appId, 'public', 'data', 'typing_scores');
                     const newDoc = await window.addDoc(scoresRef, {
                         roomId: selectedRoomId, nickname: nickname, score: 0, cpm: 0,
+                        difficulty: 'normal', 
                         userId: user.uid, createdAt: window.serverTimestamp(), updatedAt: window.serverTimestamp()
                     });
                     setCurrentScoreDocId(newDoc.id);
                     lastSyncedScoreRef.current = 0;
                 } catch (e) {
-                    alert("서버 연결 지연. 게임을 시작할 수 없습니다."); return;
+                    alert("서버 연결 지연. 다시 시도해주세요."); return;
                 }
 
                 const duration = room.duration || 300;
-                const mode = room.mode || 'mixed';
-                
                 setGameDuration(duration);
                 setTimeLeft(duration);
-                setGameMode(mode);
                 setScore(0);
                 setCorrectChars(0);
                 setCombo(0);
                 setInputValue('');
-                pickRandomWord(mode);
-                setView('playing');
+                setIsPracticeMode(false);
+                
+                setView('waiting'); 
             };
-
-            // 🌟 자유 연습하기 시작 함수
-const startPractice = () => {
-    if (!nickname.trim()) return alert("닉네임을 입력해주세요.");
-    
-    try {
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        if (!audioCtxRef.current && AudioContext) audioCtxRef.current = new AudioContext();
-        if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') audioCtxRef.current.resume();
-    } catch(e){}
-
-    setGameDuration(300); // 기본 5분 제공
-    setTimeLeft(300);
-    setGameMode('mixed'); // 상시 한/영 혼합 모드
-    setScore(0);
-    setCorrectChars(0);
-    setCombo(0);
-    setInputValue('');
-    setIsPracticeMode(true); // 연습 모드 켜기
-    setCurrentScoreDocId(null); // 연습 모드는 서버(DB)와 연결하지 않음
-    pickRandomWord('mixed');
-    
-    setView('playing');
-};
 
             const pickRandomWord = (modeStr) => {
                 const list = modeStr === 'ko' ? KOREAN_WORDS : [...KOREAN_WORDS, ...ENGLISH_WORDS];
@@ -433,7 +430,6 @@ const startPractice = () => {
                 setCurrentWord(list[randomIndex]);
             };
 
-            // 타이머 업데이트
             useEffect(() => {
                 let timerId;
                 if (view === 'playing' && timeLeft > 0) {
@@ -453,33 +449,27 @@ const startPractice = () => {
                     e.preventDefault(); 
                     if (inputValue.length === 0) return;
 
-                if (inputValue.trim() === currentWord) {
-    const newCombo = combo + 1;
-    
-    // 1. 기본 점수 (글자당 10점)
-    const baseScore = currentWord.length * 10;
-    
-    // 2. 콤보 보너스 (현재 콤보 × 글자 수 × 2) - 긴 문장일수록 콤보 점수가 폭발!
-    const comboBonus = combo * currentWord.length * 2;
-    
-    // 3. 난이도 보너스 (띄어쓰기가 있는 문장은 80점, 5글자 이상 단어는 20점 추가)
-    const lengthBonus = currentWord.includes(' ') ? 80 : (currentWord.length > 5 ? 20 : 0);
-    
-    // 최종 획득 점수 계산
-    const earnedScore = baseScore + comboBonus + lengthBonus;
-    
-    setScore(prev => prev + earnedScore);
-    setCorrectChars(prev => prev + currentWord.length);
-    setCombo(newCombo);
-    setLastEarned(earnedScore);
-    
-    playComboSound(newCombo);
-    setShowSuccess(true);
-    setTimeout(() => setShowSuccess(false), 500);
-    
-    setInputValue('');
-    pickRandomWord(gameMode);
-} else {
+                    if (inputValue.trim() === currentWord) {
+                        const newCombo = combo + 1;
+                        
+                        // ⚖️ 새롭게 변경된 공정 밸런스 점수
+                        const baseScore = currentWord.length * 10;
+                        const comboBonus = combo * currentWord.length * 2;
+                        const lengthBonus = currentWord.includes(' ') ? 50 : (currentWord.length > 5 ? 20 : 0);
+                        const earnedScore = baseScore + comboBonus + lengthBonus;
+                        
+                        setScore(prev => prev + earnedScore);
+                        setCorrectChars(prev => prev + currentWord.length);
+                        setCombo(newCombo);
+                        setLastEarned(earnedScore);
+                        
+                        playComboSound(newCombo);
+                        setShowSuccess(true);
+                        setTimeout(() => setShowSuccess(false), 500);
+                        
+                        setInputValue('');
+                        pickRandomWord(gameMode);
+                    } else {
                         setCombo(0);
                         setIsError(true);
                         setTimeout(() => setIsError(false), 400);
@@ -489,11 +479,11 @@ const startPractice = () => {
 
             const endGame = async () => {
                 setView('result');
-
+                
                 if (isPracticeMode) {
-        setIsPracticeMode(false); // 상태 초기화
-        return; 
-    }
+                    setIsPracticeMode(false);
+                    return;
+                }
 
                 if (!user || !db || !currentScoreDocId) return;
 
@@ -501,7 +491,6 @@ const startPractice = () => {
                 const cpm = minutes > 0 ? Math.round(correctChars / minutes) : 0;
 
                 try {
-                    // 종료 시 최종 기록 동기화
                     const docRef = window.doc(db, 'artifacts', appId, 'public', 'data', 'typing_scores', currentScoreDocId);
                     await window.updateDoc(docRef, { score: score, cpm: cpm, updatedAt: window.serverTimestamp() });
                 } catch (error) { }
@@ -510,7 +499,6 @@ const startPractice = () => {
 
             const formatTime = (sec) => `${Math.floor(sec/60)}:${(sec%60).toString().padStart(2,'0')}`;
 
-            // 명예의 전당 로직 (닉네임별 최고 기록)
             const getLeaderboard = () => {
                 const userBest = {};
                 
@@ -535,7 +523,7 @@ const startPractice = () => {
                         <CherryBlossomBackground />
                         <div className="glass-box rounded-3xl p-10 text-center max-w-md w-full z-10 relative">
                             <div className="text-6xl mb-4">🏫🌸</div>
-                            <h1 className="text-3xl font-black text-pink-600 mb-2">풍양중학교 타자연습</h1>
+                            <h1 className="text-3xl font-black text-pink-600 mb-2">XX중학교 타자연습</h1>
                             <p className="text-gray-500 font-medium mb-8">봄날의 타자 대결, 시작해볼까요?</p>
                             
                             <div className="space-y-4">
@@ -586,7 +574,6 @@ const startPractice = () => {
                             </div>
 
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                {/* 반 생성 패널 */}
                                 <div className="glass-box p-6 rounded-3xl col-span-1 h-fit">
                                     <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">📝 학급(반) 관리</h2>
                                     <form onSubmit={handleCreateRoom} className="space-y-4 mb-6 border-b border-pink-100 pb-6">
@@ -604,16 +591,18 @@ const startPractice = () => {
                                     </form>
 
                                     <div className="space-y-2 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
-                                        <div onClick={() => setViewingRoomId('all')} className={`p-3 rounded-xl cursor-pointer transition-all border font-medium ${viewingRoomId === 'all' ? 'bg-pink-50 border-pink-300 text-pink-700' : 'bg-white border-transparent hover:bg-pink-50 text-gray-600'}`}>
-                                            학교 전체 보기
+                                        <div onClick={() => setViewingRoomId('all')} className={`p-3 rounded-xl cursor-pointer transition-all border font-medium flex justify-between items-center ${viewingRoomId === 'all' ? 'bg-pink-50 border-pink-300 text-pink-700' : 'bg-white border-transparent hover:bg-pink-50 text-gray-600'}`}>
+                                            <span>학교 전체 보기</span>
                                         </div>
                                         {rooms.map(r => {
                                             const isExpired = r.expiresAt && currentTime > r.expiresAt;
                                             return (
                                             <div key={r.id} onClick={() => setViewingRoomId(r.id)} className={`p-3 rounded-xl cursor-pointer transition-all border flex flex-col gap-1 ${viewingRoomId === r.id ? 'bg-pink-50 border-pink-300 text-pink-700' : 'bg-white border-gray-100 hover:bg-pink-50 text-gray-600'}`}>
                                                 <div className="flex justify-between items-center">
-                                                    <span className="font-bold">{r.name}</span>
-                                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteRoom(r.id, r.name); }} className="text-gray-300 hover:text-red-500 px-2 text-lg transition-colors" title="이 반 삭제하기">🗑️</button>
+                                                    <div>
+                                                        <span className="font-bold">{r.name}</span>
+                                                    </div>
+                                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteRoom(r.id, r.name); }} className="text-red-300 hover:text-red-500 px-2 text-lg transition-colors" title="이 반 삭제하기">🗑️</button>
                                                 </div>
                                                 <div className="text-[11px] font-bold mt-1">
                                                     <span className="text-gray-400 mr-2">{r.mode === 'ko' ? '한글' : '한/영'} | {r.duration/60}분</span>
@@ -627,41 +616,57 @@ const startPractice = () => {
                                     </div>
                                 </div>
 
-                                {/* 실시간 랭킹 패널 */}
                                 <div className="glass-box p-6 rounded-3xl col-span-1 lg:col-span-2">
                                     <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center justify-between">
                                         <div className="flex items-center gap-2">
-                                            🏆 {viewingRoomId === 'all' ? '풍양중학교 전체 명예의 전당' : `[${rooms.find(r => r.id === viewingRoomId)?.name}] 실시간 명예의 전당`}
+                                            🏆 {viewingRoomId === 'all' ? 'XX중학교 전체 명예의 전당' : `[${rooms.find(r => r.id === viewingRoomId)?.name}] 실시간 명예의 전당`}
                                         </div>
-                                        <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full live-badge font-bold flex items-center gap-1">🔴 LIVE</span>
+                                        <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full animate-pulse">🔴 LIVE</span>
                                     </h2>
+                                    
+                                    {/* 🚀 시작 버튼 추가 */}
+                                    {viewingRoomId !== 'all' && rooms.find(r => r.id === viewingRoomId)?.status === 'waiting' && (
+                                        <button onClick={() => startRoomGame(viewingRoomId)} className="w-full mb-6 py-4 bg-pink-500 hover:bg-pink-600 text-white rounded-2xl font-black text-xl shadow-lg animate-pulse">
+                                            🚀 전원 타자 연습 시작!
+                                        </button>
+                                    )}
+
                                     <div className="overflow-x-auto custom-scrollbar">
                                         <table className="w-full text-left border-collapse">
                                             <thead>
                                                 <tr className="bg-pink-50 text-pink-800 text-sm">
                                                     <th className="py-3 px-4 font-bold rounded-tl-xl w-16 text-center">순위</th>
-                                                    <th className="py-3 px-4 font-bold">반 이름</th>
                                                     <th className="py-3 px-4 font-bold">학생(닉네임)</th>
+                                                    <th className="py-3 px-4 font-bold text-center">난이도 설정</th>
                                                     <th className="py-3 px-4 font-bold text-right">최고 점수</th>
                                                     <th className="py-3 px-4 font-bold text-right rounded-tr-xl">타수(CPM)</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {leaderboardScores.length > 0 ? leaderboardScores.map((s, idx) => {
-                                                    // 최근 5초 내 점수가 올랐으면 노란 배경 표시
                                                     const isRecentlyUpdated = s.updatedAt && (Date.now() - s.updatedAt.toMillis() < 5000);
                                                     return (
                                                     <tr key={s.id} className={`border-b border-gray-100 transition-colors ${isRecentlyUpdated ? 'bg-yellow-50' : 'hover:bg-white/50'}`}>
                                                         <td className="py-3 px-4 text-center font-bold">
                                                             {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : <span className="text-gray-400">{idx + 1}</span>}
                                                         </td>
-                                                        <td className="py-3 px-4 text-sm text-gray-500">{rooms.find(r => r.id === s.roomId)?.name || '삭제된 반'}</td>
-                                                        <td className="py-3 px-4 font-bold text-gray-800 flex items-center gap-2">
-                                                            {s.nickname} 
-                                                            {isRecentlyUpdated && <span className="text-[10px] bg-green-500 text-white px-1.5 py-0.5 rounded-full animate-bounce">UP!</span>}
+                                                        <td className="py-3 px-4 font-bold text-gray-800">
+                                                            {s.nickname}
+                                                            {isRecentlyUpdated && <span className="text-[10px] bg-green-500 text-white px-1.5 py-0.5 ml-2 rounded-full animate-bounce inline-block">UP!</span>}
                                                         </td>
-                                                        <td className="py-3 px-4 text-right font-black text-pink-500">{s.score.toLocaleString()}</td>
-                                                        <td className="py-3 px-4 text-right text-gray-500">{s.cpm}타</td>
+                                                        
+                                                        <td className="py-3 px-4 text-center">
+                                                            {viewingRoomId !== 'all' && rooms.find(r => r.id === viewingRoomId)?.status === 'waiting' ? (
+                                                                <button onClick={() => toggleDifficulty(s.id, s.difficulty || 'normal')} className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${s.difficulty === 'hard' ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>
+                                                                    {s.difficulty === 'hard' ? '🔥 하드(한/영)' : '🌱 일반'}
+                                                                </button>
+                                                            ) : (
+                                                                <span className="text-xs text-gray-400 font-bold">{s.difficulty === 'hard' ? '🔥 하드' : '🌱 일반'}</span>
+                                                            )}
+                                                        </td>
+
+                                                        <td className="py-3 px-4 text-right font-black text-pink-500 text-lg">{s.score.toLocaleString()}</td>
+                                                        <td className="py-3 px-4 text-right text-gray-500 font-medium">{s.cpm}타</td>
                                                     </tr>
                                                 )}) : (
                                                     <tr><td colSpan="5" className="py-8 text-center text-gray-400">아직 등록된 기록이 없습니다.</td></tr>
@@ -688,7 +693,7 @@ const startPractice = () => {
                                 <p className="text-gray-500 text-sm mt-1">본인의 닉네임과 선생님이 만든 반을 선택하세요.</p>
                             </div>
                             
-                            <div className="space-y-5">
+                            <div className="space-y-4">
                                 <div>
                                     <label className="text-sm font-bold text-gray-600 mb-1 block">내 닉네임 (이름)</label>
                                     <input type="text" value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder="예: 홍길동" className="w-full px-4 py-4 bg-white border border-pink-200 outline-none focus:ring-2 focus:ring-pink-400 text-gray-800 rounded-2xl" maxLength="10" />
@@ -703,19 +708,36 @@ const startPractice = () => {
                                                 <option key={r.id} value={r.id} disabled={isExpired}>
                                                     {r.name} ({r.duration/60}분) {isExpired ? '- 마감됨' : ''}
                                                 </option>
-                                            );
+                                            )
                                         })}
                                     </select>
                                     {rooms.length === 0 && <p className="text-xs text-red-400 mt-2">선생님이 아직 반을 만들지 않았습니다.</p>}
                                 </div>
-                        <button onClick={startGame} disabled={!nickname || !selectedRoomId} className="w-full py-4 mt-4 bg-pink-500 hover:bg-pink-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-2xl font-bold text-lg shadow-md transition-colors">
-    본 게임 입장하기
-</button>
 
-{/* 🌟 새로 추가된 자유 연습 버튼 */}
-<button onClick={startPractice} disabled={!nickname} className="w-full py-4 mt-3 bg-white border-2 border-pink-300 text-pink-600 hover:bg-pink-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200 rounded-2xl font-bold text-lg shadow-sm transition-colors">
-    🌱 자유 연습하기 (기록 미저장)
-</button>
+                                <button onClick={startGame} disabled={!nickname || !selectedRoomId} className="w-full py-4 mt-2 bg-pink-500 hover:bg-pink-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-2xl font-bold text-lg shadow-md transition-colors">
+                                    본 게임 입장하기
+                                </button>
+                                
+                                <button onClick={startPractice} disabled={!nickname} className="w-full py-4 bg-white border-2 border-pink-300 text-pink-600 hover:bg-pink-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200 rounded-2xl font-bold text-lg shadow-sm transition-colors">
+                                    🌱 자유 연습하기 (기록 미저장)
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (view === 'waiting') {
+                const myRoom = rooms.find(r => r.id === selectedRoomId);
+                return (
+                    <div className="min-h-screen spring-bg flex flex-col items-center justify-center p-4">
+                        <CherryBlossomBackground />
+                        <div className="glass-box rounded-3xl p-10 text-center max-w-md w-full z-10 relative shadow-xl">
+                            <div className="text-6xl mb-6 animate-bounce">⏳</div>
+                            <h1 className="text-2xl font-bold text-gray-800 mb-4">시작 대기 중...</h1>
+                            <p className="text-gray-500 font-medium mb-6">[{myRoom?.name}] 반에 입장했습니다.<br/>선생님이 시작할 때까지 손가락을 풀어주세요!</p>
+                            <div className="w-full bg-pink-100 h-2 rounded-full overflow-hidden">
+                                <div className="bg-pink-500 h-full animate-pulse" style={{ width: '100%' }}></div>
                             </div>
                         </div>
                     </div>
@@ -821,7 +843,9 @@ const startPractice = () => {
                             </div>
                             
                             <h1 className="text-3xl font-black text-gray-800 mb-2">연습 종료!</h1>
-                            <p className="text-gray-500 mb-8 font-medium">수고하셨습니다. 기록이 교무실로 전송되었습니다.</p>
+                            <p className="text-gray-500 mb-8 font-medium">
+                                {isPracticeMode ? '자유 연습을 마쳤습니다. 실전 대결에 도전해보세요!' : '수고하셨습니다. 기록이 교무실로 전송되었습니다.'}
+                            </p>
                             
                             <div className="bg-white rounded-2xl p-6 mb-8 border border-pink-100 shadow-sm">
                                 <div className="text-sm text-gray-500 font-bold mb-1">최종 점수</div>
