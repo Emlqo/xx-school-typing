@@ -343,8 +343,13 @@
                 } catch (e) { }
             };
 
+  // 🌟 3단계 난이도 토글 로직
             const toggleDifficulty = async (scoreId, currentDiff) => {
-                const newDiff = currentDiff === 'normal' ? 'hard' : 'normal';
+                let newDiff = 'normal';
+                if (currentDiff === 'normal') newDiff = 'hard';
+                else if (currentDiff === 'hard') newDiff = 'hell'; // 하드 다음은 헬
+                else newDiff = 'normal'; // 헬 다음은 다시 일반
+                
                 try {
                     await window.updateDoc(window.doc(db, 'artifacts', appId, 'public', 'data', 'typing_scores', scoreId), { difficulty: newDiff });
                 } catch (e) { console.error(e); }
@@ -477,8 +482,13 @@
                 setView('waiting'); 
             };
 
+      // 🌟 영어 전용 모드 로직 추가
             const pickRandomWord = (modeStr) => {
-                const list = modeStr === 'ko' ? KOREAN_WORDS : [...KOREAN_WORDS, ...ENGLISH_WORDS];
+                let list;
+                if (modeStr === 'ko') list = KOREAN_WORDS;
+                else if (modeStr === 'en') list = ENGLISH_WORDS; // 영어만 선택!
+                else list = [...KOREAN_WORDS, ...ENGLISH_WORDS]; // 혼합
+                
                 const randomIndex = Math.floor(Math.random() * list.length);
                 setCurrentWord(list[randomIndex]);
             };
@@ -671,9 +681,10 @@
                                     <form onSubmit={handleCreateRoom} className="space-y-4 mb-6 border-b border-pink-100 pb-6">
                                         <input type="text" value={newRoomName} onChange={(e) => setNewRoomName(e.target.value)} placeholder="예: 1학년 3반" className="w-full px-4 py-3 border border-pink-200 rounded-xl outline-none focus:ring-2 focus:ring-pink-400" required />
                                         <div className="grid grid-cols-2 gap-3">
-                                            <select value={roomMode} onChange={(e) => setRoomMode(e.target.value)} className="w-full px-3 py-3 border border-pink-200 rounded-xl outline-none bg-white">
+<select value={roomMode} onChange={(e) => setRoomMode(e.target.value)} className="w-full px-3 py-3 border border-pink-200 rounded-xl outline-none bg-white font-medium text-gray-700">
                                                 <option value="ko">한글 전용</option>
-                                                <option value="mixed">한글 + 영어</option>
+                                                <option value="en">영어 전용</option> {/* 🌟 옵션 추가 */}
+                                                <option value="mixed">한/영 혼합</option>
                                             </select>
                                             <select value={roomDuration} onChange={(e) => setRoomDuration(e.target.value)} className="w-full px-3 py-3 border border-pink-200 rounded-xl outline-none bg-white">
                                                 <option value="60">1분</option><option value="120">2분</option><option value="180">3분</option><option value="240">4분</option><option value="300">5분</option>
@@ -696,8 +707,11 @@
                                                     </div>
                                                     <button onClick={(e) => { e.stopPropagation(); handleDeleteRoom(r.id, r.name); }} className="text-red-300 hover:text-red-500 px-2 text-lg transition-colors" title="이 반 삭제하기">🗑️</button>
                                                 </div>
-                                                <div className="text-[11px] font-bold mt-1">
-                                                    <span className="text-gray-400 mr-2">{r.mode === 'ko' ? '한글' : '한/영'} | {r.duration/60}분</span>
+                                       <div className="text-[11px] font-bold mt-1">
+                                                    {/* 🌟 mode가 'en'일 때 '영어'라고 표시 */}
+                                                    <span className="text-gray-400 mr-2">
+                                                        {r.mode === 'ko' ? '한글' : r.mode === 'en' ? '영어' : '한/영'} | {r.duration/60}분
+                                                    </span>
                                                     {isExpired ? 
                                                         <span className="text-red-400">마감됨</span> : 
                                                         <span className="text-pink-500 animate-pulse">입장 가능</span>
