@@ -120,7 +120,7 @@
             "파이썬", "리액트", "자바스크립트", "코딩", "알고리즘", "소프트웨어", "하드웨어", "메인보드", "그래픽카드", "스마트폰",
             "데이터베이스", "네트워크", "운영체제", "프로그래밍", "웹개발", "클라우드", "서버", "키보드", "마우스", "모니터",
             "마라탕", "탕후루", "떡볶이", "돈까스", "치킨", "피자", "햄버거", "아이스크림", "콜라", "사이다",
-            "아메리카노", "에이드", "소떡소떡", "버블티", "코인노래방", "네컷사진", "풍양중학교", "웹툰", "유튜브",
+            "아메리카노", "에이드", "소떡소떡", "버블티", "코인노래방", "네컷사진", "PC방", "웹툰", "유튜브",
             "푸른 하늘 은하수 하얀 쪽배에", "계수나무 한 나무 토끼 한 마리", "남산 위에 저 소나무 철갑을 두른 듯", 
             "배움에는 끝이 없다", "연습은 완벽을 만든다", "오늘의 노력이 내일의 실력", "가는 말이 고와야 오는 말이 곱다",
             "시작이 반이다", "천 리 길도 한 걸음부터", "티끌 모아 태산", "말 한마디에 천냥 빚도 갚는다",
@@ -281,11 +281,15 @@
             useEffect(() => {
                 if (view === 'waiting' && selectedRoomId) {
                     const myRoom = rooms.find(r => r.id === selectedRoomId);
-                    if (myRoom && myRoom.status === 'playing') {
+   if (myRoom && myRoom.status === 'playing') {
                         const myScoreDoc = scores.find(s => s.id === currentScoreDocId);
-                        const myDifficulty = myScoreDoc?.difficulty === 'hard' ? 'mixed' : myRoom.mode;
                         
-                        setGameMode(myDifficulty); 
+                        // 🌟 난이도에 따른 단어장 모드 분기
+                        let myDifficulty = myRoom.mode;
+                        if (myScoreDoc?.difficulty === 'hard') myDifficulty = 'mixed';
+                        if (myScoreDoc?.difficulty === 'hell') myDifficulty = 'en'; // 헬 모드는 영어 전용!
+                        
+                        setGameMode(myDifficulty);
                         pickRandomWord(myDifficulty);
                         setView('playing'); 
                     }
@@ -761,13 +765,16 @@
                                                             {isRecentlyUpdated && <span className="text-[10px] bg-green-500 text-white px-1.5 py-0.5 ml-2 rounded-full animate-bounce inline-block">UP!</span>}
                                                         </td>
                                                         
+                                                  {/* 🌟 3단계 난이도 버튼 표시 */}
                                                         <td className="py-3 px-4 text-center">
                                                             {viewingRoomId !== 'all' && rooms.find(r => r.id === viewingRoomId)?.status === 'waiting' ? (
-                                                                <button onClick={() => toggleDifficulty(s.id, s.difficulty || 'normal')} className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${s.difficulty === 'hard' ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>
-                                                                    {s.difficulty === 'hard' ? '🔥 하드(한/영)' : '🌱 일반'}
+                                                                <button onClick={() => toggleDifficulty(s.id, s.difficulty || 'normal')} className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${s.difficulty === 'hell' ? 'bg-purple-600 text-white' : s.difficulty === 'hard' ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>
+                                                                    {s.difficulty === 'hell' ? '💀 헬(영어)' : s.difficulty === 'hard' ? '🔥 하드(한/영)' : '🌱 일반'}
                                                                 </button>
                                                             ) : (
-                                                                <span className="text-xs text-gray-400 font-bold">{s.difficulty === 'hard' ? '🔥 하드' : '🌱 일반'}</span>
+                                                                <span className="text-xs text-gray-400 font-bold">
+                                                                    {s.difficulty === 'hell' ? '💀 헬(영어)' : s.difficulty === 'hard' ? '🔥 하드' : '🌱 일반'}
+                                                                </span>
                                                             )}
                                                         </td>
 
