@@ -120,7 +120,7 @@
             "파이썬", "리액트", "자바스크립트", "코딩", "알고리즘", "소프트웨어", "하드웨어", "메인보드", "그래픽카드", "스마트폰",
             "데이터베이스", "네트워크", "운영체제", "프로그래밍", "웹개발", "클라우드", "서버", "키보드", "마우스", "모니터",
             "마라탕", "탕후루", "떡볶이", "돈까스", "치킨", "피자", "햄버거", "아이스크림", "콜라", "사이다",
-            "아메리카노", "에이드", "소떡소떡", "버블티", "코인노래방", "네컷사진", "PC방", "웹툰", "유튜브",
+            "아메리카노", "에이드", "소떡소떡", "버블티", "코인노래방", "네컷사진", "풍양중학교", "웹툰", "유튜브",
             "푸른 하늘 은하수 하얀 쪽배에", "계수나무 한 나무 토끼 한 마리", "남산 위에 저 소나무 철갑을 두른 듯", 
             "배움에는 끝이 없다", "연습은 완벽을 만든다", "오늘의 노력이 내일의 실력", "가는 말이 고와야 오는 말이 곱다",
             "시작이 반이다", "천 리 길도 한 걸음부터", "티끌 모아 태산", "말 한마디에 천냥 빚도 갚는다",
@@ -206,6 +206,14 @@
             // 🌟 연습 모드 식별
             const [isPracticeMode, setIsPracticeMode] = useState(false);
 
+            // 🌟 공지사항 관련 상태
+            const [announcements, setAnnouncements] = useState([]);
+            const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
+            const [annTitle, setAnnTitle] = useState('');
+            const [annContent, setAnnContent] = useState('');
+            const [editingAnnId, setEditingAnnId] = useState(null);
+
+
             const [currentScoreDocId, setCurrentScoreDocId] = useState(null);
             const latestScoreRef = useRef(0);
             const latestCharsRef = useRef(0);
@@ -247,6 +255,18 @@
                     roomData.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
                     setRooms(roomData);
                 });
+
+                // 🌟 공지사항 실시간 수신
+                const annRef = window.collection(db, 'artifacts', appId, 'public', 'data', 'typing_announcements');
+                const unsubscribeAnn = window.onSnapshot(annRef, (snapshot) => {
+                    const annData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    // 최신 글이 위로 오도록 정렬
+                    annData.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+                    setAnnouncements(annData);
+                });
+
+                // 기존 return 문을 아래처럼 변경해주세요.
+                return () => { unsubscribeRooms(); unsubscribeScores(); unsubscribeAnn(); };
 
                 const scoresRef = window.collection(db, 'artifacts', appId, 'public', 'data', 'typing_scores');
                 const unsubscribeScores = window.onSnapshot(scoresRef, (snapshot) => {
@@ -335,6 +355,39 @@
                     await window.updateDoc(window.doc(db, 'artifacts', appId, 'public', 'data', 'typing_rooms', roomId), { status: 'playing' });
                 } catch (e) { console.error(e); }
             };
+
+            // 🌟 공지사항 작성 및 수정
+            const handleSaveAnnouncement = async (e) => {
+                e.preventDefault();
+                if (!annTitle.trim() || !annContent.trim()) return alert("제목과 내용을 입력하세요.");
+                try {
+                    if (editingAnnId) {
+                        await window.updateDoc(window.doc(db, 'artifacts', appId, 'public', 'data', 'typing_announcements', editingAnnId), {
+                            title: annTitle, content: annContent, updatedAt: window.serverTimestamp()
+                        });
+                        setEditingAnnId(null);
+                    } else {
+                        await window.addDoc(window.collection(db, 'artifacts', appId, 'public', 'data', 'typing_announcements'), {
+                            title: annTitle, content: annContent, createdAt: window.serverTimestamp()
+                        });
+                    }
+                    setAnnTitle(''); setAnnContent('');
+                } catch (e) { alert("저장 실패: " + e.message); }
+            };
+
+            // 🌟 공지사항 삭제
+            const handleDeleteAnnouncement = async (id) => {
+                if (!window.confirm("이 공지사항을 삭제하시겠습니까?")) return;
+                try {
+                    await window.deleteDoc(window.doc(db, 'artifacts', appId, 'public', 'data', 'typing_announcements', id));
+                } catch (e) { alert("삭제 실패: " + e.message); }
+            };
+
+            // 🌟 공지사항 수정 모드 켜기
+            const editAnnouncement = (ann) => {
+                setEditingAnnId(ann.id); setAnnTitle(ann.title); setAnnContent(ann.content);
+            };
+
 
             const handleCreateRoom = async (e) => {
                 e.preventDefault();
@@ -449,13 +502,19 @@
                     e.preventDefault(); 
                     if (inputValue.length === 0) return;
 
-                    if (inputValue.trim() === currentWord) {
+             if (inputValue.trim() === currentWord) {
                         const newCombo = combo + 1;
                         
-                        // ⚖️ 새롭게 변경된 공정 밸런스 점수
+                        // 1. 기본 점수 (글자당 10점)
                         const baseScore = currentWord.length * 10;
-                        const comboBonus = combo * currentWord.length * 2;
+                        
+                        // 2. 🌟 콤보 보너스 상한선 적용! (실제 콤보가 11, 12여도 점수 계산은 10으로 제한)
+                        const effectiveCombo = Math.min(combo, 10);
+                        const comboBonus = effectiveCombo * currentWord.length * 2;
+                        
+                        // 3. 난이도 보너스 (띄어쓰기 50점, 5글자 이상 20점)
                         const lengthBonus = currentWord.includes(' ') ? 50 : (currentWord.length > 5 ? 20 : 0);
+                        
                         const earnedScore = baseScore + comboBonus + lengthBonus;
                         
                         setScore(prev => prev + earnedScore);
@@ -521,6 +580,31 @@
                 return (
                     <div className="min-h-screen spring-bg flex items-center justify-center p-4">
                         <CherryBlossomBackground />
+                        {/* 🌟 공지사항 모달창 */}
+                        {showAnnouncementModal && (
+                            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+                                <div className="bg-white rounded-3xl p-6 max-w-md w-full max-h-[80vh] overflow-y-auto custom-scrollbar shadow-2xl relative">
+                                    <button onClick={() => setShowAnnouncementModal(false)} className="absolute top-4 right-5 text-gray-400 hover:text-pink-500 text-3xl font-black">&times;</button>
+                                    <h2 className="text-2xl font-black text-pink-600 mb-6 flex items-center gap-2">📢 공지사항</h2>
+                                    <div className="space-y-4">
+                                        {announcements.length > 0 ? announcements.map(ann => (
+                                            <div key={ann.id} className="p-4 bg-pink-50/50 rounded-2xl border border-pink-100 text-left">
+                                                <h3 className="font-bold text-lg text-gray-800 mb-2">{ann.title}</h3>
+                                                <p className="text-gray-600 whitespace-pre-wrap text-sm leading-relaxed">{ann.content}</p>
+                                                <div className="text-xs text-gray-400 mt-3 text-right">
+                                                    {ann.createdAt?.toDate ? ann.createdAt.toDate().toLocaleDateString() : ''}
+                                                </div>
+                                            </div>
+                                        )) : <p className="text-gray-500 text-center py-8 font-medium">등록된 공지사항이 없습니다.</p>}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 🌟 메인 화면 우측 상단 공지사항 작고 귀여운 버튼 */}
+                        <button onClick={() => setShowAnnouncementModal(true)} className="absolute top-4 right-4 bg-white/80 hover:bg-white text-pink-600 px-4 py-2 rounded-full text-sm font-bold shadow-md border border-pink-200 transition-all flex items-center gap-2 z-20">
+                            📢 공지사항 {announcements.length > 0 && <span className="bg-pink-500 text-white w-5 h-5 flex items-center justify-center rounded-full text-xs animate-bounce">{announcements.length}</span>}
+                        </button>
                         <div className="glass-box rounded-3xl p-8 md:p-10 text-center max-w-md w-full z-10 relative shadow-2xl border-2 border-pink-200">
                             {/* 🌟 로고 이모지 장식 */}
                             <div className="text-6xl mb-2 animate-bounce">⚔️🔥</div>
@@ -681,6 +765,38 @@
                                                 )}
                                             </tbody>
                                         </table>
+                                    </div>
+                                </div>
+                            </div>
+                            {/* 🌟 공지사항 관리 섹션 */}
+                            <div className="glass-box p-6 rounded-3xl mt-6">
+                                <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">📢 공지사항 작성 및 관리</h2>
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    {/* 작성 폼 */}
+                                    <form onSubmit={handleSaveAnnouncement} className="space-y-3 bg-white p-5 rounded-2xl border border-pink-100 shadow-sm">
+                                        <input type="text" value={annTitle} onChange={e => setAnnTitle(e.target.value)} placeholder="제목 (예: 🌸 5월 이달의 MVP 발표!)" className="w-full px-4 py-3 border border-pink-200 rounded-xl outline-none focus:ring-2 focus:ring-pink-400 font-bold" required />
+                                        <textarea value={annContent} onChange={e => setAnnContent(e.target.value)} placeholder="학생들에게 알릴 내용을 적어주세요." rows="4" className="w-full px-4 py-3 border border-pink-200 rounded-xl outline-none resize-none custom-scrollbar focus:ring-2 focus:ring-pink-400" required />
+                                        <div className="flex gap-2">
+                                            <button type="submit" className="flex-1 bg-gray-800 text-white py-3 rounded-xl font-bold hover:bg-gray-900 transition-colors">{editingAnnId ? '수정 완료' : '새 공지 등록'}</button>
+                                            {editingAnnId && <button type="button" onClick={() => {setEditingAnnId(null); setAnnTitle(''); setAnnContent('');}} className="px-5 bg-gray-200 text-gray-600 rounded-xl font-bold hover:bg-gray-300 transition-colors">취소</button>}
+                                        </div>
+                                    </form>
+                                    
+                                    {/* 목록 */}
+                                    <div className="space-y-3 max-h-60 overflow-y-auto custom-scrollbar pr-2">
+                                        {announcements.map(ann => (
+                                            <div key={ann.id} className="bg-white p-4 rounded-2xl border border-pink-100 flex justify-between items-start gap-4 hover:border-pink-300 transition-colors">
+                                                <div className="flex-1">
+                                                    <div className="font-bold text-gray-800 text-sm">{ann.title}</div>
+                                                    <div className="text-xs text-gray-400 line-clamp-1 mt-1">{ann.content}</div>
+                                                </div>
+                                                <div className="flex gap-1 shrink-0">
+                                                    <button onClick={() => editAnnouncement(ann)} className="text-blue-500 hover:bg-blue-50 p-2 rounded-lg transition-colors" title="수정">✏️</button>
+                                                    <button onClick={() => handleDeleteAnnouncement(ann.id)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors" title="삭제">🗑️</button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {announcements.length === 0 && <div className="text-center text-gray-400 py-10 bg-white rounded-2xl border border-pink-100">등록된 공지사항이 없습니다.</div>}
                                     </div>
                                 </div>
                             </div>
