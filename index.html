@@ -249,10 +249,10 @@
                 } catch (error) { console.error(error); }
             }, [isFirebaseLoaded]);
 
-         useEffect(() => {
+      // 🌟 1. 공통 데이터 (방, 공지사항) - 학생/선생님 모두 수신
+            useEffect(() => {
                 if (!user || !db) return;
 
-                // 1. 방 정보 수신
                 const roomsRef = window.collection(db, 'artifacts', appId, 'public', 'data', 'typing_rooms');
                 const unsubscribeRooms = window.onSnapshot(roomsRef, (snapshot) => {
                     const roomData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -260,7 +260,6 @@
                     setRooms(roomData);
                 });
 
-                // 2. 공지사항 수신
                 const annRef = window.collection(db, 'artifacts', appId, 'public', 'data', 'typing_announcements');
                 const unsubscribeAnn = window.onSnapshot(annRef, (snapshot) => {
                     const annData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -268,20 +267,37 @@
                     setAnnouncements(annData);
                 });
 
-                // 3. 점수(랭킹) 데이터 수신
-                const scoresRef = window.collection(db, 'artifacts', appId, 'public', 'data', 'typing_scores');
-                const unsubscribeScores = window.onSnapshot(scoresRef, (snapshot) => {
-                    const scoreData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    setScores(scoreData);
-                });
-
-                // 🌟 모든 수신 로직이 끝난 후에 마지막에 한 번만 return 해줍니다.
-                return () => { 
-                    unsubscribeRooms(); 
-                    unsubscribeAnn(); 
-                    unsubscribeScores(); 
-                };
+                return () => { unsubscribeRooms(); unsubscribeAnn(); };
             }, [user, db]);
+
+            // 🌟 2. 점수 데이터 (권한에 따라 완벽하게 분리하여 트래픽 절약!)
+            useEffect(() => {
+                if (!user || !db) return;
+
+                let unsubscribeScores = () => {};
+
+                // 👨‍🏫 선생님: 전체 랭킹을 봐야 하므로 모든 점수 수신
+                if (view === 'teacher') {
+                    const scoresRef = window.collection(db, 'artifacts', appId, 'public', 'data', 'typing_scores');
+                    unsubscribeScores = window.onSnapshot(scoresRef, (snapshot) => {
+                        const scoreData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        setScores(scoreData);
+                    });
+                }
+                // 🧑‍🎓 학생: 랭킹은 안 봐도 됨. 난이도 조절 확인을 위해 '오직 내 점수표 1개'만 수신!
+                else if (currentScoreDocId) {
+                    const myScoreRef = window.doc(db, 'artifacts', appId, 'public', 'data', 'typing_scores', currentScoreDocId);
+                    unsubscribeScores = window.onSnapshot(myScoreRef, (docSnap) => {
+                        if (docSnap.exists()) {
+                            setScores([{ id: docSnap.id, ...docSnap.data() }]); 
+                        }
+                    });
+                } else {
+                    setScores([]); // 로비에 있을 때는 점수 로딩 아예 안 함 (0건)
+                }
+
+                return () => unsubscribeScores();
+            }, [user, db, view, currentScoreDocId]);
 
             // 대기실 자동 시작 감지 로직
             useEffect(() => {
