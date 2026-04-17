@@ -249,8 +249,10 @@
                 } catch (error) { console.error(error); }
             }, [isFirebaseLoaded]);
 
-            useEffect(() => {
+         useEffect(() => {
                 if (!user || !db) return;
+
+                // 1. 방 정보 수신
                 const roomsRef = window.collection(db, 'artifacts', appId, 'public', 'data', 'typing_rooms');
                 const unsubscribeRooms = window.onSnapshot(roomsRef, (snapshot) => {
                     const roomData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -258,25 +260,27 @@
                     setRooms(roomData);
                 });
 
-                // 🌟 공지사항 실시간 수신
+                // 2. 공지사항 수신
                 const annRef = window.collection(db, 'artifacts', appId, 'public', 'data', 'typing_announcements');
                 const unsubscribeAnn = window.onSnapshot(annRef, (snapshot) => {
                     const annData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    // 최신 글이 위로 오도록 정렬
                     annData.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
                     setAnnouncements(annData);
                 });
 
-                // 기존 return 문을 아래처럼 변경해주세요.
-                return () => { unsubscribeRooms(); unsubscribeScores(); unsubscribeAnn(); };
-
+                // 3. 점수(랭킹) 데이터 수신
                 const scoresRef = window.collection(db, 'artifacts', appId, 'public', 'data', 'typing_scores');
                 const unsubscribeScores = window.onSnapshot(scoresRef, (snapshot) => {
                     const scoreData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     setScores(scoreData);
                 });
 
-                return () => { unsubscribeRooms(); unsubscribeScores(); };
+                // 🌟 모든 수신 로직이 끝난 후에 마지막에 한 번만 return 해줍니다.
+                return () => { 
+                    unsubscribeRooms(); 
+                    unsubscribeAnn(); 
+                    unsubscribeScores(); 
+                };
             }, [user, db]);
 
             // 대기실 자동 시작 감지 로직
