@@ -10,9 +10,9 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
 
-    <script type="module">
+<script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
         window.firebaseApp = initializeApp;
@@ -24,13 +24,14 @@
         window.doc = doc;
         window.updateDoc = updateDoc;
         window.deleteDoc = deleteDoc;
+        window.query = query;   // 🌟 필터링 도구 추가
+        window.where = where;   // 🌟 필터링 도구 추가
         window.getAuth = getAuth;
         window.signInAnonymously = signInAnonymously;
         window.onAuthStateChanged = onAuthStateChanged;
         
         window.dispatchEvent(new Event('firebase-loaded'));
     </script>
-
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap');
         body { font-family: 'Noto Sans KR', sans-serif; }
@@ -185,9 +186,9 @@
             const [teacherPwd, setTeacherPwd] = useState('');
             const [pwdError, setPwdError] = useState('');
             const [newRoomName, setNewRoomName] = useState('');
-            const [roomMode, setRoomMode] = useState('ko'); 
+  const [roomMode, setRoomMode] = useState('ko'); 
             const [roomDuration, setRoomDuration] = useState('300'); 
-            const [viewingRoomId, setViewingRoomId] = useState('all');
+            const [viewingRoomId, setViewingRoomId] = useState(''); // 🌟 초기값을 빈칸으로 바꿔서 첫 접속 시 트래픽 0건!
 
             const [gameMode, setGameMode] = useState('ko');
             const [gameDuration, setGameDuration] = useState(300);
@@ -271,20 +272,37 @@
             }, [user, db]);
 
             // 🌟 2. 점수 데이터 (권한에 따라 완벽하게 분리하여 트래픽 절약!)
+   // 🌟 2. 점수 데이터 (클릭한 반만 딱 가져와서 트래픽 99% 절약!)
             useEffect(() => {
                 if (!user || !db) return;
 
                 let unsubscribeScores = () => {};
 
-                // 👨‍🏫 선생님: 전체 랭킹을 봐야 하므로 모든 점수 수신
+                // 👨‍🏫 선생님: 클릭한 반의 데이터만 핀셋으로 뽑아오기
                 if (view === 'teacher') {
+                    if (viewingRoomId === '') {
+                        setScores([]); // 아무것도 선택 안 했으면 아예 안 가져옴 (트래픽 0)
+                        return;
+                    }
+                    
                     const scoresRef = window.collection(db, 'artifacts', appId, 'public', 'data', 'typing_scores');
-                    unsubscribeScores = window.onSnapshot(scoresRef, (snapshot) => {
-                        const scoreData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                        setScores(scoreData);
-                    });
+                    
+                    if (viewingRoomId === 'all') {
+                        // 전체보기일 때는 다 가져옴 (과거 데이터 많을 땐 누르지 마세요!)
+                        unsubscribeScores = window.onSnapshot(scoresRef, (snapshot) => {
+                            const scoreData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                            setScores(scoreData);
+                        });
+                    } else {
+                        // 🌟 핵심 방어막: 특정 반을 클릭했을 때 '그 반 데이터(예: 30명)'만 가져오기!!
+                        const q = window.query(scoresRef, window.where("roomId", "==", viewingRoomId));
+                        unsubscribeScores = window.onSnapshot(q, (snapshot) => {
+                            const scoreData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                            setScores(scoreData);
+                        });
+                    }
                 }
-                // 🧑‍🎓 학생: 랭킹은 안 봐도 됨. 난이도 조절 확인을 위해 '오직 내 점수표 1개'만 수신!
+                // 🧑‍🎓 학생: 오직 내 점수표 1개만 수신!
                 else if (currentScoreDocId) {
                     const myScoreRef = window.doc(db, 'artifacts', appId, 'public', 'data', 'typing_scores', currentScoreDocId);
                     unsubscribeScores = window.onSnapshot(myScoreRef, (docSnap) => {
@@ -293,11 +311,11 @@
                         }
                     });
                 } else {
-                    setScores([]); // 로비에 있을 때는 점수 로딩 아예 안 함 (0건)
+                    setScores([]); // 로비에 있을 때는 0건
                 }
 
                 return () => unsubscribeScores();
-            }, [user, db, view, currentScoreDocId]);
+            }, [user, db, view, currentScoreDocId, viewingRoomId]); // 👈 배열 마지막에 viewingRoomId 추가 필수!
 
             // 대기실 자동 시작 감지 로직
             useEffect(() => {
