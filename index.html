@@ -46,7 +46,6 @@
             overflow: hidden;
         }
 
-        /* 🌟 부스터 발동 시 배경 붉어지는 애니메이션 */
         .booster-bg {
             background: linear-gradient(135deg, #fff0f5 0%, #ffedd5 50%, #fecaca 100%);
             animation: pulse-bg 2s infinite alternate;
@@ -221,7 +220,6 @@
             
             const [isPracticeMode, setIsPracticeMode] = useState(false);
 
-            // 🌟 부스터 관련 상태 추가
             const [boosterAvailable, setBoosterAvailable] = useState(true);
             const [boosterActive, setBoosterActive] = useState(false);
             const [boosterTimeLeft, setBoosterTimeLeft] = useState(0);
@@ -231,6 +229,10 @@
             const [annTitle, setAnnTitle] = useState('');
             const [annContent, setAnnContent] = useState('');
             const [editingAnnId, setEditingAnnId] = useState(null);
+            
+            // 🌟 팝업 공지사항용 추가 상태
+            const [annIsAlert, setAnnIsAlert] = useState(false);
+            const [hasSeenAlert, setHasSeenAlert] = useState(false);
 
             const [currentScoreDocId, setCurrentScoreDocId] = useState(null);
             const latestScoreRef = useRef(0);
@@ -266,7 +268,7 @@
                 } catch (error) { console.error(error); }
             }, [isFirebaseLoaded]);
 
-            // 🌟 1. 선생님용 방 목록 & 공통 공지사항
+            // 1. 방 목록 & 공통 공지사항
             useEffect(() => {
                 if (!user || !db) return;
                 let unsubscribeRooms = () => {};
@@ -290,7 +292,18 @@
                 return () => { unsubscribeRooms(); unsubscribeAnn(); };
             }, [user, db, view]);
 
-            // 🌟 2. 점수 데이터 (클릭한 반만 딱 가져와서 트래픽 방어)
+            // 🌟 1-1. 학생이 처음 로그인 화면에 오면 팝업 공지가 있는지 확인하고 띄워주기
+            useEffect(() => {
+                if (view === 'login' && !hasSeenAlert && announcements.length > 0) {
+                    const hasAlert = announcements.some(ann => ann.isAlert);
+                    if (hasAlert) {
+                        setShowAnnouncementModal(true);
+                        setHasSeenAlert(true); // 한 번 봤으면 새로고침 전까지는 안 띄움
+                    }
+                }
+            }, [view, announcements, hasSeenAlert]);
+
+            // 2. 점수 데이터 
             useEffect(() => {
                 if (!user || !db) return;
                 let unsubscribeScores = () => {};
@@ -328,7 +341,7 @@
                 return () => unsubscribeScores();
             }, [user, db, view, viewingRoomId, currentScoreDocId]);
 
-            // 🌟 3. 학생 전용: 내가 입장한 방 감시
+            // 3. 학생 전용: 내가 입장한 방 감시
             useEffect(() => {
                 if (!user || !db || !selectedRoomId || view === 'teacher') return;
                 
@@ -358,7 +371,7 @@
                 latestCharsRef.current = correctChars;
             }, [score, correctChars]);
 
-            // 🌟 4. 트래픽 0건! 선생님 갱신 신호 감지
+            // 4. 트래픽 0건! 선생님 갱신 신호 감지
             useEffect(() => {
                 if (view !== 'playing' || isPracticeMode || !currentScoreDocId || !selectedRoomId || !db) return;
                 
@@ -459,15 +472,18 @@
                 try {
                     if (editingAnnId) {
                         await window.updateDoc(window.doc(db, 'artifacts', appId, 'public', 'data', 'typing_announcements', editingAnnId), {
-                            title: annTitle, content: annContent, updatedAt: window.serverTimestamp()
+                            // 🌟 수정 시에도 팝업 설정 저장
+                            title: annTitle, content: annContent, isAlert: annIsAlert, updatedAt: window.serverTimestamp()
                         });
                         setEditingAnnId(null);
                     } else {
                         await window.addDoc(window.collection(db, 'artifacts', appId, 'public', 'data', 'typing_announcements'), {
-                            title: annTitle, content: annContent, createdAt: window.serverTimestamp()
+                            // 🌟 생성 시에도 팝업 설정 저장
+                            title: annTitle, content: annContent, isAlert: annIsAlert, createdAt: window.serverTimestamp()
                         });
                     }
-                    setAnnTitle(''); setAnnContent('');
+                    // 🌟 폼 비우기
+                    setAnnTitle(''); setAnnContent(''); setAnnIsAlert(false);
                 } catch (e) { alert("저장 실패: " + e.message); }
             };
 
@@ -479,7 +495,9 @@
             };
 
             const editAnnouncement = (ann) => {
-                setEditingAnnId(ann.id); setAnnTitle(ann.title); setAnnContent(ann.content);
+                setEditingAnnId(ann.id); setAnnTitle(ann.title); setAnnContent(ann.content); 
+                // 🌟 수정 버튼 누르면 팝업 설정도 불러오기
+                setAnnIsAlert(ann.isAlert || false);
             };
 
             const handleDeleteRoom = async (roomId, roomName) => {
@@ -509,7 +527,6 @@
                 setIsPracticeMode(true);
                 setCurrentScoreDocId(null);
                 
-                // 🌟 부스터 초기화
                 setBoosterAvailable(true);
                 setBoosterActive(false);
                 setBoosterTimeLeft(0);
@@ -562,7 +579,6 @@
                     setInputValue('');
                     setIsPracticeMode(false);
                     
-                    // 🌟 부스터 초기화
                     setBoosterAvailable(true);
                     setBoosterActive(false);
                     setBoosterTimeLeft(0);
@@ -585,18 +601,16 @@
                 setCurrentWord(list[randomIndex]);
             };
 
-            // 🌟 게임 시간 및 부스터 시간 타이머
             useEffect(() => {
                 let timerId;
                 if (view === 'playing' && timeLeft > 0) {
                     timerId = setInterval(() => {
                         setTimeLeft(prev => prev - 1);
                         
-                        // 🌟 부스터 시간 깎기 로직
                         setBoosterTimeLeft(prevTime => {
                             if (prevTime > 1) return prevTime - 1;
                             if (prevTime === 1) {
-                                setBoosterActive(false); // 0초가 되면 부스터 종료!
+                                setBoosterActive(false); 
                                 return 0;
                             }
                             return 0;
@@ -610,7 +624,6 @@
                 return () => clearInterval(timerId);
             }, [view, timeLeft, gameDuration]);
 
-            // 🌟 타자 입력 시 점수 계산
             const handleKeyDown = (e) => {
                 if (e.key === 'Backspace') setCombo(0);
 
@@ -629,9 +642,8 @@
                         
                         let earnedScore = baseScore + comboBonus + lengthBonus;
                         
-                        // 🌟 부스터가 켜져 있으면 최종 획득 점수의 50%를 추가 보너스로 줍니다! (2배)
                         if (boosterActive) {
-                            earnedScore = Math.floor(earnedScore * 2);
+                            earnedScore = Math.floor(earnedScore * 1.5);
                         }
                         
                         setScore(prev => prev + earnedScore);
@@ -697,6 +709,8 @@
                 return (
                     <div className="min-h-screen spring-bg flex items-center justify-center p-4">
                         <CherryBlossomBackground />
+                        
+                        {/* 공지사항 모달창 */}
                         {showAnnouncementModal && (
                             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
                                 <div className="bg-white rounded-3xl p-6 max-w-md w-full max-h-[80vh] overflow-y-auto custom-scrollbar shadow-2xl relative">
@@ -704,8 +718,12 @@
                                     <h2 className="text-2xl font-black text-pink-600 mb-6 flex items-center gap-2">📢 공지사항</h2>
                                     <div className="space-y-4">
                                         {announcements.length > 0 ? announcements.map(ann => (
-                                            <div key={ann.id} className="p-4 bg-pink-50/50 rounded-2xl border border-pink-100 text-left">
-                                                <h3 className="font-bold text-lg text-gray-800 mb-2">{ann.title}</h3>
+                                            /* 🌟 팝업 설정된 공지는 빨간색 테두리로 강조 표시! */
+                                            <div key={ann.id} className={`p-4 rounded-2xl border text-left ${ann.isAlert ? 'bg-red-50 border-red-200 shadow-sm' : 'bg-pink-50/50 border-pink-100'}`}>
+                                                <h3 className="font-bold text-lg text-gray-800 mb-2">
+                                                    {ann.isAlert && <span className="text-red-500 mr-1 animate-pulse">🚨</span>}
+                                                    {ann.title}
+                                                </h3>
                                                 <p className="text-gray-600 whitespace-pre-wrap text-sm leading-relaxed">{ann.content}</p>
                                                 <div className="text-xs text-gray-400 mt-3 text-right">
                                                     {ann.createdAt?.toDate ? ann.createdAt.toDate().toLocaleDateString() : ''}
@@ -713,6 +731,8 @@
                                             </div>
                                         )) : <p className="text-gray-500 text-center py-8 font-medium">등록된 공지사항이 없습니다.</p>}
                                     </div>
+                                    {/* 🌟 팝업으로 열렸을 때 닫기 버튼 하나 더 제공 (사용성 증가) */}
+                                    <button onClick={() => setShowAnnouncementModal(false)} className="w-full mt-6 py-3 bg-pink-100 text-pink-600 font-bold rounded-xl hover:bg-pink-200">닫기</button>
                                 </div>
                             </div>
                         )}
@@ -908,23 +928,35 @@
                                 </div>
                             </div>
                             
+                            {/* 🌟 공지사항 관리 섹션 */}
                             <div className="glass-box p-6 rounded-3xl mt-6">
                                 <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">📢 공지사항 작성 및 관리</h2>
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                     <form onSubmit={handleSaveAnnouncement} className="space-y-3 bg-white p-5 rounded-2xl border border-pink-100 shadow-sm">
                                         <input type="text" value={annTitle} onChange={e => setAnnTitle(e.target.value)} placeholder="제목 (예: 🌸 5월 이달의 MVP 발표!)" className="w-full px-4 py-3 border border-pink-200 rounded-xl outline-none focus:ring-2 focus:ring-pink-400 font-bold" required />
                                         <textarea value={annContent} onChange={e => setAnnContent(e.target.value)} placeholder="학생들에게 알릴 내용을 적어주세요." rows="4" className="w-full px-4 py-3 border border-pink-200 rounded-xl outline-none resize-none custom-scrollbar focus:ring-2 focus:ring-pink-400" required />
-                                        <div className="flex gap-2">
+                                        
+                                        {/* 🌟 접속 시 팝업 띄우기 체크박스 */}
+                                        <label className="flex items-center gap-2 text-sm font-bold text-gray-700 cursor-pointer p-2 bg-pink-50 rounded-lg border border-pink-100">
+                                            <input type="checkbox" checked={annIsAlert} onChange={e => setAnnIsAlert(e.target.checked)} className="w-5 h-5 text-pink-500 rounded focus:ring-pink-400 cursor-pointer" />
+                                            🚨 학생들이 처음 접속할 때 이 공지를 팝업으로 띄우기
+                                        </label>
+
+                                        <div className="flex gap-2 mt-2">
                                             <button type="submit" className="flex-1 bg-gray-800 text-white py-3 rounded-xl font-bold hover:bg-gray-900 transition-colors">{editingAnnId ? '수정 완료' : '새 공지 등록'}</button>
-                                            {editingAnnId && <button type="button" onClick={() => {setEditingAnnId(null); setAnnTitle(''); setAnnContent('');}} className="px-5 bg-gray-200 text-gray-600 rounded-xl font-bold hover:bg-gray-300 transition-colors">취소</button>}
+                                            {editingAnnId && <button type="button" onClick={() => {setEditingAnnId(null); setAnnTitle(''); setAnnContent(''); setAnnIsAlert(false);}} className="px-5 bg-gray-200 text-gray-600 rounded-xl font-bold hover:bg-gray-300 transition-colors">취소</button>}
                                         </div>
                                     </form>
                                     
                                     <div className="space-y-3 max-h-60 overflow-y-auto custom-scrollbar pr-2">
                                         {announcements.map(ann => (
-                                            <div key={ann.id} className="bg-white p-4 rounded-2xl border border-pink-100 flex justify-between items-start gap-4 hover:border-pink-300 transition-colors">
+                                            <div key={ann.id} className={`bg-white p-4 rounded-2xl border flex justify-between items-start gap-4 transition-colors ${ann.isAlert ? 'border-red-300 bg-red-50/30' : 'border-pink-100 hover:border-pink-300'}`}>
                                                 <div className="flex-1">
-                                                    <div className="font-bold text-gray-800 text-sm">{ann.title}</div>
+                                                    <div className="font-bold text-gray-800 text-sm">
+                                                        {ann.title}
+                                                        {/* 🌟 팝업 설정된 글은 뱃지로 표시 */}
+                                                        {ann.isAlert && <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full ml-2 animate-pulse align-middle">팝업 ON</span>}
+                                                    </div>
                                                     <div className="text-xs text-gray-400 line-clamp-1 mt-1">{ann.content}</div>
                                                 </div>
                                                 <div className="flex gap-1 shrink-0">
@@ -1009,18 +1041,16 @@
                 };
 
                 return (
-                    // 🌟 부스터 발동 시 배경 전체가 붉은색으로 펄스 애니메이션이 들어갑니다!
                     <div className={`min-h-screen flex flex-col p-4 md:p-8 relative overflow-hidden transition-colors duration-500 ${boosterActive ? 'booster-bg' : 'spring-bg'}`}>
                         <CherryBlossomBackground />
                         
-                        {/* 🌟 화면 오른쪽 아래 거대한 부스터 버튼! */}
                         <div className="absolute bottom-8 right-8 md:bottom-12 md:right-12 z-50">
                             <button 
                                 onClick={() => {
                                     if(boosterAvailable && !boosterActive) {
                                         setBoosterAvailable(false);
                                         setBoosterActive(true);
-                                        setBoosterTimeLeft(20); // 20초 지속
+                                        setBoosterTimeLeft(20); 
                                     }
                                 }}
                                 disabled={!boosterAvailable}
@@ -1081,7 +1111,6 @@
                                 </div>
                             </div>
 
-                            {/* 🌟 부스터 켜지면 입력창 테두리도 화려하게 변경! */}
                             <div className={`w-full max-w-3xl relative rounded-2xl overflow-hidden transition-all duration-200 ${boosterActive ? 'shadow-[0_0_40px_rgba(251,191,36,0.5)] border-4 border-yellow-400 bg-white' : combo > 2 ? 'input-success' : 'glass-box'} ${isError ? 'border-2 border-red-400 animate-shake shadow-lg shadow-red-200' : 'border-2 border-transparent'}`}>
                                 <input
                                     ref={inputRef}
