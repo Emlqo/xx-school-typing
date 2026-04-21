@@ -131,7 +131,6 @@
             measurementId: "G-PFMZNFKKQW"
         };
 
-        // 🌟 선생님이 꽉꽉 채워두신 원본 단어장 100% 복구 완료!
         const KOREAN_WORDS = [
             "학교", "선생님", "교과서", "칠판", "체육대회", "수학여행", "중간고사", "기말고사", "쉬는시간", "점심시간",
             "도서관", "과학실", "미술실", "음악실", "동아리", "급식", "친구", "우정", "추억", "졸업식", "정보교과", "인공지능",
@@ -274,7 +273,7 @@
                 } catch (error) { console.error(error); }
             }, [isFirebaseLoaded]);
 
-            // 🌟 1-A. 공지사항 전용 (화면이 바뀌어도 재구독 안 함! 무한 다운로드 차단)
+            // 🌟 1-A. 공지사항 전용
             useEffect(() => {
                 if (!user || !db) return;
                 const annRef = window.collection(db, 'artifacts', appId, 'public', 'data', 'typing_announcements');
@@ -313,7 +312,7 @@
                 }
             }, [view, announcements, hasSeenAlert]);
 
-            // 🌟 2. 점수 데이터 수신 (선생님: 선택한 방만 / 학생: 내 것만)
+            // 🌟 2. 점수 데이터 수신
             useEffect(() => {
                 if (!user || !db) return;
                 let unsubscribeScores = () => {};
@@ -825,6 +824,9 @@
             if (view === 'teacher') {
                 const leaderboardScores = getLeaderboard();
                 
+                // 🌟 우리 반 총합 점수 계산기
+                const roomTotalScore = leaderboardScores.reduce((sum, s) => sum + s.score, 0);
+                
                 return (
                     <div className="min-h-screen spring-bg p-4 md:p-8">
                         <CherryBlossomBackground />
@@ -884,40 +886,56 @@
                                 </div>
 
                                 <div className="glass-box p-6 rounded-3xl col-span-1 lg:col-span-2">
-                                    <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            🏆 {viewingRoomId === 'all' ? '풍양중학교 전체 명예의 전당' : viewingRoomId === '' ? '학생 점수 확인 (반을 선택하세요)' : `[${rooms.find(r => r.id === viewingRoomId)?.name}] 실시간 명예의 전당`}
-                                        </div>
-                                        {viewingRoomId !== '' && <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full animate-pulse">🔴 LIVE</span>}
-                                    </h2>
-                                    
-                                    {viewingRoomId !== '' && viewingRoomId !== 'all' && (
-                                        <div className="flex gap-2 mb-6">
-                                            {rooms.find(r => r.id === viewingRoomId)?.status === 'waiting' && (
-                                                <button onClick={() => startRoomGame(viewingRoomId)} className="flex-1 py-4 bg-pink-500 hover:bg-pink-600 text-white rounded-2xl font-black text-xl shadow-lg animate-pulse">
-                                                    🚀 전원 타자 연습 시작!
-                                                </button>
+                                    {/* 🌟 학급 총점 및 시작 컨트롤 영역 */}
+                                    <div className="flex flex-col gap-4 mb-6">
+                                        <div className="flex justify-between items-center">
+                                            <h2 className="text-2xl font-bold text-pink-600 flex items-center gap-2">
+                                                🏆 {viewingRoomId === 'all' ? '풍양중 전체 명예의 전당' : viewingRoomId === '' ? '학생 점수 확인 (반을 선택하세요)' : `[${rooms.find(r => r.id === viewingRoomId)?.name}] 실시간 점수판`}
+                                                {viewingRoomId !== '' && <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full animate-pulse ml-2">🔴 LIVE</span>}
+                                            </h2>
+                                            
+                                            {viewingRoomId !== '' && viewingRoomId !== 'all' && (
+                                                <div className="flex gap-2">
+                                                    {rooms.find(r => r.id === viewingRoomId)?.status === 'waiting' && (
+                                                        <button onClick={() => startRoomGame(viewingRoomId)} className="px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-xl font-bold animate-bounce shadow-lg">
+                                                            🚀 게임 시작!
+                                                        </button>
+                                                    )}
+                                                    {rooms.find(r => r.id === viewingRoomId)?.status === 'playing' && (
+                                                        <button 
+                                                            onClick={(e) => {
+                                                                requestScoreSync(viewingRoomId);
+                                                                const btn = e.currentTarget;
+                                                                const originalText = btn.innerHTML;
+                                                                btn.innerHTML = '✅ 수집 완료!';
+                                                                btn.classList.replace('bg-blue-500', 'bg-green-500');
+                                                                setTimeout(() => {
+                                                                    btn.innerHTML = originalText;
+                                                                    btn.classList.replace('bg-green-500', 'bg-blue-500');
+                                                                }, 1500);
+                                                            }} 
+                                                            className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-bold shadow-lg transition-all"
+                                                        >
+                                                            🔄 실시간 가져오기
+                                                        </button>
+                                                    )}
+                                                </div>
                                             )}
-                                            {rooms.find(r => r.id === viewingRoomId)?.status === 'playing' && (
-                                                <button 
-                                                    onClick={(e) => {
-                                                        requestScoreSync(viewingRoomId);
-                                                        const btn = e.currentTarget;
-                                                        const originalText = btn.innerHTML;
-                                                        btn.innerHTML = '✅ 학생들 점수 수집 완료!';
-                                                        btn.classList.replace('bg-blue-500', 'bg-green-500');
-                                                        setTimeout(() => {
-                                                            btn.innerHTML = originalText;
-                                                            btn.classList.replace('bg-green-500', 'bg-blue-500');
-                                                        }, 1500);
-                                                    }} 
-                                                    className="flex-1 py-4 bg-blue-500 hover:bg-blue-600 text-white rounded-2xl font-black text-xl shadow-lg transition-all"
-                                                >
-                                                    🔄 실시간 점수 가져오기
-                                                </button>
-                                            )}
                                         </div>
-                                    )}
+
+                                        {/* 🌟 반 총합 전광판 (선택된 반이 있을 때만 보임) */}
+                                        {viewingRoomId !== '' && viewingRoomId !== 'all' && (
+                                            <div className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 p-6 rounded-2xl text-white shadow-lg flex justify-between items-center transform hover:scale-[1.01] transition-transform">
+                                                <div>
+                                                    <div className="text-indigo-100 font-bold text-sm mb-1 tracking-wide">학급 총합 (반대항전 기록)</div>
+                                                    <div className="text-5xl font-black drop-shadow-md tracking-tight">
+                                                        {roomTotalScore.toLocaleString()} <span className="text-2xl font-bold text-indigo-200">PTS</span>
+                                                    </div>
+                                                </div>
+                                                <div className="text-6xl animate-bounce drop-shadow-lg">🔥</div>
+                                            </div>
+                                        )}
+                                    </div>
 
                                     <div className="overflow-x-auto custom-scrollbar">
                                         <table className="w-full text-left border-collapse">
@@ -943,7 +961,6 @@
                                                             {isRecentlyUpdated && <span className="text-[10px] bg-green-500 text-white px-1.5 py-0.5 ml-2 rounded-full animate-bounce inline-block">UP!</span>}
                                                         </td>
                                                         
-                                                        {/* 🌟 관리자 개별 설정 (부스터, 가중치, 난이도) */}
                                                         <td className="py-3 px-4 text-center">
                                                             {viewingRoomId !== 'all' && rooms.find(r => r.id === viewingRoomId)?.status === 'waiting' ? (
                                                                 <div className="flex justify-center gap-1">
@@ -976,7 +993,6 @@
                                 </div>
                             </div>
                             
-                            {/* 🌟 공지사항 관리 섹션 */}
                             <div className="glass-box p-6 rounded-3xl mt-6">
                                 <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">📢 공지사항 작성 및 관리</h2>
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -984,7 +1000,6 @@
                                         <input type="text" value={annTitle} onChange={e => setAnnTitle(e.target.value)} placeholder="제목 (예: 🌸 5월 이달의 MVP 발표!)" className="w-full px-4 py-3 border border-pink-200 rounded-xl outline-none focus:ring-2 focus:ring-pink-400 font-bold" required />
                                         <textarea value={annContent} onChange={e => setAnnContent(e.target.value)} placeholder="학생들에게 알릴 내용을 적어주세요." rows="4" className="w-full px-4 py-3 border border-pink-200 rounded-xl outline-none resize-none custom-scrollbar focus:ring-2 focus:ring-pink-400" required />
                                         
-                                        {/* 🌟 접속 시 팝업 띄우기 체크박스 */}
                                         <label className="flex items-center gap-2 text-sm font-bold text-gray-700 cursor-pointer p-2 bg-pink-50 rounded-lg border border-pink-100">
                                             <input type="checkbox" checked={annIsAlert} onChange={e => setAnnIsAlert(e.target.checked)} className="w-5 h-5 text-pink-500 rounded focus:ring-pink-400 cursor-pointer" />
                                             🚨 학생들이 처음 접속할 때 이 공지를 팝업으로 띄우기
@@ -1087,14 +1102,12 @@
                     });
                 };
                 
-                // 현재 내 점수 정보 확인
                 const myInfo = scores.find(s => s.id === currentScoreDocId) || { boosterEnabled: true, pointWeight: 1.0 };
 
                 return (
                     <div className={`min-h-screen flex flex-col p-4 md:p-8 relative overflow-hidden transition-colors duration-500 ${boosterActive ? 'booster-bg' : 'spring-bg'}`}>
                         <CherryBlossomBackground />
                         
-                        {/* 🌟 조건부 부스터 표시 (선생님이 OFF하면 안 보임) */}
                         {myInfo.boosterEnabled !== false && (
                             <div className="absolute bottom-8 right-8 md:bottom-12 md:right-12 z-50">
                                 <button 
@@ -1102,7 +1115,7 @@
                                         if(boosterAvailable && !boosterActive) {
                                             setBoosterAvailable(false);
                                             setBoosterActive(true);
-                                            setBoosterTimeLeft(25); // 25초 지속!
+                                            setBoosterTimeLeft(25);
                                         }
                                     }}
                                     disabled={!boosterAvailable}
@@ -1145,7 +1158,6 @@
                                 <div className={`flex items-center gap-2 px-4 py-2 rounded-xl border font-bold transition-all ${combo > 2 ? 'bg-pink-100 border-pink-300 text-pink-600 shadow-sm' : 'bg-white border-gray-200 text-gray-500'}`}>
                                     🔥 {combo} 콤보
                                 </div>
-                                {/* 내 배율이 1 이상이면 화면에 자랑스럽게 표시! */}
                                 {myInfo.pointWeight > 1.0 && (
                                     <div className="flex items-center gap-2 px-4 py-2 rounded-xl border font-bold bg-purple-100 border-purple-300 text-purple-600 shadow-sm">
                                         ✨ 점수 x{myInfo.pointWeight}
