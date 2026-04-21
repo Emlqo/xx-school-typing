@@ -46,6 +46,16 @@
             overflow: hidden;
         }
 
+        /* 🌟 부스터 발동 시 배경 붉어지는 애니메이션 */
+        .booster-bg {
+            background: linear-gradient(135deg, #fff0f5 0%, #ffedd5 50%, #fecaca 100%);
+            animation: pulse-bg 2s infinite alternate;
+        }
+        @keyframes pulse-bg {
+            0% { background: linear-gradient(135deg, #fff0f5 0%, #ffe4e1 100%); }
+            100% { background: linear-gradient(135deg, #ffedd5 0%, #fecaca 100%); }
+        }
+
         .petal {
             position: absolute;
             background-color: #ffb7c5;
@@ -185,15 +195,15 @@
             
             const [nickname, setNickname] = useState('');
             const [selectedRoomId, setSelectedRoomId] = useState('');
-            const [roomCodeInput, setRoomCodeInput] = useState(''); // 🌟 학생이 입력할 4자리 코드
-            const [myRoomData, setMyRoomData] = useState(null);     // 🌟 학생이 소속된 단 1개의 방 정보
+            const [roomCodeInput, setRoomCodeInput] = useState(''); 
+            const [myRoomData, setMyRoomData] = useState(null);     
 
             const [teacherPwd, setTeacherPwd] = useState('');
             const [pwdError, setPwdError] = useState('');
             const [newRoomName, setNewRoomName] = useState('');
             const [roomMode, setRoomMode] = useState('ko'); 
             const [roomDuration, setRoomDuration] = useState('300'); 
-            const [viewingRoomId, setViewingRoomId] = useState(''); // 🌟 초기값을 빈칸으로 바꿔서 첫 접속 시 트래픽 0건!
+            const [viewingRoomId, setViewingRoomId] = useState(''); 
 
             const [gameMode, setGameMode] = useState('ko');
             const [gameDuration, setGameDuration] = useState(300);
@@ -210,6 +220,11 @@
             const [isError, setIsError] = useState(false);
             
             const [isPracticeMode, setIsPracticeMode] = useState(false);
+
+            // 🌟 부스터 관련 상태 추가
+            const [boosterAvailable, setBoosterAvailable] = useState(true);
+            const [boosterActive, setBoosterActive] = useState(false);
+            const [boosterTimeLeft, setBoosterTimeLeft] = useState(0);
 
             const [announcements, setAnnouncements] = useState([]);
             const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
@@ -256,7 +271,6 @@
                 if (!user || !db) return;
                 let unsubscribeRooms = () => {};
                 
-                // 👨‍🏫 선생님일 때만 전체 방 목록을 가져옵니다! (학생은 로비에서 방 목록 다운로드 0건)
                 if (view === 'teacher') {
                     const roomsRef = window.collection(db, 'artifacts', appId, 'public', 'data', 'typing_rooms');
                     const roomsQuery = window.query(roomsRef, window.orderBy('createdAt', 'desc'), window.limit(20));
@@ -276,12 +290,11 @@
                 return () => { unsubscribeRooms(); unsubscribeAnn(); };
             }, [user, db, view]);
 
-            // 🌟 2. 점수 데이터 (클릭한 반만 딱 가져와서 트래픽 99% 절약!)
+            // 🌟 2. 점수 데이터 (클릭한 반만 딱 가져와서 트래픽 방어)
             useEffect(() => {
                 if (!user || !db) return;
                 let unsubscribeScores = () => {};
 
-                // 👨‍🏫 선생님: 클릭한 반의 데이터만 핀셋으로 뽑아오기
                 if (view === 'teacher') {
                     if (viewingRoomId === '') {
                         setScores([]); 
@@ -301,7 +314,6 @@
                         });
                     }
                 }
-                // 🧑‍🎓 학생: 오직 내 점수표 1개만 수신!
                 else if (currentScoreDocId) {
                     const myScoreRef = window.doc(db, 'artifacts', appId, 'public', 'data', 'typing_scores', currentScoreDocId);
                     unsubscribeScores = window.onSnapshot(myScoreRef, (docSnap) => {
@@ -316,7 +328,7 @@
                 return () => unsubscribeScores();
             }, [user, db, view, viewingRoomId, currentScoreDocId]);
 
-            // 🌟 3. 학생 전용: 내가 입장한 딱 1개의 방만 감시 (선생님이 시작버튼 눌렀는지 확인)
+            // 🌟 3. 학생 전용: 내가 입장한 방 감시
             useEffect(() => {
                 if (!user || !db || !selectedRoomId || view === 'teacher') return;
                 
@@ -326,7 +338,6 @@
                         const rData = { id: docSnap.id, ...docSnap.data() };
                         setMyRoomData(rData);
                         
-                        // 선생님이 시작 버튼을 누르면!
                         if (view === 'waiting' && rData.status === 'playing') {
                             const myScoreDoc = scores.find(s => s.id === currentScoreDocId);
                             let myDifficulty = rData.mode;
@@ -347,11 +358,10 @@
                 latestCharsRef.current = correctChars;
             }, [score, correctChars]);
 
-            // 🌟 4. 학생 로직: 완벽한 트래픽 절약! 자동 타이머 끄고 선생님 갱신 신호에만 반응하기
+            // 🌟 4. 트래픽 0건! 선생님 갱신 신호 감지
             useEffect(() => {
                 if (view !== 'playing' || isPracticeMode || !currentScoreDocId || !selectedRoomId || !db) return;
                 
-                // 🌟 선생님이 갱신 버튼을 눌러서 새로운 신호(syncRequestedAt)가 발생했을 때만 작동!
                 if (myRoomData && myRoomData.syncRequestedAt && myRoomData.syncRequestedAt > lastProcessedSyncRef.current) {
                     lastProcessedSyncRef.current = myRoomData.syncRequestedAt; 
                     
@@ -410,12 +420,12 @@
                 if (!newRoomName.trim() || !user || !db) return;
 
                 const durationSec = Number(roomDuration);
-                const roomCode = Math.floor(1000 + Math.random() * 9000).toString(); // 🌟 1000~9999 무작위 4자리 코드 생성
+                const roomCode = Math.floor(1000 + Math.random() * 9000).toString(); 
 
                 const roomsRef = window.collection(db, 'artifacts', appId, 'public', 'data', 'typing_rooms');
                 await window.addDoc(roomsRef, {
                     name: newRoomName.trim(), mode: roomMode, duration: durationSec,
-                    roomCode: roomCode, // DB에 코드 저장
+                    roomCode: roomCode, 
                     status: 'waiting', 
                     createdBy: user.uid, createdAt: window.serverTimestamp()
                 });
@@ -476,7 +486,7 @@
                 if(!window.confirm(`정말 [${roomName}] 반을 삭제하시겠습니까?\n기록은 유지되지만 반 목록에서 삭제됩니다.`)) return;
                 try {
                     await window.deleteDoc(window.doc(db, 'artifacts', appId, 'public', 'data', 'typing_rooms', roomId));
-                    if (viewingRoomId === roomId) setViewingRoomId(''); // 빈 화면으로 초기화
+                    if (viewingRoomId === roomId) setViewingRoomId(''); 
                 } catch (e) { alert('삭제 실패: ' + e.message); }
             };
 
@@ -498,8 +508,13 @@
                 setInputValue('');
                 setIsPracticeMode(true);
                 setCurrentScoreDocId(null);
-                pickRandomWord('mixed');
                 
+                // 🌟 부스터 초기화
+                setBoosterAvailable(true);
+                setBoosterActive(false);
+                setBoosterTimeLeft(0);
+
+                pickRandomWord('mixed');
                 setView('playing');
             };
 
@@ -508,7 +523,6 @@
                 if (roomCodeInput.length !== 4) return alert("4자리 코드를 입력해주세요.");
 
                 try {
-                    // 🌟 4자리 코드로 DB에서 방 딱 1개만 검색해서 가져오기 (비용 초절약)
                     const roomsRef = window.collection(db, 'artifacts', appId, 'public', 'data', 'typing_rooms');
                     const q = window.query(roomsRef, window.where('roomCode', '==', roomCodeInput), window.where('status', '==', 'waiting'));
                     const querySnapshot = await window.getDocs(q);
@@ -548,6 +562,11 @@
                     setInputValue('');
                     setIsPracticeMode(false);
                     
+                    // 🌟 부스터 초기화
+                    setBoosterAvailable(true);
+                    setBoosterActive(false);
+                    setBoosterTimeLeft(0);
+                    
                     setView('waiting'); 
 
                 } catch (e) {
@@ -566,10 +585,24 @@
                 setCurrentWord(list[randomIndex]);
             };
 
+            // 🌟 게임 시간 및 부스터 시간 타이머
             useEffect(() => {
                 let timerId;
                 if (view === 'playing' && timeLeft > 0) {
-                    timerId = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
+                    timerId = setInterval(() => {
+                        setTimeLeft(prev => prev - 1);
+                        
+                        // 🌟 부스터 시간 깎기 로직
+                        setBoosterTimeLeft(prevTime => {
+                            if (prevTime > 1) return prevTime - 1;
+                            if (prevTime === 1) {
+                                setBoosterActive(false); // 0초가 되면 부스터 종료!
+                                return 0;
+                            }
+                            return 0;
+                        });
+
+                    }, 1000);
                 } else if (view === 'playing' && timeLeft === 0) {
                     endGame();
                 }
@@ -577,6 +610,7 @@
                 return () => clearInterval(timerId);
             }, [view, timeLeft, gameDuration]);
 
+            // 🌟 타자 입력 시 점수 계산
             const handleKeyDown = (e) => {
                 if (e.key === 'Backspace') setCombo(0);
 
@@ -592,7 +626,13 @@
                         const effectiveCombo = Math.min(combo, 10);
                         const comboBonus = effectiveCombo * currentWord.length * 2;
                         const lengthBonus = currentWord.includes(' ') ? 50 : (currentWord.length > 5 ? 20 : 0);
-                        const earnedScore = baseScore + comboBonus + lengthBonus;
+                        
+                        let earnedScore = baseScore + comboBonus + lengthBonus;
+                        
+                        // 🌟 부스터가 켜져 있으면 최종 획득 점수의 50%를 추가 보너스로 줍니다! (1.5배)
+                        if (boosterActive) {
+                            earnedScore = Math.floor(earnedScore * 1.5);
+                        }
                         
                         setScore(prev => prev + earnedScore);
                         setCorrectChars(prev => prev + currentWord.length);
@@ -657,7 +697,6 @@
                 return (
                     <div className="min-h-screen spring-bg flex items-center justify-center p-4">
                         <CherryBlossomBackground />
-                        {/* 🌟 공지사항 모달창 */}
                         {showAnnouncementModal && (
                             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
                                 <div className="bg-white rounded-3xl p-6 max-w-md w-full max-h-[80vh] overflow-y-auto custom-scrollbar shadow-2xl relative">
@@ -767,7 +806,6 @@
                                             <div key={r.id} onClick={() => setViewingRoomId(r.id)} className={`p-3 rounded-xl cursor-pointer transition-all border flex flex-col gap-1 ${viewingRoomId === r.id ? 'bg-pink-50 border-pink-300 text-pink-700' : 'bg-white border-gray-100 hover:bg-pink-50 text-gray-600'}`}>
                                                 <div className="flex justify-between items-center">
                                                     <div>
-                                                        {/* 🌟 방 이름 옆에 파란색으로 4자리 코드가 표시되도록 변경! */}
                                                         <span className="font-bold">{r.name} <span className="text-blue-500 font-black ml-2 bg-blue-50 px-2 py-1 rounded">코드: {r.roomCode}</span></span>
                                                     </div>
                                                     <button onClick={(e) => { e.stopPropagation(); handleDeleteRoom(r.id, r.name); }} className="text-red-300 hover:text-red-500 px-2 text-lg transition-colors" title="이 반 삭제하기">🗑️</button>
@@ -794,7 +832,6 @@
                                         {viewingRoomId !== '' && <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full animate-pulse">🔴 LIVE</span>}
                                     </h2>
                                     
-                                    {/* 🚀 시작 및 갱신 버튼 영역 */}
                                     {viewingRoomId !== '' && viewingRoomId !== 'all' && (
                                         <div className="flex gap-2 mb-6">
                                             {rooms.find(r => r.id === viewingRoomId)?.status === 'waiting' && (
@@ -847,7 +884,6 @@
                                                             {isRecentlyUpdated && <span className="text-[10px] bg-green-500 text-white px-1.5 py-0.5 ml-2 rounded-full animate-bounce inline-block">UP!</span>}
                                                         </td>
                                                         
-                                                        {/* 🌟 3단계 난이도 버튼 표시 */}
                                                         <td className="py-3 px-4 text-center">
                                                             {viewingRoomId !== 'all' && rooms.find(r => r.id === viewingRoomId)?.status === 'waiting' ? (
                                                                 <button onClick={() => toggleDifficulty(s.id, s.difficulty || 'normal')} className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${s.difficulty === 'hell' ? 'bg-purple-600 text-white' : s.difficulty === 'hard' ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>
@@ -871,11 +907,10 @@
                                     </div>
                                 </div>
                             </div>
-                            {/* 🌟 공지사항 관리 섹션 */}
+                            
                             <div className="glass-box p-6 rounded-3xl mt-6">
                                 <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">📢 공지사항 작성 및 관리</h2>
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                    {/* 작성 폼 */}
                                     <form onSubmit={handleSaveAnnouncement} className="space-y-3 bg-white p-5 rounded-2xl border border-pink-100 shadow-sm">
                                         <input type="text" value={annTitle} onChange={e => setAnnTitle(e.target.value)} placeholder="제목 (예: 🌸 5월 이달의 MVP 발표!)" className="w-full px-4 py-3 border border-pink-200 rounded-xl outline-none focus:ring-2 focus:ring-pink-400 font-bold" required />
                                         <textarea value={annContent} onChange={e => setAnnContent(e.target.value)} placeholder="학생들에게 알릴 내용을 적어주세요." rows="4" className="w-full px-4 py-3 border border-pink-200 rounded-xl outline-none resize-none custom-scrollbar focus:ring-2 focus:ring-pink-400" required />
@@ -885,7 +920,6 @@
                                         </div>
                                     </form>
                                     
-                                    {/* 목록 */}
                                     <div className="space-y-3 max-h-60 overflow-y-auto custom-scrollbar pr-2">
                                         {announcements.map(ann => (
                                             <div key={ann.id} className="bg-white p-4 rounded-2xl border border-pink-100 flex justify-between items-start gap-4 hover:border-pink-300 transition-colors">
@@ -927,7 +961,6 @@
                                 </div>
                                 <div>
                                     <label className="text-sm font-bold text-gray-600 mb-1 block">입장 코드 (4자리 숫자)</label>
-                                    {/* 🌟 드롭다운 대신 4자리 숫자만 입력되는 코드창으로 변경 */}
                                     <input type="text" value={roomCodeInput} onChange={(e) => setRoomCodeInput(e.target.value.replace(/[^0-9]/g, ''))} placeholder="예: 1234" className="w-full px-4 py-4 bg-white border border-pink-200 outline-none focus:ring-2 focus:ring-pink-400 text-gray-800 rounded-2xl text-center text-2xl tracking-[0.5em] font-black" maxLength="4" />
                                 </div>
 
@@ -976,9 +1009,42 @@
                 };
 
                 return (
-                    <div className="min-h-screen spring-bg flex flex-col p-4 md:p-8 relative overflow-hidden">
+                    // 🌟 부스터 발동 시 배경 전체가 붉은색으로 펄스 애니메이션이 들어갑니다!
+                    <div className={`min-h-screen flex flex-col p-4 md:p-8 relative overflow-hidden transition-colors duration-500 ${boosterActive ? 'booster-bg' : 'spring-bg'}`}>
                         <CherryBlossomBackground />
                         
+                        {/* 🌟 화면 오른쪽 아래 거대한 부스터 버튼! */}
+                        <div className="absolute bottom-8 right-8 md:bottom-12 md:right-12 z-50">
+                            <button 
+                                onClick={() => {
+                                    if(boosterAvailable && !boosterActive) {
+                                        setBoosterAvailable(false);
+                                        setBoosterActive(true);
+                                        setBoosterTimeLeft(20); // 20초 지속
+                                    }
+                                }}
+                                disabled={!boosterAvailable}
+                                className={`w-24 h-24 md:w-32 md:h-32 rounded-full shadow-2xl font-black flex flex-col items-center justify-center transition-all transform ${boosterActive ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white animate-pulse scale-110 shadow-orange-400' : boosterAvailable ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:scale-105 hover:shadow-pink-400 cursor-pointer' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+                            >
+                                {boosterActive ? (
+                                    <>
+                                        <span className="text-4xl md:text-5xl mb-1 drop-shadow-md">🔥</span>
+                                        <span className="text-xl md:text-2xl">{boosterTimeLeft}초</span>
+                                    </>
+                                ) : boosterAvailable ? (
+                                    <>
+                                        <span className="text-4xl md:text-5xl mb-1 drop-shadow-md">🚀</span>
+                                        <span className="text-sm md:text-base tracking-widest">부스터</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span className="text-4xl md:text-5xl mb-1 opacity-50">💨</span>
+                                        <span className="text-xs md:text-sm">사용됨</span>
+                                    </>
+                                )}
+                            </button>
+                        </div>
+
                         {showSuccess && (
                             <div className="animate-success-pop flex flex-col items-center">
                                 <div className="text-4xl md:text-5xl font-black text-pink-500 drop-shadow-md italic">
@@ -999,7 +1065,7 @@
                             </div>
                             <div className="flex items-center gap-6">
                                 <div className="text-gray-500 font-medium text-lg">
-                                    점수: <span className="text-pink-500 font-black text-2xl md:text-3xl">{score.toLocaleString()}</span>
+                                    점수: <span className={`font-black text-2xl md:text-3xl transition-colors ${boosterActive ? 'text-orange-500 animate-pulse' : 'text-pink-500'}`}>{score.toLocaleString()}</span>
                                 </div>
                                 <div className={`font-mono text-2xl font-bold px-4 py-2 rounded-xl border ${timeLeft <= 60 ? 'bg-red-50 border-red-200 text-red-500 animate-pulse' : 'bg-white border-pink-200 text-gray-700'}`}>
                                     ⏱️ {formatTime(timeLeft)}
@@ -1015,7 +1081,8 @@
                                 </div>
                             </div>
 
-                            <div className={`w-full max-w-3xl relative rounded-2xl overflow-hidden transition-all duration-200 ${combo > 2 ? 'input-success' : 'glass-box'} ${isError ? 'border-2 border-red-400 animate-shake shadow-lg shadow-red-200' : 'border-2 border-transparent'}`}>
+                            {/* 🌟 부스터 켜지면 입력창 테두리도 화려하게 변경! */}
+                            <div className={`w-full max-w-3xl relative rounded-2xl overflow-hidden transition-all duration-200 ${boosterActive ? 'shadow-[0_0_40px_rgba(251,191,36,0.5)] border-4 border-yellow-400 bg-white' : combo > 2 ? 'input-success' : 'glass-box'} ${isError ? 'border-2 border-red-400 animate-shake shadow-lg shadow-red-200' : 'border-2 border-transparent'}`}>
                                 <input
                                     ref={inputRef}
                                     type="text"
@@ -1036,7 +1103,7 @@
                             
                             <div className="w-full max-w-3xl h-2 bg-white/50 rounded-full mt-4 overflow-hidden border border-pink-100">
                                 <div 
-                                    className={`h-full transition-all duration-300 ${isError ? 'bg-red-400' : 'bg-gradient-to-r from-pink-300 to-pink-500'}`}
+                                    className={`h-full transition-all duration-300 ${isError ? 'bg-red-400' : boosterActive ? 'bg-gradient-to-r from-yellow-400 to-orange-500' : 'bg-gradient-to-r from-pink-300 to-pink-500'}`}
                                     style={{ width: `${Math.min((inputValue.length / currentWord.length) * 100, 100)}%` }}
                                 />
                             </div>
