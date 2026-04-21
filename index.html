@@ -629,9 +629,9 @@
                         
                         let earnedScore = baseScore + comboBonus + lengthBonus;
                         
-                        // 🌟 부스터가 켜져 있으면 최종 획득 점수의 50%를 추가 보너스로 줍니다! (1.5배)
+                        // 🌟 부스터가 켜져 있으면 최종 획득 점수의 50%를 추가 보너스로 줍니다! (2배)
                         if (boosterActive) {
-                            earnedScore = Math.floor(earnedScore * 1.5);
+                            earnedScore = Math.floor(earnedScore * 2);
                         }
                         
                         setScore(prev => prev + earnedScore);
