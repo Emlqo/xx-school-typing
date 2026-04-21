@@ -12,7 +12,8 @@
 
 <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        // 🌟 getDocs 추가!
+        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, query, where, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
         window.firebaseApp = initializeApp;
@@ -24,8 +25,11 @@
         window.doc = doc;
         window.updateDoc = updateDoc;
         window.deleteDoc = deleteDoc;
-        window.query = query;   // 🌟 필터링 도구 추가
-        window.where = where;   // 🌟 필터링 도구 추가
+        window.query = query;
+        window.where = where;
+        window.orderBy = orderBy; 
+        window.limit = limit;     
+        window.getDocs = getDocs; // 🌟 추가
         window.getAuth = getAuth;
         window.signInAnonymously = signInAnonymously;
         window.onAuthStateChanged = onAuthStateChanged;
@@ -180,8 +184,10 @@
             const [scores, setScores] = useState([]);
             const [currentTime, setCurrentTime] = useState(Date.now());
             
-            const [nickname, setNickname] = useState('');
+      const [nickname, setNickname] = useState('');
             const [selectedRoomId, setSelectedRoomId] = useState('');
+            const [roomCodeInput, setRoomCodeInput] = useState(''); // 🌟 학생이 입력할 4자리 코드
+            const [myRoomData, setMyRoomData] = useState(null);     // 🌟 학생이 소속된 단 1개의 방 정보
 
             const [teacherPwd, setTeacherPwd] = useState('');
             const [pwdError, setPwdError] = useState('');
@@ -273,49 +279,56 @@
 
             // 🌟 2. 점수 데이터 (권한에 따라 완벽하게 분리하여 트래픽 절약!)
    // 🌟 2. 점수 데이터 (클릭한 반만 딱 가져와서 트래픽 99% 절약!)
+     // 🌟 1. 선생님용 방 목록 & 공통 공지사항
             useEffect(() => {
                 if (!user || !db) return;
-
-                let unsubscribeScores = () => {};
-
-                // 👨‍🏫 선생님: 클릭한 반의 데이터만 핀셋으로 뽑아오기
+                let unsubscribeRooms = () => {};
+                
+                // 👨‍🏫 선생님일 때만 전체 방 목록을 가져옵니다! (학생은 로비에서 방 목록 다운로드 0건!!!)
                 if (view === 'teacher') {
-                    if (viewingRoomId === '') {
-                        setScores([]); // 아무것도 선택 안 했으면 아예 안 가져옴 (트래픽 0)
-                        return;
-                    }
-                    
-                    const scoresRef = window.collection(db, 'artifacts', appId, 'public', 'data', 'typing_scores');
-                    
-                    if (viewingRoomId === 'all') {
-                        // 전체보기일 때는 다 가져옴 (과거 데이터 많을 땐 누르지 마세요!)
-                        unsubscribeScores = window.onSnapshot(scoresRef, (snapshot) => {
-                            const scoreData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                            setScores(scoreData);
-                        });
-                    } else {
-                        // 🌟 핵심 방어막: 특정 반을 클릭했을 때 '그 반 데이터(예: 30명)'만 가져오기!!
-                        const q = window.query(scoresRef, window.where("roomId", "==", viewingRoomId));
-                        unsubscribeScores = window.onSnapshot(q, (snapshot) => {
-                            const scoreData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                            setScores(scoreData);
-                        });
-                    }
-                }
-                // 🧑‍🎓 학생: 오직 내 점수표 1개만 수신!
-                else if (currentScoreDocId) {
-                    const myScoreRef = window.doc(db, 'artifacts', appId, 'public', 'data', 'typing_scores', currentScoreDocId);
-                    unsubscribeScores = window.onSnapshot(myScoreRef, (docSnap) => {
-                        if (docSnap.exists()) {
-                            setScores([{ id: docSnap.id, ...docSnap.data() }]); 
-                        }
+                    const roomsRef = window.collection(db, 'artifacts', appId, 'public', 'data', 'typing_rooms');
+                    const roomsQuery = window.query(roomsRef, window.orderBy('createdAt', 'desc'), window.limit(20));
+                    unsubscribeRooms = window.onSnapshot(roomsQuery, (snapshot) => {
+                        const roomData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        setRooms(roomData);
                     });
-                } else {
-                    setScores([]); // 로비에 있을 때는 0건
                 }
 
-                return () => unsubscribeScores();
-            }, [user, db, view, currentScoreDocId, viewingRoomId]); // 👈 배열 마지막에 viewingRoomId 추가 필수!
+                const annRef = window.collection(db, 'artifacts', appId, 'public', 'data', 'typing_announcements');
+                const unsubscribeAnn = window.onSnapshot(annRef, (snapshot) => {
+                    const annData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    annData.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+                    setAnnouncements(annData);
+                });
+
+                return () => { unsubscribeRooms(); unsubscribeAnn(); };
+            }, [user, db, view]);
+
+            // 🌟 2. 학생 전용: 내가 입장한 딱 1개의 방만 감시 (선생님이 시작버튼 눌렀는지 확인)
+            useEffect(() => {
+                if (!user || !db || !selectedRoomId || view === 'teacher') return;
+                
+                const myRoomRef = window.doc(db, 'artifacts', appId, 'public', 'data', 'typing_rooms', selectedRoomId);
+                const unsubscribeMyRoom = window.onSnapshot(myRoomRef, (docSnap) => {
+                    if (docSnap.exists()) {
+                        const rData = { id: docSnap.id, ...docSnap.data() };
+                        setMyRoomData(rData);
+                        
+                        // 선생님이 시작 버튼을 누르면!
+                        if (view === 'waiting' && rData.status === 'playing') {
+                            const myScoreDoc = scores.find(s => s.id === currentScoreDocId);
+                            let myDifficulty = rData.mode;
+                            if (myScoreDoc?.difficulty === 'hard') myDifficulty = 'mixed';
+                            if (myScoreDoc?.difficulty === 'hell') myDifficulty = 'en'; 
+                            
+                            setGameMode(myDifficulty);
+                            pickRandomWord(myDifficulty);
+                            setView('playing'); 
+                        }
+                    }
+                });
+                return () => unsubscribeMyRoom();
+            }, [user, db, selectedRoomId, view, scores, currentScoreDocId]);
 
             // 대기실 자동 시작 감지 로직
             useEffect(() => {
@@ -344,14 +357,15 @@
             // 실시간 동기화   X  
         // 🌟 학생 로직: 선생님의 '점수 갱신' 신호를 감지하면 내 점수 전송하기
    // 🌟 실시간 동기화 (10초 단위 자동 전송으로 변경!)
+     // 🌟 학생 로직: 선생님의 '점수 갱신' 신호를 감지하면 내 점수 전송하기
             useEffect(() => {
-                // 게임 중이 아니거나 연습모드면 작동 안 함
-                if (view !== 'playing' || isPracticeMode || !currentScoreDocId || !db) return;
+                if (view !== 'playing' || isPracticeMode || !currentScoreDocId || !selectedRoomId || !db) return;
                 
-                const syncInterval = setInterval(() => {
-                    const currentScore = latestScoreRef.current;
+                // 🌟 rooms 배열 대신 myRoomData 단일 데이터 사용
+                if (myRoomData && myRoomData.syncRequestedAt && myRoomData.syncRequestedAt > lastProcessedSyncRef.current) {
+                    lastProcessedSyncRef.current = myRoomData.syncRequestedAt; 
                     
-                    // 점수가 예전보다 올랐을 때만 서버로 전송 (쓸데없는 전송 방지)
+                    const currentScore = latestScoreRef.current;
                     if (currentScore > lastSyncedScoreRef.current) {
                         const elapsedMin = gameInfoRef.current.elapsed / 60;
                         const currentCpm = elapsedMin > 0 ? Math.round(latestCharsRef.current / elapsedMin) : 0;
@@ -363,10 +377,8 @@
                         
                         lastSyncedScoreRef.current = currentScore;
                     }
-                }, 10000); // 👈 10초(10000ms)마다 알아서 조용히 갱신됩니다.
-                
-                return () => clearInterval(syncInterval);
-            }, [view, isPracticeMode, currentScoreDocId, db]);
+                }
+            }, [myRoomData, view, isPracticeMode, currentScoreDocId, selectedRoomId, db]);
 
             const playComboSound = (comboLevel) => {
                 try {
@@ -460,19 +472,18 @@
             const editAnnouncement = (ann) => {
                 setEditingAnnId(ann.id); setAnnTitle(ann.title); setAnnContent(ann.content);
             };
-
-
-        const handleCreateRoom = async (e) => {
+const handleCreateRoom = async (e) => {
                 e.preventDefault();
                 if (!newRoomName.trim() || !user || !db) return;
 
                 const durationSec = Number(roomDuration);
-                // 🚨 여기서 expiresAt(마감시간)을 미리 계산하던 코드를 삭제했습니다!
+                const roomCode = Math.floor(1000 + Math.random() * 9000).toString(); // 🌟 1000~9999 무작위 4자리 코드 생성
 
                 const roomsRef = window.collection(db, 'artifacts', appId, 'public', 'data', 'typing_rooms');
                 await window.addDoc(roomsRef, {
                     name: newRoomName.trim(), mode: roomMode, duration: durationSec,
-                    status: 'waiting', // 마감 시간 없이 '대기 중' 상태로만 만듭니다.
+                    roomCode: roomCode, // DB에 코드 저장
+                    status: 'waiting', 
                     createdBy: user.uid, createdAt: window.serverTimestamp()
                 });
                 setNewRoomName('');
@@ -509,44 +520,57 @@
                 setView('playing');
             };
 
-            const startGame = async () => {
+   const handleJoinRoom = async () => {
                 if (!nickname.trim()) return alert("닉네임을 입력해주세요.");
-                const room = rooms.find(r => r.id === selectedRoomId);
-                if (!room) return alert("입장할 반을 선택해주세요.");
-
-                if (room.expiresAt && Date.now() > room.expiresAt) {
-                    return alert("이 반은 설정된 시간이 지나 입장이 마감되었습니다!");
-                }
-                
-                try {
-                    const AudioContext = window.AudioContext || window.webkitAudioContext;
-                    if (!audioCtxRef.current && AudioContext) audioCtxRef.current = new AudioContext();
-                    if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') audioCtxRef.current.resume();
-                } catch(e){}
+                if (roomCodeInput.length !== 4) return alert("4자리 코드를 입력해주세요.");
 
                 try {
+                    // 🌟 4자리 코드로 DB에서 방 딱 1개만 검색해서 가져오기 (비용 초절약)
+                    const roomsRef = window.collection(db, 'artifacts', appId, 'public', 'data', 'typing_rooms');
+                    const q = window.query(roomsRef, window.where('roomCode', '==', roomCodeInput), window.where('status', '==', 'waiting'));
+                    const querySnapshot = await window.getDocs(q);
+
+                    if (querySnapshot.empty) {
+                        return alert("입장 코드가 틀렸거나, 이미 시작/마감된 방입니다!");
+                    }
+
+                    const roomDoc = querySnapshot.docs[0];
+                    const roomId = roomDoc.id;
+                    const roomData = roomDoc.data();
+
+                    setSelectedRoomId(roomId);
+                    setMyRoomData({ id: roomId, ...roomData });
+
+                    try {
+                        const AudioContext = window.AudioContext || window.webkitAudioContext;
+                        if (!audioCtxRef.current && AudioContext) audioCtxRef.current = new AudioContext();
+                        if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') audioCtxRef.current.resume();
+                    } catch(e){}
+
                     const scoresRef = window.collection(db, 'artifacts', appId, 'public', 'data', 'typing_scores');
                     const newDoc = await window.addDoc(scoresRef, {
-                        roomId: selectedRoomId, nickname: nickname, score: 0, cpm: 0,
+                        roomId: roomId, nickname: nickname, score: 0, cpm: 0,
                         difficulty: 'normal', 
                         userId: user.uid, createdAt: window.serverTimestamp(), updatedAt: window.serverTimestamp()
                     });
                     setCurrentScoreDocId(newDoc.id);
                     lastSyncedScoreRef.current = 0;
-                } catch (e) {
-                    alert("서버 연결 지연. 다시 시도해주세요."); return;
-                }
 
-                const duration = room.duration || 300;
-                setGameDuration(duration);
-                setTimeLeft(duration);
-                setScore(0);
-                setCorrectChars(0);
-                setCombo(0);
-                setInputValue('');
-                setIsPracticeMode(false);
-                
-                setView('waiting'); 
+                    const duration = roomData.duration || 300;
+                    setGameDuration(duration);
+                    setTimeLeft(duration);
+                    setScore(0);
+                    setCorrectChars(0);
+                    setCombo(0);
+                    setInputValue('');
+                    setIsPracticeMode(false);
+                    
+                    setView('waiting'); 
+
+                } catch (e) {
+                    console.error(e);
+                    alert("방 접속 중 오류가 발생했습니다.");
+                }
             };
 
       // 🌟 영어 전용 모드 로직 추가
@@ -912,7 +936,7 @@
                 );
             }
 
-            if (view === 'studentLobby') {
+     if (view === 'studentLobby') {
                 return (
                     <div className="min-h-screen spring-bg flex items-center justify-center p-4">
                         <CherryBlossomBackground />
@@ -920,8 +944,8 @@
                             <button onClick={() => setView('login')} className="absolute top-6 left-6 text-gray-400 hover:text-gray-600 font-medium">← 뒤로</button>
                             <div className="text-center mb-8 mt-4">
                                 <div className="text-5xl mb-2 animate-bounce">🎒</div>
-                                <h1 className="text-2xl font-bold text-gray-800">준비 완료</h1>
-                                <p className="text-gray-500 text-sm mt-1">본인의 닉네임과 선생님이 만든 반을 선택하세요.</p>
+                                <h1 className="text-2xl font-bold text-gray-800">선수 입장</h1>
+                                <p className="text-gray-500 text-sm mt-1">선생님이 알려주신 4자리 코드를 입력하세요!</p>
                             </div>
                             
                             <div className="space-y-4">
@@ -930,22 +954,12 @@
                                     <input type="text" value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder="예: 홍길동" className="w-full px-4 py-4 bg-white border border-pink-200 outline-none focus:ring-2 focus:ring-pink-400 text-gray-800 rounded-2xl" maxLength="10" />
                                 </div>
                                 <div>
-                                    <label className="text-sm font-bold text-gray-600 mb-1 block">입장할 반</label>
-                                    <select value={selectedRoomId} onChange={(e) => setSelectedRoomId(e.target.value)} className="w-full px-4 py-4 bg-white border border-pink-200 outline-none focus:ring-2 focus:ring-pink-400 text-gray-800 rounded-2xl appearance-none">
-                                        <option value="" disabled>선택해주세요</option>
-                                        {rooms.map(r => {
-                                            const isExpired = r.expiresAt && currentTime > r.expiresAt;
-                                            return (
-                                                <option key={r.id} value={r.id} disabled={isExpired}>
-                                                    {r.name} ({r.duration/60}분) {isExpired ? '- 마감됨' : ''}
-                                                </option>
-                                            )
-                                        })}
-                                    </select>
-                                    {rooms.length === 0 && <p className="text-xs text-red-400 mt-2">선생님이 아직 반을 만들지 않았습니다.</p>}
+                                    <label className="text-sm font-bold text-gray-600 mb-1 block">입장 코드 (4자리 숫자)</label>
+                                    {/* 🌟 드롭다운 대신 4자리 숫자만 입력되는 코드창으로 변경 */}
+                                    <input type="text" value={roomCodeInput} onChange={(e) => setRoomCodeInput(e.target.value.replace(/[^0-9]/g, ''))} placeholder="예: 1234" className="w-full px-4 py-4 bg-white border border-pink-200 outline-none focus:ring-2 focus:ring-pink-400 text-gray-800 rounded-2xl text-center text-2xl tracking-[0.5em] font-black" maxLength="4" />
                                 </div>
 
-                                <button onClick={startGame} disabled={!nickname || !selectedRoomId} className="w-full py-4 mt-2 bg-pink-500 hover:bg-pink-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-2xl font-bold text-lg shadow-md transition-colors">
+                                <button onClick={handleJoinRoom} disabled={!nickname || roomCodeInput.length !== 4} className="w-full py-4 mt-2 bg-pink-500 hover:bg-pink-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-2xl font-bold text-lg shadow-md transition-colors">
                                     본 게임 입장하기
                                 </button>
                                 
@@ -957,16 +971,14 @@
                     </div>
                 );
             }
-
-            if (view === 'waiting') {
-                const myRoom = rooms.find(r => r.id === selectedRoomId);
+if (view === 'waiting') {
                 return (
                     <div className="min-h-screen spring-bg flex flex-col items-center justify-center p-4">
                         <CherryBlossomBackground />
                         <div className="glass-box rounded-3xl p-10 text-center max-w-md w-full z-10 relative shadow-xl">
                             <div className="text-6xl mb-6 animate-bounce">⏳</div>
                             <h1 className="text-2xl font-bold text-gray-800 mb-4">시작 대기 중...</h1>
-                            <p className="text-gray-500 font-medium mb-6">[{myRoom?.name}] 반에 입장했습니다.<br/>선생님이 시작할 때까지 손가락을 풀어주세요!</p>
+                            <p className="text-gray-500 font-medium mb-6">[{myRoomData?.name}] 반에 입장했습니다.<br/>선생님이 시작할 때까지 손가락을 풀어주세요!</p>
                             <div className="w-full bg-pink-100 h-2 rounded-full overflow-hidden">
                                 <div className="bg-pink-500 h-full animate-pulse" style={{ width: '100%' }}></div>
                             </div>
@@ -1108,5 +1120,6 @@
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
+    <span className="font-bold">{r.name} <span className="text-blue-500 font-black ml-2 bg-blue-50 px-2 py-1 rounded">코드: {r.roomCode}</span></span>
 </body>
 </html>
