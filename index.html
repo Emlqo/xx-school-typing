@@ -788,13 +788,14 @@ const handleCreateRoom = async (e) => {
                                         <div onClick={() => setViewingRoomId('all')} className={`p-3 rounded-xl cursor-pointer transition-all border font-medium flex justify-between items-center ${viewingRoomId === 'all' ? 'bg-pink-50 border-pink-300 text-pink-700' : 'bg-white border-transparent hover:bg-pink-50 text-gray-600'}`}>
                                             <span>학교 전체 보기</span>
                                         </div>
-                                        {rooms.map(r => {
+                               {rooms.map(r => {
                                             const isExpired = r.expiresAt && currentTime > r.expiresAt;
                                             return (
                                             <div key={r.id} onClick={() => setViewingRoomId(r.id)} className={`p-3 rounded-xl cursor-pointer transition-all border flex flex-col gap-1 ${viewingRoomId === r.id ? 'bg-pink-50 border-pink-300 text-pink-700' : 'bg-white border-gray-100 hover:bg-pink-50 text-gray-600'}`}>
                                                 <div className="flex justify-between items-center">
                                                     <div>
-                                                        <span className="font-bold">{r.name}</span>
+                                                        {/* 🌟 방 이름 옆에 파란색으로 4자리 코드가 표시되도록 변경! */}
+                                                        <span className="font-bold">{r.name} <span className="text-blue-500 font-black ml-2 bg-blue-50 px-2 py-1 rounded">코드: {r.roomCode}</span></span>
                                                     </div>
                                                     <button onClick={(e) => { e.stopPropagation(); handleDeleteRoom(r.id, r.name); }} className="text-red-300 hover:text-red-500 px-2 text-lg transition-colors" title="이 반 삭제하기">🗑️</button>
                                                 </div>
