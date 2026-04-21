@@ -269,41 +269,32 @@
             }, [isFirebaseLoaded]);
 
             // 1. 방 목록 & 공통 공지사항
+    // 🌟 1-A. 공통 공지사항 (화면이 바뀌어도 딱 1번만! 최근 5개만 가져오기)
             useEffect(() => {
                 if (!user || !db) return;
-                let unsubscribeRooms = () => {};
-                
-                if (view === 'teacher') {
-                    const roomsRef = window.collection(db, 'artifacts', appId, 'public', 'data', 'typing_rooms');
-                    const roomsQuery = window.query(roomsRef, window.orderBy('createdAt', 'desc'), window.limit(20));
-                    unsubscribeRooms = window.onSnapshot(roomsQuery, (snapshot) => {
-                        const roomData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                        setRooms(roomData);
-                    });
-                }
-
                 const annRef = window.collection(db, 'artifacts', appId, 'public', 'data', 'typing_announcements');
-                const unsubscribeAnn = window.onSnapshot(annRef, (snapshot) => {
+                // 🚨 무제한으로 가져오지 않고 최근 5개만 잘라서 가져옵니다.
+                const q = window.query(annRef, window.orderBy('createdAt', 'desc'), window.limit(5));
+                const unsubscribeAnn = window.onSnapshot(q, (snapshot) => {
                     const annData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    annData.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
                     setAnnouncements(annData);
                 });
+                return () => unsubscribeAnn();
+            }, [user, db]); // 👈 view 조건을 빼서 화면이 바뀌어도 재구독하지 않음!
 
-                return () => { unsubscribeRooms(); unsubscribeAnn(); };
+            // 🌟 1-B. 선생님 전용 방 목록 (선생님 화면일 때만 최근 15개 방 가져오기)
+            useEffect(() => {
+                if (!user || !db || view !== 'teacher') return;
+                const roomsRef = window.collection(db, 'artifacts', appId, 'public', 'data', 'typing_rooms');
+                const roomsQuery = window.query(roomsRef, window.orderBy('createdAt', 'desc'), window.limit(15));
+                const unsubscribeRooms = window.onSnapshot(roomsQuery, (snapshot) => {
+                    const roomData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setRooms(roomData);
+                });
+                return () => unsubscribeRooms();
             }, [user, db, view]);
 
-            // 🌟 1-1. 학생이 처음 로그인 화면에 오면 팝업 공지가 있는지 확인하고 띄워주기
-            useEffect(() => {
-                if (view === 'login' && !hasSeenAlert && announcements.length > 0) {
-                    const hasAlert = announcements.some(ann => ann.isAlert);
-                    if (hasAlert) {
-                        setShowAnnouncementModal(true);
-                        setHasSeenAlert(true); // 한 번 봤으면 새로고침 전까지는 안 띄움
-                    }
-                }
-            }, [view, announcements, hasSeenAlert]);
-
-            // 2. 점수 데이터 
+            // 🌟 2. 점수 데이터 (가장 위험했던 곳 완벽 방어!)
             useEffect(() => {
                 if (!user || !db) return;
                 let unsubscribeScores = () => {};
@@ -314,12 +305,16 @@
                         return;
                     }
                     const scoresRef = window.collection(db, 'artifacts', appId, 'public', 'data', 'typing_scores');
+                    
                     if (viewingRoomId === 'all') {
-                        unsubscribeScores = window.onSnapshot(scoresRef, (snapshot) => {
+                        // 🚨 가장 큰 지뢰 제거: 전체 보기를 눌러도 과거 데이터 수천 개를 안 가져오고 '최근 100건'만 가져옵니다!
+                        const q = window.query(scoresRef, window.orderBy('updatedAt', 'desc'), window.limit(100));
+                        unsubscribeScores = window.onSnapshot(q, (snapshot) => {
                             const scoreData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                             setScores(scoreData);
                         });
                     } else {
+                        // 🌟 클릭한 방의 학생들만 쏙!
                         const q = window.query(scoresRef, window.where("roomId", "==", viewingRoomId));
                         unsubscribeScores = window.onSnapshot(q, (snapshot) => {
                             const scoreData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -341,7 +336,7 @@
                 return () => unsubscribeScores();
             }, [user, db, view, viewingRoomId, currentScoreDocId]);
 
-            // 3. 학생 전용: 내가 입장한 방 감시
+            // 🌟 3. 학생 전용: 내가 입장한 방 감시 (쓸데없는 재구독 완벽 차단)
             useEffect(() => {
                 if (!user || !db || !selectedRoomId || view === 'teacher') return;
                 
@@ -352,19 +347,14 @@
                         setMyRoomData(rData);
                         
                         if (view === 'waiting' && rData.status === 'playing') {
-                            const myScoreDoc = scores.find(s => s.id === currentScoreDocId);
-                            let myDifficulty = rData.mode;
-                            if (myScoreDoc?.difficulty === 'hard') myDifficulty = 'mixed';
-                            if (myScoreDoc?.difficulty === 'hell') myDifficulty = 'en'; 
-                            
-                            setGameMode(myDifficulty);
-                            pickRandomWord(myDifficulty);
+                            setGameMode(rData.mode);
+                            pickRandomWord(rData.mode);
                             setView('playing'); 
                         }
                     }
                 });
                 return () => unsubscribeMyRoom();
-            }, [user, db, selectedRoomId, view, scores, currentScoreDocId]);
+            }, [user, db, selectedRoomId, view]); // 🚨 의존성 배열에서 scores를 제거하여 무한 읽기 폭탄 제거!
 
             useEffect(() => {
                 latestScoreRef.current = score;
