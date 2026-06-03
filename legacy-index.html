@@ -1,0 +1,1833 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>풍양중학교 타자연습</title>
+    
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, query, where, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+        window.firebaseApp = initializeApp;
+        window.getFirestore = getFirestore;
+        window.collection = collection;
+        window.addDoc = addDoc;
+        window.onSnapshot = onSnapshot;
+        window.serverTimestamp = serverTimestamp;
+        window.doc = doc;
+        window.updateDoc = updateDoc;
+        window.deleteDoc = deleteDoc;
+        window.query = query;
+        window.where = where;
+        window.orderBy = orderBy; 
+        window.limit = limit;     
+        window.getDocs = getDocs; 
+        window.getAuth = getAuth;
+        window.signInAnonymously = signInAnonymously;
+        window.onAuthStateChanged = onAuthStateChanged;
+        
+        window.dispatchEvent(new Event('firebase-loaded'));
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap');
+        body { font-family: 'Noto Sans KR', sans-serif; }
+
+        .spring-bg {
+            background: linear-gradient(135deg, #fff0f5 0%, #ffe4e1 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .booster-bg {
+            background: linear-gradient(135deg, #fff0f5 0%, #ffedd5 50%, #fecaca 100%);
+            animation: pulse-bg 2s infinite alternate;
+        }
+        
+        @keyframes pulse-bg {
+            0% { background: linear-gradient(135deg, #fff0f5 0%, #ffe4e1 100%); }
+            100% { background: linear-gradient(135deg, #ffedd5 0%, #fecaca 100%); }
+        }
+
+        .petal {
+            position: absolute;
+            background-color: #ffb7c5;
+            border-radius: 15px 0 15px 0;
+            opacity: 0.8;
+            box-shadow: 0 0 10px rgba(255, 183, 197, 0.5);
+            animation: fall linear infinite, sway ease-in-out infinite alternate;
+        }
+
+        @keyframes fall { 0% { top: -10%; } 100% { top: 110%; } }
+        @keyframes sway { 0% { transform: translateX(0) rotate(0deg); } 100% { transform: translateX(30px) rotate(45deg); } }
+
+        .glass-box {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 8px 32px rgba(255, 183, 197, 0.2);
+        }
+
+        .input-success {
+            box-shadow: 0 0 20px rgba(244, 114, 182, 0.6), inset 0 0 10px rgba(244, 114, 182, 0.2);
+            border-color: #f472b6 !important;
+        }
+
+        .animate-shake { animation: shake 0.4s ease-in-out; }
+        @keyframes shake { 
+            0%, 100% { transform: translateX(0); } 
+            20%, 60% { transform: translateX(-10px); } 
+            40%, 80% { transform: translateX(10px); } 
+        }
+
+        .animate-success-pop {
+            position: absolute;
+            top: 25%;
+            left: 50%;
+            animation: float-up-fade 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+            pointer-events: none;
+            z-index: 50;
+        }
+        @keyframes float-up-fade {
+            0% { transform: translate(-50%, 0) scale(0.5); opacity: 0; }
+            20% { transform: translate(-50%, -20px) scale(1.2); opacity: 1; }
+            80% { transform: translate(-50%, -40px) scale(1); opacity: 1; }
+            100% { transform: translate(-50%, -60px) scale(0.8); opacity: 0; }
+        }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255, 228, 225, 0.5); border-radius: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(244, 114, 182, 0.5); border-radius: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(236, 72, 153, 0.8); }
+
+        .live-badge { animation: pulse-red 1.5s infinite; }
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBj29ErYiUHN9Q4S0uHASKnSs-QlzLPEWM",
+            authDomain: "dongducheon-c28a0.firebaseapp.com",
+            projectId: "dongducheon-c28a0",
+            storageBucket: "dongducheon-c28a0.firebasestorage.app",
+            messagingSenderId: "523115840407",
+            appId: "1:523115840407:web:60f90dce434c63e29bfad2",
+            measurementId: "G-PFMZNFKKQW"
+        };
+
+        const appId = 'xx-school-typing-app';
+        const TEACHER_PASSWORD = '0327';
+
+        const FIRESTORE_PATHS = {
+            rooms: 'typing_rooms',
+            scores: 'typing_scores',
+            announcements: 'typing_announcements',
+            quizzes: 'typing_quizzes'
+        };
+
+        const getPublicCollection = (db, appId, collectionName) => {
+            return window.collection(db, 'artifacts', appId, 'public', 'data', collectionName);
+        };
+
+        const getPublicDoc = (db, appId, collectionName, docId) => {
+            return window.doc(db, 'artifacts', appId, 'public', 'data', collectionName, docId);
+        };
+
+        const GAME_RULES = {
+            baseCharScore: 10,
+            quizCorrectBaseScore: 400,
+            quizWrongPenalty: -200,
+            boosterMultiplier: 2.0,
+            boosterDuration: 25,
+            quizIntervalWords: 3
+        };
+
+        // Score helpers stay pure so game rules can be checked without touching UI state.
+        const calculateTypingScore = ({ word, combo, pointWeight, boosterActive }) => {
+            const baseScore = word.length * GAME_RULES.baseCharScore;
+            const effectiveCombo = Math.min(combo, 10);
+            const comboBonus = effectiveCombo * word.length * 2;
+            const lengthBonus = word.includes(' ') ? 50 : (word.length > 5 ? 20 : 0);
+            let earnedScore = (baseScore + comboBonus + lengthBonus) * (pointWeight || 1.0);
+            
+            if (boosterActive) {
+                earnedScore *= GAME_RULES.boosterMultiplier;
+            }
+            
+            return Math.floor(earnedScore);
+        };
+
+        const calculateQuizScore = ({ pointWeight, boosterActive }) => {
+            let earnedScore = GAME_RULES.quizCorrectBaseScore * (pointWeight || 1.0);
+            
+            if (boosterActive) {
+                earnedScore *= GAME_RULES.boosterMultiplier;
+            }
+            
+            return Math.floor(earnedScore);
+        };
+
+        const calculateCpm = ({ chars, seconds }) => {
+            const minutes = seconds / 60;
+            return minutes > 0 ? Math.round(chars / minutes) : 0;
+        };
+
+ const KOREAN_WORDS = [
+            // 기본 학교생활 & 일상
+            "학교", "선생님", "교과서", "칠판", "체육대회", "수학여행", "중간고사", "기말고사", "쉬는시간", "점심시간",
+            "도서관", "과학실", "미술실", "음악실", "동아리", "급식", "친구", "우정", "추억", "졸업식", "정보교과",
+            "수행평가", "방학식", "개학식", "학급회의", "동아리활동", "학생회장", "교장선생님", "담임선생님", "진로상담", 
+            "가정통신문", "알림장", "조회시간", "종례시간", "야간자율학습", "교복", "체육복", "풍양중학교",
+
+            // 정보/컴퓨터 교과 특화 (선생님 맞춤형)
+            "인공지능", "파이썬", "리액트", "자바스크립트", "코딩", "알고리즘", "소프트웨어", "하드웨어", "메인보드", 
+            "그래픽카드", "스마트폰", "데이터베이스", "네트워크", "운영체제", "프로그래밍", "웹개발", "클라우드", "서버", 
+            "키보드", "마우스", "모니터", "머신러닝", "딥러닝", "프롬프트", "메타버스", "사물인터넷", "가상현실", 
+            "증강현실", "프론트엔드", "백엔드", "디버깅", "오류", "버그", "해킹", "정보보안", "인터넷",
+
+            // 중학생 트렌드 & 음식
+            "마라탕", "탕후루", "떡볶이", "돈까스", "치킨", "피자", "햄버거", "아이스크림", "콜라", "사이다",
+            "아메리카노", "에이드", "소떡소떡", "버블티", "코인노래방", "네컷사진", "웹툰", "유튜브", "알고리즘의 선택",
+            "완전 럭키비키잖아", "폼미쳤다", "중요한 것은 꺾이지 않는 마음", "오운완", "알잘딱깔센", "취향존중", "벼락치기",
+
+            // 짧은 명언 및 속담
+            "푸른 하늘 은하수 하얀 쪽배에", "계수나무 한 나무 토끼 한 마리", "남산 위에 저 소나무 철갑을 두른 듯", 
+            "동해 물과 백두산이 마르고 닳도록", "배움에는 끝이 없다", "연습은 완벽을 만든다", "오늘의 노력이 내일의 실력", 
+            "가는 말이 고와야 오는 말이 곱다", "시작이 반이다", "천 리 길도 한 걸음부터", "티끌 모아 태산", 
+            "포기하지 않으면 실패는 없다", "시간은 금이다", "백지장도 맞들면 낫다", "아는 것이 힘이다",
+            "바른 인성과 실력을 갖춘 인재", "꿈을 향해 도전하는 우리들", "별 헤는 밤 하늘을 우러러 한 점 부끄럼이 없기를",
+
+            // 🌟 코딩 & 학교생활 관련 재미있는 긴 문장 (추가)
+            "일찍 일어나는 새가 피곤하다",
+            "맛있게 먹으면 0칼로리",
+            "왜 안 돌아가지? 왜 돌아가지?",
+            "세상에 완벽한 코드는 없다",
+            "내 코드에 버그가 있을 리 없어",
+            "컴퓨터는 거짓말을 하지 않는다",
+            "백 번 듣는 것보다 한 번 코딩하는 것이 낫다",
+            "Ctrl+C와 Ctrl+V는 나의 빛과 소금",
+            "코딩의 완성은 디버깅이다",
+            "에러 메시지를 두려워하지 말라",
+            "오늘 피하면 내일은 두 배로 해야 한다",
+            "에러가 발생했습니다 다시 시도해주세요",
+            "코딩은 손으로 하는 것이 아니라 머리로 하는 것이다",
+            "우리는 자랑스러운 풍양중학교 학생이다"
+        ];
+
+        const ENGLISH_WORDS = [
+            // Basic & School
+            "apple", "banana", "school", "student", "teacher", "book", "desk", "chair", "notebook", "pencil",
+            "library", "science", "music", "art", "history", "math", "english", "friend", "study", "learn",
+            "classroom", "homework", "semester", "graduation", "uniform", "subject", "vocabulary", "grammar",
+
+            // Emotion & Abstract
+            "future", "dream", "success", "challenge", "passion", "effort", "courage", "wisdom", "health", "peace",
+            "happy", "smile", "laugh", "love", "hope", "believe", "amazing", "awesome", "perfect", "great",
+
+            // 🌟 CS / Tech / Coding (대폭 추가)
+            "computer", "keyboard", "mouse", "internet", "coding", "software", "hardware", "network", "program",
+            "python", "react", "javascript", "developer", "server", "database", "algorithm", "variable", "function",
+            "artificial intelligence", "machine learning", "deep learning", "big data", "cloud computing",
+            "front end", "back end", "full stack", "operating system", "protocol", "debug", "compiler", 
+            "execution", "exception", "framework", "terminal", "console", "syntax", "object", "array", "string",
+
+            // Proverbs & Famous Quotes
+            "Time is gold", "No pain, no gain", "Knowledge is power", "Practice makes perfect", 
+            "Where there is a will, there is a way", "Actions speak louder than words", 
+            "Honesty is the best policy", "Rome was not built in a day", 
+            "To be or not to be, that is the question", "I think, therefore I am", "Seize the day",
+            "A rolling stone gathers no moss", "Better late than never", "Don't judge a book by its cover",
+
+            // 🌟 Fun & Coding Quotes (추가)
+            "The quick brown fox jumps over the lazy dog", 
+            "Hello, World!", 
+            "Show me the code.", 
+            "Keep calm and write code.", 
+            "Talk is cheap. Show me the code.", 
+            "First, solve the problem. Then, write the code.", 
+            "Make it work, make it right, make it fast.", 
+            "Error 404 Not Found", 
+            "I am not a bug, I am a feature.", 
+            "May the Force be with you.", 
+            "Just do it.", 
+            "Never give up.",
+            "Ctrl C and Ctrl V"
+        ];
+        const CherryBlossomBackground = () => {
+            const petals = React.useMemo(() => {
+                return Array.from({ length: 30 }).map((_, i) => ({
+                    id: i, 
+                    left: `${Math.random() * 100}%`,
+                    animationDuration: `${Math.random() * 15 + 10}s`, 
+                    animationDelay: `-${Math.random() * 20}s`, 
+                    width: `${Math.random() * 8 + 6}px`, 
+                    height: `${Math.random() * 8 + 6}px`
+                }));
+            }, []);
+
+            return (
+                <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+                    {petals.map(p => (
+                        <div key={p.id} className="petal" style={{ 
+                            left: p.left, width: p.width, height: p.height, 
+                            animationDuration: p.animationDuration, animationDelay: p.animationDelay 
+                        }} />
+                    ))}
+                </div>
+            );
+        };
+
+        function App() {
+            const [isFirebaseLoaded, setIsFirebaseLoaded] = useState(false);
+            const [user, setUser] = useState(null);
+            const [db, setDb] = useState(null);
+
+            const [view, setView] = useState('login');
+            const [rooms, setRooms] = useState([]);
+            const [scores, setScores] = useState([]);
+            const [currentTime, setCurrentTime] = useState(Date.now());
+            
+            const [nickname, setNickname] = useState('');
+            const [selectedRoomId, setSelectedRoomId] = useState('');
+            const [roomCodeInput, setRoomCodeInput] = useState(''); 
+            const [myRoomData, setMyRoomData] = useState(null);     
+
+            const [teacherPwd, setTeacherPwd] = useState('');
+            const [pwdError, setPwdError] = useState('');
+            const [newRoomName, setNewRoomName] = useState('');
+            const [roomMode, setRoomMode] = useState('ko'); 
+            const [roomDuration, setRoomDuration] = useState('300'); 
+            const [viewingRoomId, setViewingRoomId] = useState(''); 
+
+            const [gameMode, setGameMode] = useState('ko');
+            const [gameDuration, setGameDuration] = useState(300);
+            const [timeLeft, setTimeLeft] = useState(300);
+            const [currentWord, setCurrentWord] = useState('');
+            const [inputValue, setInputValue] = useState('');
+            const [score, setScore] = useState(0);
+            const [correctChars, setCorrectChars] = useState(0); 
+            const inputRef = useRef(null);
+
+            const [combo, setCombo] = useState(0);
+            const [showSuccess, setShowSuccess] = useState(false);
+            const [lastEarned, setLastEarned] = useState(0);
+            const [isError, setIsError] = useState(false);
+            
+            const [isPracticeMode, setIsPracticeMode] = useState(false);
+
+            // 🌟 부스터 관련 상태
+            const [boosterAvailable, setBoosterAvailable] = useState(true);
+            const [boosterActive, setBoosterActive] = useState(false);
+            const [boosterTimeLeft, setBoosterTimeLeft] = useState(0);
+
+            // 🌟 공지사항 관련 상태
+            const [announcements, setAnnouncements] = useState([]);
+            const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
+            const [annTitle, setAnnTitle] = useState('');
+            const [annContent, setAnnContent] = useState('');
+            const [editingAnnId, setEditingAnnId] = useState(null);
+            const [annIsAlert, setAnnIsAlert] = useState(false);
+            const [hasSeenAlert, setHasSeenAlert] = useState(false);
+
+            // 🌟 퀴즈 관련 상태 및 보관소
+            const [quizzes, setQuizzes] = useState([]);
+            const [currentQuiz, setCurrentQuiz] = useState(null);
+            const [quizQuestion, setQuizQuestion] = useState('');
+            const [quizOptions, setQuizOptions] = useState(['', '', '', '']);
+            const [quizAnswer, setQuizAnswer] = useState(0);
+            
+            const pendingQuizzesRef = useRef([]); // 출제 대기 중인 퀴즈 목록
+            const wordCountRef = useRef(0); // 단어를 몇 개 쳤는지 세는 카운터
+            
+
+            const [currentScoreDocId, setCurrentScoreDocId] = useState(null);
+            const latestScoreRef = useRef(0);
+            const latestCharsRef = useRef(0);
+            const lastSyncedScoreRef = useRef(0);
+            const gameInfoRef = useRef({ elapsed: 0 });
+
+            const audioCtxRef = useRef(null);
+            const lastProcessedSyncRef = useRef(0); 
+
+            useEffect(() => {
+                const clock = setInterval(() => setCurrentTime(Date.now()), 1000);
+                return () => clearInterval(clock);
+            }, []);
+
+            // ------------------------------------------------------------------
+            // Firebase 초기화 영역
+            // ------------------------------------------------------------------
+            useEffect(() => {
+                const handleFirebaseLoad = () => setIsFirebaseLoaded(true);
+                window.addEventListener('firebase-loaded', handleFirebaseLoad);
+                if (window.firebaseApp) setIsFirebaseLoaded(true); 
+                return () => window.removeEventListener('firebase-loaded', handleFirebaseLoad);
+            }, []);
+
+            // Firebase 앱/Firestore/Auth를 초기화하고 익명 로그인을 연결합니다.
+            useEffect(() => {
+                if (!isFirebaseLoaded) return;
+                try {
+                    const app = window.firebaseApp(firebaseConfig);
+                    const database = window.getFirestore(app);
+                    const auth = window.getAuth(app);
+                    setDb(database);
+
+                    window.signInAnonymously(auth).catch(e => console.error(e));
+                    window.onAuthStateChanged(auth, setUser);
+                } catch (error) { console.error(error); }
+            }, [isFirebaseLoaded]);
+
+            // ------------------------------------------------------------------
+            // 공지사항 구독 영역
+            // ------------------------------------------------------------------
+            // 최신 공지사항 5개를 구독하고 시작 화면 팝업에 사용합니다.
+            useEffect(() => {
+                if (!user || !db) return;
+                const annRef = getPublicCollection(db, appId, FIRESTORE_PATHS.announcements);
+                const q = window.query(annRef, window.orderBy('createdAt', 'desc'), window.limit(5));
+                
+                const unsubscribeAnn = window.onSnapshot(q, (snapshot) => {
+                    const annData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setAnnouncements(annData);
+                });
+
+                return () => unsubscribeAnn();
+            }, [user, db]);
+
+            // 공지사항 중 팝업 표시 대상이 있으면 로그인 화면에서 자동으로 띄웁니다.
+            useEffect(() => {
+                if (view === 'login' && !hasSeenAlert && announcements.length > 0) {
+                    const hasAlert = announcements.some(ann => ann.isAlert);
+                    if (hasAlert) {
+                        setShowAnnouncementModal(true);
+                        setHasSeenAlert(true);
+                    }
+                }
+            }, [view, announcements, hasSeenAlert]);
+
+            // ------------------------------------------------------------------
+            // 교사 방 목록 구독 영역
+            // ------------------------------------------------------------------
+            // 교사 화면에서만 최근 방 목록을 구독합니다.
+            useEffect(() => {
+                if (!user || !db || view !== 'teacher') return;
+                const roomsRef = getPublicCollection(db, appId, FIRESTORE_PATHS.rooms);
+                const roomsQuery = window.query(roomsRef, window.orderBy('createdAt', 'desc'), window.limit(20));
+                
+                const unsubscribeRooms = window.onSnapshot(roomsQuery, (snapshot) => {
+                    const roomData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setRooms(roomData);
+                });
+
+                return () => unsubscribeRooms();
+            }, [user, db, view]);
+
+            // ------------------------------------------------------------------
+            // 퀴즈 구독 영역
+            // ------------------------------------------------------------------
+            // 게임 시작 시 섞어서 장전할 돌발 퀴즈 목록을 구독합니다.
+            useEffect(() => {
+                if (!user || !db) return;
+                const quizRef = getPublicCollection(db, appId, FIRESTORE_PATHS.quizzes);
+                const unsubscribeQuiz = window.onSnapshot(quizRef, (snapshot) => {
+                    const quizData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setQuizzes(quizData);
+                });
+                return () => unsubscribeQuiz();
+            }, [user, db]);
+
+            // ------------------------------------------------------------------
+            // 점수 구독 영역
+            // ------------------------------------------------------------------
+            // 교사는 선택한 범위의 점수판을, 학생은 자기 점수 문서 1개를 구독합니다.
+            useEffect(() => {
+                if (!user || !db) return;
+                let unsubscribeScores = () => {};
+
+                if (view === 'teacher') {
+                    if (viewingRoomId === '') {
+                        setScores([]); 
+                        return;
+                    }
+                    const scoresRef = getPublicCollection(db, appId, FIRESTORE_PATHS.scores);
+                    
+                    if (viewingRoomId === 'all') {
+                        const q = window.query(scoresRef, window.orderBy('updatedAt', 'desc'), window.limit(100));
+                        unsubscribeScores = window.onSnapshot(q, (snapshot) => {
+                            const scoreData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                            setScores(scoreData);
+                        });
+                    } else {
+                        const q = window.query(scoresRef, window.where("roomId", "==", viewingRoomId));
+                        unsubscribeScores = window.onSnapshot(q, (snapshot) => {
+                            const scoreData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                            setScores(scoreData);
+                        });
+                    }
+                }
+                else if (currentScoreDocId) {
+                    const myScoreRef = getPublicDoc(db, appId, FIRESTORE_PATHS.scores, currentScoreDocId);
+                    unsubscribeScores = window.onSnapshot(myScoreRef, (docSnap) => {
+                        if (docSnap.exists()) {
+                            setScores([{ id: docSnap.id, ...docSnap.data() }]); 
+                        }
+                    });
+                } else {
+                    setScores([]); 
+                }
+
+                return () => unsubscribeScores();
+            }, [user, db, view, viewingRoomId, currentScoreDocId]);
+
+            // ------------------------------------------------------------------
+            // 학생 입장 방 감시 영역
+            // ------------------------------------------------------------------
+            // 학생이 입장한 방 문서를 감시하고 교사가 시작하면 playing 화면으로 전환합니다.
+            useEffect(() => {
+                if (!user || !db || !selectedRoomId || view === 'teacher') return;
+                
+                const myRoomRef = getPublicDoc(db, appId, FIRESTORE_PATHS.rooms, selectedRoomId);
+                const unsubscribeMyRoom = window.onSnapshot(myRoomRef, (docSnap) => {
+                    if (docSnap.exists()) {
+                        const rData = { id: docSnap.id, ...docSnap.data() };
+                        setMyRoomData(rData);
+                        
+                        if (view === 'waiting' && rData.status === 'playing') {
+                            const myScoreDoc = scores.find(s => s.id === currentScoreDocId);
+                            let myDifficulty = rData.mode;
+                            if (myScoreDoc?.difficulty === 'hard') myDifficulty = 'mixed';
+                            if (myScoreDoc?.difficulty === 'hell') myDifficulty = 'en'; 
+                            
+                            setGameMode(myDifficulty);
+
+                            // 🌟 등록된 모든 퀴즈를 섞어서 출제 대기열에 장전!
+                            pendingQuizzesRef.current = [...quizzes].sort(() => Math.random() - 0.5);
+                            wordCountRef.current = 0; // 타자 카운트 초기
+                            
+                            pickRandomWord(myDifficulty);
+                            setView('playing'); 
+                        }
+                    }
+                });
+                return () => unsubscribeMyRoom();
+            }, [user, db, selectedRoomId, view, scores, currentScoreDocId]);
+
+            useEffect(() => {
+                latestScoreRef.current = score;
+                latestCharsRef.current = correctChars;
+            }, [score, correctChars]);
+
+            // ------------------------------------------------------------------
+            // 선생님 점수 동기화 요청 감지 영역
+            // ------------------------------------------------------------------
+            // 방 문서의 syncRequestedAt 신호가 바뀌었을 때만 학생 점수를 전송합니다.
+            useEffect(() => {
+                if (view !== 'playing' || isPracticeMode || !currentScoreDocId || !selectedRoomId || !db) return;
+                
+                if (myRoomData && myRoomData.syncRequestedAt && myRoomData.syncRequestedAt > lastProcessedSyncRef.current) {
+                    lastProcessedSyncRef.current = myRoomData.syncRequestedAt; 
+                    
+                    const currentScore = latestScoreRef.current;
+                    // 🛠️ 버그 수정: 점수가 깎였을 때(오답)도 무조건 동기화되도록 > 를 !== 로 변경!
+                    if (currentScore !== lastSyncedScoreRef.current) {
+                        const currentCpm = calculateCpm({ chars: latestCharsRef.current, seconds: gameInfoRef.current.elapsed });
+
+                        const docRef = getPublicDoc(db, appId, FIRESTORE_PATHS.scores, currentScoreDocId);
+                        window.updateDoc(docRef, {
+                            score: currentScore, cpm: currentCpm, updatedAt: window.serverTimestamp()
+                        }).catch(e => console.error(e));
+                        
+                        lastSyncedScoreRef.current = currentScore;
+                    }
+                }
+            }, [myRoomData, view, isPracticeMode, currentScoreDocId, selectedRoomId, db]);
+
+            const playComboSound = (comboLevel) => {
+                try {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if (!audioCtxRef.current && AudioContext) audioCtxRef.current = new AudioContext();
+                    if (!audioCtxRef.current || audioCtxRef.current.state === 'suspended') return;
+
+                    const oscillator = audioCtxRef.current.createOscillator();
+                    const gainNode = audioCtxRef.current.createGain();
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioCtxRef.current.destination);
+                    
+                    const frequency = 400 + (Math.min(comboLevel, 20) * 40);
+                    oscillator.type = 'sine';
+                    oscillator.frequency.setValueAtTime(frequency, audioCtxRef.current.currentTime);
+                    
+                    gainNode.gain.setValueAtTime(0.15, audioCtxRef.current.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtxRef.current.currentTime + 0.1);
+                    
+                    oscillator.start();
+                    oscillator.stop(audioCtxRef.current.currentTime + 0.1);
+                } catch (e) { }
+            };
+
+            const toggleDifficulty = async (scoreId, currentDiff) => {
+                let newDiff = 'normal';
+                if (currentDiff === 'normal') newDiff = 'hard';
+                else if (currentDiff === 'hard') newDiff = 'hell'; 
+                else newDiff = 'normal'; 
+                
+                try {
+                    await window.updateDoc(getPublicDoc(db, appId, FIRESTORE_PATHS.scores, scoreId), { difficulty: newDiff });
+                } catch (e) { console.error(e); }
+            };
+
+            // 🌟 부스터 ON/OFF 제어
+            const toggleBoosterPower = async (scoreId, currentVal) => {
+                try {
+                    await window.updateDoc(getPublicDoc(db, appId, FIRESTORE_PATHS.scores, scoreId), { boosterEnabled: !currentVal });
+                } catch (e) { console.error(e); }
+            };
+
+            // 🌟 점수 배율(가중치) 제어
+            const toggleWeight = async (scoreId, currentWeight) => {
+                let nextWeight = 1.0;
+                if (currentWeight === 1.0) nextWeight = 1.5;
+                else if (currentWeight === 1.5) nextWeight = 2.0;
+                
+                try {
+                    await window.updateDoc(getPublicDoc(db, appId, FIRESTORE_PATHS.scores, scoreId), { pointWeight: nextWeight });
+                } catch (e) { console.error(e); }
+            };
+
+            // 🌟 관리자: 퀴즈 등록/삭제
+            const handleSaveQuiz = async (e) => {
+                e.preventDefault();
+                if (!quizQuestion.trim() || quizOptions.some(o => !o.trim())) return alert("문제와 보기를 모두 입력하세요.");
+                try {
+                    await window.addDoc(getPublicCollection(db, appId, FIRESTORE_PATHS.quizzes), {
+                        question: quizQuestion, options: quizOptions, answer: quizAnswer, createdAt: window.serverTimestamp()
+                    });
+                    setQuizQuestion(''); setQuizOptions(['', '', '', '']); setQuizAnswer(0);
+                } catch(e) { alert("퀴즈 저장 실패"); }
+            };
+
+            const handleDeleteQuiz = async (id) => {
+                if (!window.confirm("이 퀴즈를 삭제하시겠습니까?")) return;
+                try {
+                    await window.deleteDoc(getPublicDoc(db, appId, FIRESTORE_PATHS.quizzes, id));
+                } catch(e) { }
+            };
+            
+            const handleCreateRoom = async (e) => {
+                e.preventDefault();
+                if (!newRoomName.trim() || !user || !db) return;
+
+                const durationSec = Number(roomDuration);
+                const roomCode = Math.floor(1000 + Math.random() * 9000).toString(); 
+
+                const roomsRef = getPublicCollection(db, appId, FIRESTORE_PATHS.rooms);
+                await window.addDoc(roomsRef, {
+                    name: newRoomName.trim(), mode: roomMode, duration: durationSec,
+                    roomCode: roomCode, 
+                    status: 'waiting', 
+                    createdBy: user.uid, createdAt: window.serverTimestamp()
+                });
+                setNewRoomName('');
+            };
+
+            const startRoomGame = async (roomId) => {
+                try {
+                    const room = rooms.find(r => r.id === roomId);
+                    const expiresAt = Date.now() + (room.duration * 1000); 
+                    
+                    await window.updateDoc(getPublicDoc(db, appId, FIRESTORE_PATHS.rooms, roomId), { 
+                        status: 'playing',
+                        expiresAt: expiresAt
+                    });
+                } catch (e) { console.error(e); }
+            };
+
+            const requestScoreSync = async (roomId) => {
+                if (roomId === 'all') return alert("특정 반을 선택한 상태에서만 점수를 가져올 수 있습니다.");
+                try {
+                    await window.updateDoc(getPublicDoc(db, appId, FIRESTORE_PATHS.rooms, roomId), {
+                        syncRequestedAt: Date.now() 
+                    });
+                } catch (e) { console.error(e); }
+            };
+
+            const handleSaveAnnouncement = async (e) => {
+                e.preventDefault();
+                if (!annTitle.trim() || !annContent.trim()) return alert("제목과 내용을 입력하세요.");
+                try {
+                    if (editingAnnId) {
+                        await window.updateDoc(getPublicDoc(db, appId, FIRESTORE_PATHS.announcements, editingAnnId), {
+                            title: annTitle, content: annContent, isAlert: annIsAlert, updatedAt: window.serverTimestamp()
+                        });
+                        setEditingAnnId(null);
+                    } else {
+                        await window.addDoc(getPublicCollection(db, appId, FIRESTORE_PATHS.announcements), {
+                            title: annTitle, content: annContent, isAlert: annIsAlert, createdAt: window.serverTimestamp()
+                        });
+                    }
+                    setAnnTitle(''); setAnnContent(''); setAnnIsAlert(false);
+                } catch (e) { alert("저장 실패: " + e.message); }
+            };
+
+            const handleDeleteAnnouncement = async (id) => {
+                if (!window.confirm("이 공지사항을 삭제하시겠습니까?")) return;
+                try {
+                    await window.deleteDoc(getPublicDoc(db, appId, FIRESTORE_PATHS.announcements, id));
+                } catch (e) { alert("삭제 실패: " + e.message); }
+            };
+
+            const editAnnouncement = (ann) => {
+                setEditingAnnId(ann.id); setAnnTitle(ann.title); setAnnContent(ann.content); 
+                setAnnIsAlert(ann.isAlert || false);
+            };
+
+            const handleDeleteRoom = async (roomId, roomName) => {
+                if(!window.confirm(`정말 [${roomName}] 반을 삭제하시겠습니까?\n기록은 유지되지만 반 목록에서 삭제됩니다.`)) return;
+                try {
+                    await window.deleteDoc(getPublicDoc(db, appId, FIRESTORE_PATHS.rooms, roomId));
+                    if (viewingRoomId === roomId) setViewingRoomId(''); 
+                } catch (e) { alert('삭제 실패: ' + e.message); }
+            };
+
+            const startPractice = () => {
+                if (!nickname.trim()) return alert("닉네임을 입력해주세요.");
+                
+                try {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if (!audioCtxRef.current && AudioContext) audioCtxRef.current = new AudioContext();
+                    if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') audioCtxRef.current.resume();
+                } catch(e){}
+
+                setGameDuration(300);
+                setTimeLeft(300);
+                setGameMode('mixed'); 
+                setScore(0);
+                setCorrectChars(0);
+                setCombo(0);
+                setInputValue('');
+                setIsPracticeMode(true);
+                setCurrentScoreDocId(null);
+                
+                setBoosterAvailable(true);
+                setBoosterActive(false);
+                setBoosterTimeLeft(0);
+// 🌟 연습 게임에서도 퀴즈 장전
+                pendingQuizzesRef.current = [...quizzes].sort(() => Math.random() - 0.5);
+                wordCountRef.current = 0;
+                
+                pickRandomWord('mixed');
+                setView('playing');
+            };
+
+            const handleJoinRoom = async () => {
+                if (!nickname.trim()) return alert("닉네임을 입력해주세요.");
+                if (roomCodeInput.length !== 4) return alert("4자리 코드를 입력해주세요.");
+
+                try {
+                    const roomsRef = getPublicCollection(db, appId, FIRESTORE_PATHS.rooms);
+                    const q = window.query(roomsRef, window.where('roomCode', '==', roomCodeInput), window.where('status', '==', 'waiting'));
+                    const querySnapshot = await window.getDocs(q);
+
+                    if (querySnapshot.empty) {
+                        return alert("입장 코드가 틀렸거나, 이미 시작/마감된 방입니다!");
+                    }
+
+                    const roomDoc = querySnapshot.docs[0];
+                    const roomId = roomDoc.id;
+                    const roomData = roomDoc.data();
+
+                    setSelectedRoomId(roomId);
+                    setMyRoomData({ id: roomId, ...roomData });
+
+                    try {
+                        const AudioContext = window.AudioContext || window.webkitAudioContext;
+                        if (!audioCtxRef.current && AudioContext) audioCtxRef.current = new AudioContext();
+                        if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') audioCtxRef.current.resume();
+                    } catch(e){}
+
+                    const scoresRef = getPublicCollection(db, appId, FIRESTORE_PATHS.scores);
+                    const newDoc = await window.addDoc(scoresRef, {
+                        roomId: roomId, 
+                        nickname: nickname, 
+                        score: 0, 
+                        cpm: 0,
+                        difficulty: 'normal', 
+                        boosterEnabled: true, // 기본으로 부스터 사용 가능
+                        pointWeight: 1.0,     // 기본 점수 배율 1배
+                        userId: user.uid, 
+                        createdAt: window.serverTimestamp(), 
+                        updatedAt: window.serverTimestamp()
+                    });
+                    setCurrentScoreDocId(newDoc.id);
+                    lastSyncedScoreRef.current = 0;
+
+                    const duration = roomData.duration || 300;
+                    setGameDuration(duration);
+                    setTimeLeft(duration);
+                    setScore(0);
+                    setCorrectChars(0);
+                    setCombo(0);
+                    setInputValue('');
+                    setIsPracticeMode(false);
+                    
+                    setBoosterAvailable(true);
+                    setBoosterActive(false);
+                    setBoosterTimeLeft(0);
+                    
+                    setView('waiting'); 
+
+                } catch (e) {
+                    console.error(e);
+                    alert("방 접속 중 오류가 발생했습니다.");
+                }
+            };
+
+      const pickRandomWord = (modeStr) => {
+                // 🌟 단어를 3번 성공할 때마다 남은 퀴즈가 있다면 돌발 퀴즈 출제! (무조건 등록한 만큼 나옴)
+                if (pendingQuizzesRef.current.length > 0 && wordCountRef.current > 0 && wordCountRef.current % GAME_RULES.quizIntervalWords === 0) {
+                    const nextQuiz = pendingQuizzesRef.current.shift(); // 목록에서 하나 꺼냄
+                    setCurrentQuiz(nextQuiz);
+                    setCurrentWord(''); 
+                } else {
+                    setCurrentQuiz(null); // 퀴즈 모드 끄기
+                    let list;
+                    if (modeStr === 'ko') list = KOREAN_WORDS;
+                    else if (modeStr === 'en') list = ENGLISH_WORDS; 
+                    else list = [...KOREAN_WORDS, ...ENGLISH_WORDS]; 
+                    
+                    const randomIndex = Math.floor(Math.random() * list.length);
+                    setCurrentWord(list[randomIndex]);
+                }
+                wordCountRef.current++;
+            };
+
+         // 🌟 돌발 퀴즈 정답 처리 함수 (부스터 및 밸런스 배율 완벽 적용!)
+            const handleQuizAnswer = (selectedIndex) => {
+                // 현재 내 밸런스 배율(x1.5, x2.0 등)을 가져옵니다.
+                const myInfo = scores.find(s => s.id === currentScoreDocId) || { pointWeight: 1.0 };
+
+                if (selectedIndex === currentQuiz.answer) {
+                    const earnedScore = calculateQuizScore({
+                        pointWeight: myInfo.pointWeight,
+                        boosterActive
+                    });
+
+                    setScore(prev => prev + earnedScore);
+                    setLastEarned(earnedScore);
+                    setShowSuccess(true);
+                    setTimeout(() => setShowSuccess(false), 500);
+                } else {
+                    // 🚨 틀렸을 때의 감점(-200)은 너무 가혹하지 않게 부스터/배율을 적용하지 않고 고정 감점합니다.
+                    setScore(prev => prev + GAME_RULES.quizWrongPenalty); 
+                    setCombo(0); // 콤보 끊김
+                    setIsError(true);
+                    setTimeout(() => setIsError(false), 400);
+                }
+                pickRandomWord(gameMode); // 다시 타자로 돌아감
+            };
+
+            useEffect(() => {
+                let timerId;
+                if (view === 'playing' && timeLeft > 0) {
+                    timerId = setInterval(() => {
+                        setTimeLeft(prev => prev - 1);
+                        
+                        setBoosterTimeLeft(prevTime => {
+                            if (prevTime > 1) return prevTime - 1;
+                            if (prevTime === 1) {
+                                setBoosterActive(false); 
+                                return 0;
+                            }
+                            return 0;
+                        });
+
+                    }, 1000);
+                } else if (view === 'playing' && timeLeft === 0) {
+                    endGame();
+                }
+                gameInfoRef.current.elapsed = gameDuration - timeLeft;
+                return () => clearInterval(timerId);
+            }, [view, timeLeft, gameDuration]);
+
+            const handleKeyDown = (e) => {
+                if (e.key === 'Backspace') setCombo(0);
+
+                const isSentence = currentWord.includes(' ');
+                if (e.key === 'Enter' || (!isSentence && e.key === ' ')) {
+                    e.preventDefault(); 
+                    if (inputValue.length === 0) return;
+
+                    if (inputValue.trim() === currentWord) {
+                        const newCombo = combo + 1;
+                        
+                        // 현재 내 점수 문서의 정보를 가져옴 (배율 적용 위해)
+                        const myInfo = scores.find(s => s.id === currentScoreDocId) || { pointWeight: 1.0 };
+                        
+                        const earnedScore = calculateTypingScore({
+                            word: currentWord,
+                            combo,
+                            pointWeight: myInfo.pointWeight,
+                            boosterActive
+                        });
+                        
+                        setScore(prev => prev + earnedScore);
+                        setCorrectChars(prev => prev + currentWord.length);
+                        setCombo(newCombo);
+                        setLastEarned(earnedScore);
+                        
+                        playComboSound(newCombo);
+                        setShowSuccess(true);
+                        setTimeout(() => setShowSuccess(false), 500);
+                        
+                        setInputValue('');
+                        pickRandomWord(gameMode);
+                    } else {
+                        setCombo(0);
+                        setIsError(true);
+                        setTimeout(() => setIsError(false), 400);
+                    }
+                }
+            };
+
+        const endGame = async () => {
+                setView('result');
+                
+                if (isPracticeMode) {
+                    setIsPracticeMode(false);
+                    return;
+                }
+
+                if (!user || !db || !currentScoreDocId) return;
+
+                // 🛠️ 버그 수정: 0초 순간의 딜레이를 무시하고 무조건 '최신 점수'를 가져와서 꽂아버립니다!
+                const finalScore = latestScoreRef.current;
+                const finalChars = latestCharsRef.current;
+
+                const cpm = calculateCpm({ chars: finalChars, seconds: gameDuration });
+
+                try {
+                    const docRef = getPublicDoc(db, appId, FIRESTORE_PATHS.scores, currentScoreDocId);
+                    await window.updateDoc(docRef, { score: finalScore, cpm: cpm, updatedAt: window.serverTimestamp() });
+                } catch (error) { }
+                setCurrentScoreDocId(null);
+            };
+
+            const formatTime = (sec) => `${Math.floor(sec/60)}:${(sec%60).toString().padStart(2,'0')}`;
+
+         const getLeaderboard = () => {
+                const userLatest = {};
+                
+                scores.forEach(s => {
+                    if (viewingRoomId !== 'all' && s.roomId !== viewingRoomId) return;
+                    if (viewingRoomId !== 'all' && !rooms.find(r => r.id === s.roomId)) return; 
+                    
+                    // 🛠️ 버그 수정: '최고 점수'가 아니라 무조건 '가장 마지막에 입장해서 치고 있는(가장 최근 시간)' 점수를 띄웁니다!
+                    if (!userLatest[s.nickname] || (userLatest[s.nickname].createdAt?.toMillis() || 0) < (s.createdAt?.toMillis() || 0)) {
+                        userLatest[s.nickname] = s;
+                    }
+                });
+                
+                return Object.values(userLatest).sort((a, b) => b.score - a.score);
+            };
+
+            
+            if (!isFirebaseLoaded) return null;
+
+            if (view === 'login') {
+                return (
+                    <LoginView
+                        showAnnouncementModal={showAnnouncementModal}
+                        setShowAnnouncementModal={setShowAnnouncementModal}
+                        announcements={announcements}
+                        setView={setView}
+                        setPwdError={setPwdError}
+                    />
+                );
+            }
+
+            if (view === 'teacherLogin') {
+                return (
+                    <TeacherLoginView
+                        setView={setView}
+                        teacherPwd={teacherPwd}
+                        setTeacherPwd={setTeacherPwd}
+                        setPwdError={setPwdError}
+                        pwdError={pwdError}
+                    />
+                );
+            }
+
+            if (view === 'teacher') {
+                return (
+                    <TeacherDashboardView
+                        getLeaderboard={getLeaderboard}
+                        currentTime={currentTime}
+                        setView={setView}
+                        handleCreateRoom={handleCreateRoom}
+                        newRoomName={newRoomName}
+                        setNewRoomName={setNewRoomName}
+                        roomMode={roomMode}
+                        setRoomMode={setRoomMode}
+                        roomDuration={roomDuration}
+                        setRoomDuration={setRoomDuration}
+                        rooms={rooms}
+                        viewingRoomId={viewingRoomId}
+                        setViewingRoomId={setViewingRoomId}
+                        handleDeleteRoom={handleDeleteRoom}
+                        startRoomGame={startRoomGame}
+                        requestScoreSync={requestScoreSync}
+                        toggleBoosterPower={toggleBoosterPower}
+                        toggleWeight={toggleWeight}
+                        toggleDifficulty={toggleDifficulty}
+                        handleSaveAnnouncement={handleSaveAnnouncement}
+                        annTitle={annTitle}
+                        setAnnTitle={setAnnTitle}
+                        annContent={annContent}
+                        setAnnContent={setAnnContent}
+                        annIsAlert={annIsAlert}
+                        setAnnIsAlert={setAnnIsAlert}
+                        editingAnnId={editingAnnId}
+                        setEditingAnnId={setEditingAnnId}
+                        announcements={announcements}
+                        editAnnouncement={editAnnouncement}
+                        handleDeleteAnnouncement={handleDeleteAnnouncement}
+                        handleSaveQuiz={handleSaveQuiz}
+                        quizQuestion={quizQuestion}
+                        setQuizQuestion={setQuizQuestion}
+                        quizOptions={quizOptions}
+                        setQuizOptions={setQuizOptions}
+                        quizAnswer={quizAnswer}
+                        setQuizAnswer={setQuizAnswer}
+                        quizzes={quizzes}
+                        handleDeleteQuiz={handleDeleteQuiz}
+                    />
+                );
+            }
+
+            if (view === 'studentLobby') {
+                return (
+                    <StudentLobbyView
+                        setView={setView}
+                        nickname={nickname}
+                        setNickname={setNickname}
+                        roomCodeInput={roomCodeInput}
+                        setRoomCodeInput={setRoomCodeInput}
+                        handleJoinRoom={handleJoinRoom}
+                        startPractice={startPractice}
+                    />
+                );
+            }
+
+            if (view === 'waiting') {
+                return <WaitingView myRoomData={myRoomData} />;
+            }
+
+            if (view === 'playing') {
+                return (
+                    <PlayingView
+                        scores={scores}
+                        currentScoreDocId={currentScoreDocId}
+                        currentWord={currentWord}
+                        inputValue={inputValue}
+                        setInputValue={setInputValue}
+                        setIsError={setIsError}
+                        handleKeyDown={handleKeyDown}
+                        currentQuiz={currentQuiz}
+                        handleQuizAnswer={handleQuizAnswer}
+                        nickname={nickname}
+                        combo={combo}
+                        boosterActive={boosterActive}
+                        boosterAvailable={boosterAvailable}
+                        setBoosterAvailable={setBoosterAvailable}
+                        setBoosterActive={setBoosterActive}
+                        setBoosterTimeLeft={setBoosterTimeLeft}
+                        boosterTimeLeft={boosterTimeLeft}
+                        showSuccess={showSuccess}
+                        lastEarned={lastEarned}
+                        score={score}
+                        timeLeft={timeLeft}
+                        formatTime={formatTime}
+                        isError={isError}
+                        inputRef={inputRef}
+                    />
+                );
+            }
+
+            if (view === 'result') {
+                return (
+                    <ResultView
+                        gameDuration={gameDuration}
+                        correctChars={correctChars}
+                        isPracticeMode={isPracticeMode}
+                        score={score}
+                        setView={setView}
+                    />
+                );
+            }
+
+            return null;
+        }
+
+
+        function AnnouncementModal({ show, announcements, onClose }) {
+            if (!show) return null;
+
+            return (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-3xl p-6 max-w-md w-full max-h-[80vh] overflow-y-auto custom-scrollbar shadow-2xl relative">
+                        <button onClick={onClose} className="absolute top-4 right-5 text-gray-400 hover:text-pink-500 text-3xl font-black">&times;</button>
+                        <h2 className="text-2xl font-black text-pink-600 mb-6 flex items-center gap-2">📢 공지사항</h2>
+                        <div className="space-y-4">
+                            {announcements.length > 0 ? announcements.map(ann => (
+                                <div key={ann.id} className={`p-4 rounded-2xl border text-left ${ann.isAlert ? 'bg-red-50 border-red-200 shadow-sm' : 'bg-pink-50/50 border-pink-100'}`}>
+                                    <h3 className="font-bold text-lg text-gray-800 mb-2">
+                                        {ann.isAlert && <span className="text-red-500 mr-1 animate-pulse">🚨</span>}
+                                        {ann.title}
+                                    </h3>
+                                    <p className="text-gray-600 whitespace-pre-wrap text-sm leading-relaxed">{ann.content}</p>
+                                    <div className="text-xs text-gray-400 mt-3 text-right">
+                                        {ann.createdAt?.toDate ? ann.createdAt.toDate().toLocaleDateString() : ''}
+                                    </div>
+                                </div>
+                            )) : <p className="text-gray-500 text-center py-8 font-medium">등록된 공지사항이 없습니다.</p>}
+                        </div>
+                        <button onClick={onClose} className="w-full mt-6 py-3 bg-pink-100 text-pink-600 font-bold rounded-xl hover:bg-pink-200">닫기</button>
+                    </div>
+                </div>
+            );
+        }
+        function LoginView({ showAnnouncementModal, setShowAnnouncementModal, announcements, setView, setPwdError }) {
+                return (
+                    <div className="min-h-screen spring-bg flex items-center justify-center p-4">
+                        <CherryBlossomBackground />
+                        
+                        <AnnouncementModal
+                            show={showAnnouncementModal}
+                            announcements={announcements}
+                            onClose={() => setShowAnnouncementModal(false)}
+                        />
+                        <button onClick={() => setShowAnnouncementModal(true)} className="absolute top-4 right-4 bg-white/80 hover:bg-white text-pink-600 px-4 py-2 rounded-full text-sm font-bold shadow-md border border-pink-200 transition-all flex items-center gap-2 z-20">
+                            📢 공지사항 {announcements.length > 0 && <span className="bg-pink-500 text-white w-5 h-5 flex items-center justify-center rounded-full text-xs animate-bounce">{announcements.length}</span>}
+                        </button>
+                        <div className="glass-box rounded-3xl p-8 md:p-10 text-center max-w-md w-full z-10 relative shadow-2xl border-2 border-pink-200">
+                            <div className="text-6xl mb-2 animate-bounce">⚔️🔥</div>
+                            
+                            <h1 className="text-4xl md:text-5xl font-black mb-3 italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-pink-500 to-orange-400 drop-shadow-sm">
+                                풍양중<br/>키보드 배틀
+                            </h1>
+                            
+                            <p className="text-gray-600 font-bold mb-8 tracking-wide">
+                                🏆 누가 최고의 타자왕이 될 것인가?
+                            </p>
+                            
+                            <div className="space-y-4">
+                                <button onClick={() => setView('studentLobby')} className="w-full py-4 bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white rounded-2xl font-bold text-lg shadow-lg shadow-pink-300 transition-all flex items-center justify-center gap-2 transform hover:scale-105">
+                                    🧑‍🎓 선수 입장
+                                </button>
+                                <button onClick={() => {setPwdError(''); setView('teacherLogin');}} className="w-full py-4 bg-white hover:bg-gray-50 text-gray-700 rounded-2xl font-bold text-lg border-2 border-pink-200 transition-all flex items-center justify-center gap-2">
+                                    👩‍🏫 교무실(관리자) 접속
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            
+        }
+
+        function TeacherLoginView({ setView, teacherPwd, setTeacherPwd, setPwdError, pwdError }) {
+                return (
+                    <div className="min-h-screen spring-bg flex items-center justify-center p-4">
+                        <CherryBlossomBackground />
+                        <div className="glass-box rounded-3xl p-10 text-center max-w-md w-full z-10 relative">
+                            <button onClick={() => setView('login')} className="absolute top-6 left-6 text-gray-400 hover:text-gray-600 font-medium">← 뒤로</button>
+                            <div className="text-5xl mb-4 mt-4">🔐</div>
+                            <h1 className="text-2xl font-bold text-gray-800 mb-2">교무실 인증</h1>
+                            <p className="text-gray-500 mb-6">선생님 전용 비밀번호를 입력해주세요.</p>
+                            <form onSubmit={(e) => { e.preventDefault(); teacherPwd === TEACHER_PASSWORD ? (setView('teacher'), setTeacherPwd(''), setPwdError('')) : setPwdError('비밀번호가 일치하지 않습니다.'); }}>
+                                <input type="password" value={teacherPwd} onChange={(e) => setTeacherPwd(e.target.value)} placeholder="비밀번호 입력" className="w-full px-4 py-4 bg-white border border-pink-200 outline-none focus:ring-2 focus:ring-pink-400 text-gray-800 rounded-2xl mb-2 text-center tracking-widest text-lg" />
+                                {pwdError && <p className="text-red-500 text-sm mb-4">{pwdError}</p>}
+                                <button type="submit" className="w-full py-4 bg-gray-800 hover:bg-gray-900 text-white rounded-2xl font-bold text-lg shadow-lg mt-4">인증하기</button>
+                            </form>
+                        </div>
+                    </div>
+                );
+            
+        }
+
+        function TeacherDashboardView({ getLeaderboard, currentTime, setView, handleCreateRoom, newRoomName, setNewRoomName, roomMode, setRoomMode, roomDuration, setRoomDuration, rooms, viewingRoomId, setViewingRoomId, handleDeleteRoom, startRoomGame, requestScoreSync, toggleBoosterPower, toggleWeight, toggleDifficulty, handleSaveAnnouncement, annTitle, setAnnTitle, annContent, setAnnContent, annIsAlert, setAnnIsAlert, editingAnnId, setEditingAnnId, announcements, editAnnouncement, handleDeleteAnnouncement, handleSaveQuiz, quizQuestion, setQuizQuestion, quizOptions, setQuizOptions, quizAnswer, setQuizAnswer, quizzes, handleDeleteQuiz }) {
+                const leaderboardScores = getLeaderboard();
+                
+                // 🌟 학급 평균 점수 계산기 (결석/인원수 무관하게 완벽한 공정성!)
+                const roomTotalScore = leaderboardScores.reduce((sum, s) => sum + s.score, 0);
+                const participantCount = leaderboardScores.length;
+                const roomAverageScore = participantCount > 0 ? Math.floor(roomTotalScore / participantCount) : 0;
+                
+                return (
+                    <div className="min-h-screen spring-bg p-4 md:p-8">
+                        <CherryBlossomBackground />
+                        <div className="max-w-6xl mx-auto space-y-6 z-10 relative">
+                            <TeacherHeader setView={setView} />
+
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                <RoomManagementPanel
+                                    handleCreateRoom={handleCreateRoom}
+                                    newRoomName={newRoomName}
+                                    setNewRoomName={setNewRoomName}
+                                    roomMode={roomMode}
+                                    setRoomMode={setRoomMode}
+                                    roomDuration={roomDuration}
+                                    setRoomDuration={setRoomDuration}
+                                    rooms={rooms}
+                                    currentTime={currentTime}
+                                    viewingRoomId={viewingRoomId}
+                                    setViewingRoomId={setViewingRoomId}
+                                    handleDeleteRoom={handleDeleteRoom}
+                                />
+                                <LeaderboardPanel
+                                    leaderboardScores={leaderboardScores}
+                                    rooms={rooms}
+                                    viewingRoomId={viewingRoomId}
+                                    participantCount={participantCount}
+                                    roomAverageScore={roomAverageScore}
+                                    startRoomGame={startRoomGame}
+                                    requestScoreSync={requestScoreSync}
+                                    toggleBoosterPower={toggleBoosterPower}
+                                    toggleWeight={toggleWeight}
+                                    toggleDifficulty={toggleDifficulty}
+                                />
+                            </div>
+                            
+                            <AnnouncementManagementPanel
+                                handleSaveAnnouncement={handleSaveAnnouncement}
+                                annTitle={annTitle}
+                                setAnnTitle={setAnnTitle}
+                                annContent={annContent}
+                                setAnnContent={setAnnContent}
+                                annIsAlert={annIsAlert}
+                                setAnnIsAlert={setAnnIsAlert}
+                                editingAnnId={editingAnnId}
+                                setEditingAnnId={setEditingAnnId}
+                                announcements={announcements}
+                                editAnnouncement={editAnnouncement}
+                                handleDeleteAnnouncement={handleDeleteAnnouncement}
+                            />
+
+                            <QuizManagementPanel
+                                handleSaveQuiz={handleSaveQuiz}
+                                quizQuestion={quizQuestion}
+                                setQuizQuestion={setQuizQuestion}
+                                quizOptions={quizOptions}
+                                setQuizOptions={setQuizOptions}
+                                quizAnswer={quizAnswer}
+                                setQuizAnswer={setQuizAnswer}
+                                quizzes={quizzes}
+                                handleDeleteQuiz={handleDeleteQuiz}
+                            />
+                        </div>
+                    </div>
+                );
+            
+        }
+
+        function TeacherHeader({ setView }) {
+                return (
+                    <div className="glass-box p-6 rounded-3xl flex justify-between items-center">
+                        <div>
+                            <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">🏫 교무실 타자 점수 관리</h1>
+                            <p className="text-gray-500 mt-1 font-medium">실시간으로 학생들의 점수를 확인하세요!</p>
+                        </div>
+                        <button onClick={() => setView('login')} className="px-5 py-2 bg-white border border-gray-200 text-gray-600 rounded-xl font-medium hover:bg-gray-50">로그아웃</button>
+                    </div>
+                );
+        }
+
+        function RoomManagementPanel({ handleCreateRoom, newRoomName, setNewRoomName, roomMode, setRoomMode, roomDuration, setRoomDuration, rooms, currentTime, viewingRoomId, setViewingRoomId, handleDeleteRoom }) {
+                return (
+                    <div className="glass-box p-6 rounded-3xl col-span-1 h-fit">
+                        <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">📝 학급(반) 관리</h2>
+                        <form onSubmit={handleCreateRoom} className="space-y-4 mb-6 border-b border-pink-100 pb-6">
+                            <input type="text" value={newRoomName} onChange={(e) => setNewRoomName(e.target.value)} placeholder="예: 1학년 3반" className="w-full px-4 py-3 border border-pink-200 rounded-xl outline-none focus:ring-2 focus:ring-pink-400" required />
+                            <div className="grid grid-cols-2 gap-3">
+                                <select value={roomMode} onChange={(e) => setRoomMode(e.target.value)} className="w-full px-3 py-3 border border-pink-200 rounded-xl outline-none bg-white font-medium text-gray-700">
+                                    <option value="ko">한글 전용</option>
+                                    <option value="en">영어 전용</option>
+                                    <option value="mixed">한영 혼합</option>
+                                </select>
+                                <select value={roomDuration} onChange={(e) => setRoomDuration(e.target.value)} className="w-full px-3 py-3 border border-pink-200 rounded-xl outline-none bg-white">
+                                    <option value="60">1분</option><option value="120">2분</option><option value="180">3분</option><option value="240">4분</option><option value="300">5분</option>
+                                </select>
+                            </div>
+                            <button type="submit" className="w-full bg-pink-500 hover:bg-pink-600 py-3 rounded-xl font-bold text-white shadow-md">반 만들기</button>
+                        </form>
+
+                        <RoomList
+                            rooms={rooms}
+                            currentTime={currentTime}
+                            viewingRoomId={viewingRoomId}
+                            setViewingRoomId={setViewingRoomId}
+                            handleDeleteRoom={handleDeleteRoom}
+                        />
+                    </div>
+                );
+        }
+
+        function RoomList({ rooms, currentTime, viewingRoomId, setViewingRoomId, handleDeleteRoom }) {
+                return (
+                    <div className="space-y-2 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
+                        <div onClick={() => setViewingRoomId('all')} className={`p-3 rounded-xl cursor-pointer transition-all border font-medium flex justify-between items-center ${viewingRoomId === 'all' ? 'bg-pink-50 border-pink-300 text-pink-700' : 'bg-white border-transparent hover:bg-pink-50 text-gray-600'}`}>
+                            <span>학교 전체 보기</span>
+                        </div>
+                        {rooms.map(r => {
+                            const isExpired = r.expiresAt && currentTime > r.expiresAt;
+                            return (
+                            <div key={r.id} onClick={() => setViewingRoomId(r.id)} className={`p-3 rounded-xl cursor-pointer transition-all border flex flex-col gap-1 ${viewingRoomId === r.id ? 'bg-pink-50 border-pink-300 text-pink-700' : 'bg-white border-gray-100 hover:bg-pink-50 text-gray-600'}`}>
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <span className="font-bold">{r.name} <span className="text-blue-500 font-black ml-2 bg-blue-50 px-2 py-1 rounded">코드: {r.roomCode}</span></span>
+                                    </div>
+                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteRoom(r.id, r.name); }} className="text-red-300 hover:text-red-500 px-2 text-lg transition-colors" title="반 삭제하기">✖</button>
+                                </div>
+                               <div className="text-[11px] font-bold mt-1">
+                                    <span className="text-gray-400 mr-2">
+                                        {r.mode === 'ko' ? '한글' : r.mode === 'en' ? '영어' : '혼합'} | {r.duration/60}분
+                                    </span>
+                                    {isExpired ? 
+                                        <span className="text-red-400">마감됨</span> : 
+                                        <span className="text-pink-500 animate-pulse">입장 가능</span>
+                                    }
+                                </div>
+                            </div>
+                        )})}
+                    </div>
+                );
+        }
+
+        function LeaderboardPanel({ leaderboardScores, rooms, viewingRoomId, participantCount, roomAverageScore, startRoomGame, requestScoreSync, toggleBoosterPower, toggleWeight, toggleDifficulty }) {
+                return (
+                    <div className="glass-box p-6 rounded-3xl col-span-1 lg:col-span-2">
+                        {/* 🌟 학급 총점 및 시작 컨트롤 영역 */}
+                        <div className="flex flex-col gap-4 mb-6">
+                            <div className="flex justify-between items-center">
+                                <h2 className="text-2xl font-bold text-pink-600 flex items-center gap-2">
+                                    🏆 {viewingRoomId === 'all' ? '풍양중 전체 명예의 전당' : viewingRoomId === '' ? '학생 점수 확인 (반을 선택하세요)' : `[${rooms.find(r => r.id === viewingRoomId)?.name}] 실시간 점수판`}
+                                    {viewingRoomId !== '' && <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full animate-pulse ml-2">🔴 LIVE</span>}
+                                </h2>
+                                
+                                {viewingRoomId !== '' && viewingRoomId !== 'all' && (
+                                    <div className="flex gap-2">
+                                        {rooms.find(r => r.id === viewingRoomId)?.status === 'waiting' && (
+                                            <button onClick={() => startRoomGame(viewingRoomId)} className="px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-xl font-bold animate-bounce shadow-lg">
+                                                🚀 게임 시작!
+                                            </button>
+                                        )}
+                                        {rooms.find(r => r.id === viewingRoomId)?.status === 'playing' && (
+                                            <button 
+                                                onClick={(e) => {
+                                                    requestScoreSync(viewingRoomId);
+                                                    const btn = e.currentTarget;
+                                                    const originalText = btn.innerHTML;
+                                                    btn.innerHTML = '📥 수집 완료!';
+                                                    btn.classList.replace('bg-blue-500', 'bg-green-500');
+                                                    setTimeout(() => {
+                                                        btn.innerHTML = originalText;
+                                                        btn.classList.replace('bg-green-500', 'bg-blue-500');
+                                                    }, 1500);
+                                                }} 
+                                                className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-bold shadow-lg transition-all"
+                                            >
+                                                📡 실시간 가져오기
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+{/* 🌟 반 평균 점수 위젯 (참여 인원수 표시 추가!) */}
+                            {viewingRoomId !== '' && viewingRoomId !== 'all' && (
+                                <div className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 p-6 rounded-2xl text-white shadow-lg flex justify-between items-center transform hover:scale-[1.01] transition-transform">
+                                    <div>
+                                        <div className="text-indigo-100 font-bold text-sm mb-1 tracking-wide">학급 평균 점수 (참여: {participantCount}명)</div>
+                                        <div className="text-5xl font-black drop-shadow-md tracking-tight">
+                                            {roomAverageScore.toLocaleString()} <span className="text-2xl font-bold text-indigo-200">PTS</span>
+                                        </div>
+                                    </div>
+                                    <div className="text-6xl animate-bounce drop-shadow-lg">🔥</div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="overflow-x-auto custom-scrollbar">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-pink-50 text-pink-800 text-sm">
+                                        <th className="py-3 px-4 font-bold rounded-tl-xl w-16 text-center">순위</th>
+                                        <th className="py-3 px-4 font-bold">학생(닉네임)</th>
+                                        <th className="py-3 px-4 font-bold text-center">설정(밸런스)</th>
+                                        <th className="py-3 px-4 font-bold text-right">최고 점수</th>
+                                        <th className="py-3 px-4 font-bold text-right rounded-tr-xl">타수(CPM)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {leaderboardScores.length > 0 ? leaderboardScores.map((s, idx) => {
+                                        const isRecentlyUpdated = s.updatedAt && (Date.now() - s.updatedAt.toMillis() < 5000);
+                                        return (
+                                        <tr key={s.id} className={`border-b border-gray-100 transition-colors ${isRecentlyUpdated ? 'bg-yellow-50' : 'hover:bg-white/50'}`}>
+                                            <td className="py-3 px-4 text-center font-bold">
+                                                {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : <span className="text-gray-400">{idx + 1}</span>}
+                                            </td>
+                                            <td className="py-3 px-4 font-bold text-gray-800">
+                                                {s.nickname}
+                                                {isRecentlyUpdated && <span className="text-[10px] bg-green-500 text-white px-1.5 py-0.5 ml-2 rounded-full animate-bounce inline-block">UP!</span>}
+                                            </td>
+                                            
+                                            <td className="py-3 px-4 text-center">
+                                                {viewingRoomId !== 'all' && rooms.find(r => r.id === viewingRoomId)?.status === 'waiting' ? (
+                                                    <div className="flex justify-center gap-1">
+                                                        <button onClick={() => toggleBoosterPower(s.id, s.boosterEnabled)} className={`px-2 py-1 rounded text-xs font-bold transition-all ${s.boosterEnabled !== false ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-400'}`}>
+                                                            부스터 {s.boosterEnabled !== false ? 'ON' : 'OFF'}
+                                                        </button>
+                                                        <button onClick={() => toggleWeight(s.id, s.pointWeight || 1.0)} className={`px-2 py-1 rounded text-xs font-bold transition-all bg-purple-500 text-white`}>
+                                                            x{s.pointWeight || 1.0}
+                                                        </button>
+                                                        <button onClick={() => toggleDifficulty(s.id, s.difficulty || 'normal')} className={`px-2 py-1 rounded text-xs font-bold transition-all ${s.difficulty === 'hell' ? 'bg-black text-white' : s.difficulty === 'hard' ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-600'}`}>
+                                                            {s.difficulty === 'hell' ? '💀' : s.difficulty === 'hard' ? '🔥' : '🌱'}
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-xs text-gray-400 font-bold">
+                                                        {s.boosterEnabled !== false ? '부스터⭕' : '부스터❌'} | x{s.pointWeight || 1.0} | {s.difficulty === 'hell' ? '💀' : s.difficulty === 'hard' ? '🔥' : '🌱'}
+                                                    </span>
+                                                )}
+                                            </td>
+
+                                            <td className="py-3 px-4 text-right font-black text-pink-500 text-lg">{s.score.toLocaleString()}</td>
+                                            <td className="py-3 px-4 text-right text-gray-500 font-medium">{s.cpm}타</td>
+                                        </tr>
+                                    )}) : (
+                                        <tr><td colSpan="5" className="py-8 text-center text-gray-400">아직 등록된 기록이 없거나 선택한 반이 없습니다.</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                );
+        }
+
+        function AnnouncementManagementPanel({ handleSaveAnnouncement, annTitle, setAnnTitle, annContent, setAnnContent, annIsAlert, setAnnIsAlert, editingAnnId, setEditingAnnId, announcements, editAnnouncement, handleDeleteAnnouncement }) {
+                return (
+                    <div className="glass-box p-6 rounded-3xl mt-6">
+                        <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">📢 공지사항 작성 및 관리</h2>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <form onSubmit={handleSaveAnnouncement} className="space-y-3 bg-white p-5 rounded-2xl border border-pink-100 shadow-sm">
+                                <input type="text" value={annTitle} onChange={e => setAnnTitle(e.target.value)} placeholder="제목 (예: 📌 5월 코딩대회 MVP 발표!)" className="w-full px-4 py-3 border border-pink-200 rounded-xl outline-none focus:ring-2 focus:ring-pink-400 font-bold" required />
+                                <textarea value={annContent} onChange={e => setAnnContent(e.target.value)} placeholder="학생들에게 알릴 내용을 적어주세요." rows="4" className="w-full px-4 py-3 border border-pink-200 rounded-xl outline-none resize-none custom-scrollbar focus:ring-2 focus:ring-pink-400" required />
+                                
+                                <label className="flex items-center gap-2 text-sm font-bold text-gray-700 cursor-pointer p-2 bg-pink-50 rounded-lg border border-pink-100">
+                                    <input type="checkbox" checked={annIsAlert} onChange={e => setAnnIsAlert(e.target.checked)} className="w-5 h-5 text-pink-500 rounded focus:ring-pink-400 cursor-pointer" />
+                                    🚨 학생들이 처음 접속할 때 이 공지를 팝업으로 띄우기
+                                </label>
+
+                                <div className="flex gap-2 mt-2">
+                                    <button type="submit" className="flex-1 bg-gray-800 text-white py-3 rounded-xl font-bold hover:bg-gray-900 transition-colors">{editingAnnId ? '수정 완료' : '📢 공지 등록'}</button>
+                                    {editingAnnId && <button type="button" onClick={() => {setEditingAnnId(null); setAnnTitle(''); setAnnContent(''); setAnnIsAlert(false);}} className="px-5 bg-gray-200 text-gray-600 rounded-xl font-bold hover:bg-gray-300 transition-colors">취소</button>}
+                                </div>
+                            </form>
+                            
+                            <div className="space-y-3 max-h-60 overflow-y-auto custom-scrollbar pr-2">
+                                {announcements.map(ann => (
+                                    <div key={ann.id} className={`bg-white p-4 rounded-2xl border flex justify-between items-start gap-4 transition-colors ${ann.isAlert ? 'border-red-300 bg-red-50/30' : 'border-pink-100 hover:border-pink-300'}`}>
+                                        <div className="flex-1">
+                                            <div className="font-bold text-gray-800 text-sm">
+                                                {ann.title}
+                                                {ann.isAlert && <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full ml-2 animate-pulse align-middle">팝업 ON</span>}
+                                            </div>
+                                            <div className="text-xs text-gray-400 line-clamp-1 mt-1">{ann.content}</div>
+                                        </div>
+                                        <div className="flex gap-1 shrink-0">
+                                            <button onClick={() => editAnnouncement(ann)} className="text-blue-500 hover:bg-blue-50 p-2 rounded-lg transition-colors" title="수정">✏️</button>
+                                            <button onClick={() => handleDeleteAnnouncement(ann.id)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors" title="삭제">✖</button>
+                                        </div>
+                                    </div>
+                                ))}
+                                {announcements.length === 0 && <div className="text-center text-gray-400 py-10 bg-white rounded-2xl border border-pink-100">등록된 공지사항이 없습니다.</div>}
+                            </div>
+                        </div>
+                    </div>
+                );
+        }
+
+        function QuizManagementPanel({ handleSaveQuiz, quizQuestion, setQuizQuestion, quizOptions, setQuizOptions, quizAnswer, setQuizAnswer, quizzes, handleDeleteQuiz }) {
+                return (
+                    <div className="glass-box p-6 rounded-3xl mt-6 border border-indigo-100">
+                        <h2 className="text-lg font-bold text-indigo-800 mb-4 flex items-center gap-2">🧠 4지선다 퀴즈 관리 (게임 중 돌발 출제)</h2>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <form onSubmit={handleSaveQuiz} className="space-y-3 bg-white p-5 rounded-2xl border border-indigo-100 shadow-sm">
+                                <input type="text" value={quizQuestion} onChange={e => setQuizQuestion(e.target.value)} placeholder="퀴즈 문제 (예: 파이썬의 출력 함수는?)" className="w-full px-4 py-3 border border-indigo-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-400 font-bold text-gray-700" required />
+                                <div className="space-y-2 mt-2">
+                                    {[0, 1, 2, 3].map(i => (
+                                        <div key={i} className="flex items-center gap-3">
+                                            <input type="radio" name="quizAnswer" checked={quizAnswer === i} onChange={() => setQuizAnswer(i)} className="w-5 h-5 text-indigo-500 cursor-pointer" />
+                                            <input type="text" value={quizOptions[i]} onChange={e => { const newOpts = [...quizOptions]; newOpts[i] = e.target.value; setQuizOptions(newOpts); }} placeholder={`${i+1}번 보기`} className={`flex-1 px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-400 ${quizAnswer === i ? 'bg-indigo-50 border-indigo-300 font-bold' : 'border-gray-200'}`} required />
+                                        </div>
+                                    ))}
+                                </div>
+                                <button type="submit" className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition-colors mt-2">🧠 퀴즈 등록</button>
+                            </form>
+                            
+                            <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
+                                {quizzes.map((q, idx) => (
+                                    <div key={q.id} className="bg-white p-4 rounded-2xl border border-indigo-100 flex justify-between items-start gap-4 hover:border-indigo-300 transition-colors">
+                                        <div className="flex-1">
+                                            <div className="font-bold text-indigo-900 text-sm mb-2">Q{idx+1}. {q.question}</div>
+                                            <div className="grid grid-cols-2 gap-1 text-xs">
+                                                {q.options.map((opt, i) => (
+                                                    <div key={i} className={`p-1 px-2 rounded-md ${q.answer === i ? 'bg-indigo-100 text-indigo-700 font-bold' : 'text-gray-500'}`}>
+                                                        {i+1}. {opt} {q.answer === i && '✅'}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <button onClick={() => handleDeleteQuiz(q.id)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors shrink-0">✖</button>
+                                    </div>
+                                ))}
+                                {quizzes.length === 0 && <div className="text-center text-gray-400 py-10 bg-white rounded-2xl border border-indigo-100">등록된 퀴즈가 없습니다.</div>}
+                            </div>
+                        </div>
+                    </div>
+                );
+        }
+        function StudentLobbyView({ setView, nickname, setNickname, roomCodeInput, setRoomCodeInput, handleJoinRoom, startPractice }) {
+                return (
+                    <div className="min-h-screen spring-bg flex items-center justify-center p-4">
+                        <CherryBlossomBackground />
+                        <div className="glass-box rounded-3xl p-10 max-w-md w-full z-10 relative shadow-xl">
+                            <button onClick={() => setView('login')} className="absolute top-6 left-6 text-gray-400 hover:text-gray-600 font-medium">← 뒤로</button>
+                            <div className="text-center mb-8 mt-4">
+                                <div className="text-5xl mb-2 animate-bounce">🎒</div>
+                                <h1 className="text-2xl font-bold text-gray-800">선수 입장</h1>
+                                <p className="text-gray-500 text-sm mt-1">선생님이 알려주신 4자리 코드를 입력하세요!</p>
+                            </div>
+                            
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-sm font-bold text-gray-600 mb-1 block">내 닉네임 (이름)</label>
+                                    <input type="text" value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder="예: 홍길동" className="w-full px-4 py-4 bg-white border border-pink-200 outline-none focus:ring-2 focus:ring-pink-400 text-gray-800 rounded-2xl" maxLength="10" />
+                                </div>
+                                <div>
+                                    <label className="text-sm font-bold text-gray-600 mb-1 block">입장 코드 (4자리 숫자)</label>
+                                    <input type="text" value={roomCodeInput} onChange={(e) => setRoomCodeInput(e.target.value.replace(/[^0-9]/g, ''))} placeholder="예: 1234" className="w-full px-4 py-4 bg-white border border-pink-200 outline-none focus:ring-2 focus:ring-pink-400 text-gray-800 rounded-2xl text-center text-2xl tracking-[0.5em] font-black" maxLength="4" />
+                                </div>
+
+                                <button onClick={handleJoinRoom} disabled={!nickname || roomCodeInput.length !== 4} className="w-full py-4 mt-2 bg-pink-500 hover:bg-pink-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-2xl font-bold text-lg shadow-md transition-colors">
+                                    본 게임 입장하기
+                                </button>
+                                
+                                <button onClick={startPractice} disabled={!nickname} className="w-full py-4 bg-white border-2 border-pink-300 text-pink-600 hover:bg-pink-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200 rounded-2xl font-bold text-lg shadow-sm transition-colors">
+                                    🌱 자유 연습하기 (기록 미저장)
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            
+        }
+
+        function WaitingView({ myRoomData }) {
+                return (
+                    <div className="min-h-screen spring-bg flex flex-col items-center justify-center p-4">
+                        <CherryBlossomBackground />
+                        <div className="glass-box rounded-3xl p-10 text-center max-w-md w-full z-10 relative shadow-xl">
+                            <div className="text-6xl mb-6 animate-bounce">⏳</div>
+                            <h1 className="text-2xl font-bold text-gray-800 mb-4">시작 대기 중...</h1>
+                            <p className="text-gray-500 font-medium mb-6">[{myRoomData?.name}] 반에 입장했습니다.<br/>선생님이 시작할 때까지 손가락을 풀어주세요!</p>
+                            <div className="w-full bg-pink-100 h-2 rounded-full overflow-hidden">
+                                <div className="bg-pink-500 h-full animate-pulse" style={{ width: '100%' }}></div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            
+        }
+
+        function PlayingView({ scores, currentScoreDocId, currentWord, inputValue, setInputValue, setIsError, handleKeyDown, currentQuiz, handleQuizAnswer, nickname, combo, boosterActive, boosterAvailable, setBoosterAvailable, setBoosterActive, setBoosterTimeLeft, boosterTimeLeft, showSuccess, lastEarned, score, timeLeft, formatTime, isError, inputRef }) {
+                const myInfo = scores.find(s => s.id === currentScoreDocId) || { boosterEnabled: true, pointWeight: 1.0 };
+
+                return (
+                    <div className={`min-h-screen flex flex-col p-4 md:p-8 relative overflow-hidden transition-colors duration-500 ${boosterActive ? 'booster-bg' : 'spring-bg'}`}>
+                        <CherryBlossomBackground />
+                        
+                        <BoosterButton
+                            boosterEnabled={myInfo.boosterEnabled !== false}
+                            boosterActive={boosterActive}
+                            boosterAvailable={boosterAvailable}
+                            setBoosterAvailable={setBoosterAvailable}
+                            setBoosterActive={setBoosterActive}
+                            setBoosterTimeLeft={setBoosterTimeLeft}
+                            boosterTimeLeft={boosterTimeLeft}
+                        />
+
+                        {showSuccess && (
+                            <div className="animate-success-pop flex flex-col items-center">
+                                <div className="text-4xl md:text-5xl font-black text-pink-500 drop-shadow-md italic">
+                                    {combo > 1 ? `${combo} COMBO 🌸` : 'PERFECT!'}
+                                </div>
+                                <div className="text-2xl font-bold text-yellow-500 mt-1">+{lastEarned}</div>
+                            </div>
+                        )}
+
+                        <GameStatusBar
+                            nickname={nickname}
+                            combo={combo}
+                            pointWeight={myInfo.pointWeight}
+                            score={score}
+                            boosterActive={boosterActive}
+                            timeLeft={timeLeft}
+                            formatTime={formatTime}
+                        />
+
+                      <div className="flex-1 flex flex-col items-center justify-center max-w-4xl w-full mx-auto -mt-10 md:-mt-20 z-10">
+                            {/* 🌟 퀴즈 출제 시 화면이 변환됩니다! */}
+                            {currentQuiz ? (
+                                <QuizCard
+                                    currentQuiz={currentQuiz}
+                                    handleQuizAnswer={handleQuizAnswer}
+                                />
+                            ) : (
+                                /* 🌟 원래 있던 타자 입력창 */
+                                <>
+                                    <WordDisplay
+                                        currentWord={currentWord}
+                                        inputValue={inputValue}
+                                    />
+
+                                    <TypingInput
+                                        currentWord={currentWord}
+                                        inputValue={inputValue}
+                                        setInputValue={setInputValue}
+                                        setIsError={setIsError}
+                                        handleKeyDown={handleKeyDown}
+                                        inputRef={inputRef}
+                                        boosterActive={boosterActive}
+                                        combo={combo}
+                                        isError={isError}
+                                    />
+                                    
+                                    <p className="mt-8 text-gray-500 text-sm font-medium">
+                                        백스페이스(지우기)를 누르거나 오답 제출 시 <span className="text-red-400">콤보가 초기화</span>됩니다.
+                                    </p>
+                                    
+                                    <div className="w-full max-w-3xl h-2 bg-white/50 rounded-full mt-4 overflow-hidden border border-pink-100">
+                                        <div 
+                                            className={`h-full transition-all duration-300 ${isError ? 'bg-red-400' : boosterActive ? 'bg-gradient-to-r from-yellow-400 to-orange-500' : 'bg-gradient-to-r from-pink-300 to-pink-500'}`}
+                                            style={{ width: `${Math.min((inputValue.length / currentWord.length) * 100, 100)}%` }}
+                                        />
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                );
+            
+        }
+
+        function GameStatusBar({ nickname, combo, pointWeight, score, boosterActive, timeLeft, formatTime }) {
+                return (
+                    <div className="max-w-5xl w-full mx-auto glass-box rounded-3xl p-5 mb-8 flex flex-wrap justify-between items-center gap-4 z-10 shadow-sm">
+                        <div className="flex items-center gap-4">
+                            <div className="bg-white px-4 py-2 rounded-xl font-bold text-gray-700 border border-pink-100 shadow-sm flex items-center gap-2">
+                                🧑‍🎓 {nickname}
+                            </div>
+                            <div className={`flex items-center gap-2 px-4 py-2 rounded-xl border font-bold transition-all ${combo > 2 ? 'bg-pink-100 border-pink-300 text-pink-600 shadow-sm' : 'bg-white border-gray-200 text-gray-500'}`}>
+                                🔥 {combo} 콤보
+                            </div>
+                            {pointWeight > 1.0 && (
+                                <div className="flex items-center gap-2 px-4 py-2 rounded-xl border font-bold bg-purple-100 border-purple-300 text-purple-600 shadow-sm">
+                                    ✨ 점수 x{pointWeight}
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-6">
+                            <div className="text-gray-500 font-medium text-lg">
+                                점수: <span className={`font-black text-2xl md:text-3xl transition-colors ${boosterActive ? 'text-orange-500 animate-pulse' : 'text-pink-500'}`}>{score.toLocaleString()}</span>
+                            </div>
+                            <div className={`font-mono text-2xl font-bold px-4 py-2 rounded-xl border ${timeLeft <= 60 ? 'bg-red-50 border-red-200 text-red-500 animate-pulse' : 'bg-white border-pink-200 text-gray-700'}`}>
+                                ⏱️ {formatTime(timeLeft)}
+                            </div>
+                        </div>
+                    </div>
+                );
+        }
+
+        function WordDisplay({ currentWord, inputValue }) {
+                const renderWord = () => {
+                    return currentWord.split('').map((char, index) => {
+                        let colorClass = "text-gray-400"; 
+                        if (index < inputValue.length) {
+                            if (inputValue[index] === char) {
+                                colorClass = "text-pink-500 font-black"; 
+                            } else {
+                                colorClass = "text-red-500 bg-red-100 rounded underline decoration-wavy decoration-red-500"; 
+                            }
+                        }
+                        return <span key={index} className={`transition-colors duration-100 ${colorClass}`}>{char}</span>;
+                    });
+                };
+
+                return (
+                    <div className="w-full text-center mb-8">
+                        <p className="text-pink-400 font-bold tracking-widest text-sm mb-4">제시어</p>
+                        <div className="text-4xl md:text-6xl font-black tracking-wide break-keep leading-tight min-h-[100px] text-gray-300 select-none pointer-events-none">
+                            {renderWord()}
+                        </div>
+                    </div>
+                );
+        }
+
+        function TypingInput({ currentWord, inputValue, setInputValue, setIsError, handleKeyDown, inputRef, boosterActive, combo, isError }) {
+                return (
+                    <div className={`w-full max-w-3xl relative rounded-2xl overflow-hidden transition-all duration-200 ${boosterActive ? 'shadow-[0_0_40px_rgba(251,191,36,0.5)] border-4 border-yellow-400 bg-white' : combo > 2 ? 'input-success' : 'glass-box'} ${isError ? 'border-2 border-red-400 animate-shake shadow-lg shadow-red-200' : 'border-2 border-transparent'}`}>
+                        <input
+                            ref={inputRef}
+                            type="text"
+                            value={inputValue}
+                            onChange={(e) => {setInputValue(e.target.value); setIsError(false);}}
+                            onKeyDown={handleKeyDown}
+                            onPaste={(e) => { e.preventDefault(); alert("🚨 앗! 복사/붙여넣기 치트키는 사용할 수 없습니다!"); }}
+                            onDrop={(e) => e.preventDefault()}
+                            className={`w-full text-center text-2xl md:text-4xl py-6 md:py-8 px-6 outline-none bg-transparent font-bold transition-colors ${isError ? 'text-red-600' : 'text-gray-800'}`}
+                            placeholder={currentWord.includes(' ') ? "입력 후 엔터(Enter)를 누르세요" : "입력 후 스페이스바 또는 엔터"}
+                            autoFocus
+                            autoComplete="off"
+                            spellCheck="false"
+                        />
+                    </div>
+                );
+        }
+
+        function BoosterButton({ boosterEnabled, boosterActive, boosterAvailable, setBoosterAvailable, setBoosterActive, setBoosterTimeLeft, boosterTimeLeft }) {
+                if (!boosterEnabled) return null;
+
+                return (
+                    <div className="absolute bottom-8 right-8 md:bottom-12 md:right-12 z-50">
+                        <button 
+                            onClick={() => {
+                                if(boosterAvailable && !boosterActive) {
+                                    setBoosterAvailable(false);
+                                    setBoosterActive(true);
+                                    setBoosterTimeLeft(GAME_RULES.boosterDuration);
+                                }
+                            }}
+                            disabled={!boosterAvailable}
+                            className={`w-24 h-24 md:w-32 md:h-32 rounded-full shadow-2xl font-black flex flex-col items-center justify-center transition-all transform ${boosterActive ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white animate-pulse scale-110 shadow-orange-400' : boosterAvailable ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:scale-105 hover:shadow-pink-400 cursor-pointer' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+                        >
+                            {boosterActive ? (
+                                <>
+                                    <span className="text-4xl md:text-5xl mb-1 drop-shadow-md">🔥</span>
+                                    <span className="text-xl md:text-2xl">{boosterTimeLeft}초</span>
+                                </>
+                            ) : boosterAvailable ? (
+                                <>
+                                    <span className="text-4xl md:text-5xl mb-1 drop-shadow-md">🚀</span>
+                                    <span className="text-sm md:text-base tracking-widest">부스터</span>
+                                </>
+                            ) : (
+                                <>
+                                    <span className="text-4xl md:text-5xl mb-1 opacity-50">💨</span>
+                                    <span className="text-xs md:text-sm">사용됨</span>
+                                </>
+                            )}
+                        </button>
+                    </div>
+                );
+        }
+
+        function QuizCard({ currentQuiz, handleQuizAnswer }) {
+                return (
+                    <div className="w-full text-center mb-8 animate-float-up-fade">
+                        <div className="bg-indigo-600 text-white text-sm font-bold px-5 py-1.5 rounded-full inline-block mb-6 animate-bounce shadow-md">🚨 돌발 퀴즈!</div>
+                        <div className="text-3xl md:text-5xl font-black tracking-wide break-keep leading-tight mb-10 text-gray-800 drop-shadow-sm">
+                            Q. {currentQuiz.question}
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto w-full">
+                            {currentQuiz.options.map((opt, idx) => (
+                                <button 
+                                    key={idx} 
+                                    onClick={() => handleQuizAnswer(idx)}
+                                    className="bg-white border-2 border-indigo-200 hover:bg-indigo-50 hover:border-indigo-500 hover:text-indigo-700 text-gray-700 font-bold text-xl md:text-2xl py-6 px-4 rounded-2xl shadow-sm transition-all transform hover:scale-[1.02]"
+                                >
+                                    {idx + 1}. {opt}
+                                </button>
+                            ))}
+                        </div>
+                        <p className="mt-8 text-gray-500 text-sm font-medium">정답 <span className="text-green-500 font-bold">+{GAME_RULES.quizCorrectBaseScore}점</span> / 오답 <span className="text-red-500 font-bold">{GAME_RULES.quizWrongPenalty}점 (콤보 증발)</span></p>
+                    </div>
+                );
+        }
+        function ResultView({ gameDuration, correctChars, isPracticeMode, score, setView }) {
+                const finalCpm = calculateCpm({ chars: correctChars, seconds: gameDuration });
+
+                return (
+                    <div className="min-h-screen spring-bg flex items-center justify-center p-4 relative overflow-hidden">
+                        <CherryBlossomBackground />
+                        
+                        <div className="glass-box rounded-3xl p-10 text-center max-w-md w-full border border-pink-100 shadow-2xl z-10 relative">
+                            <div className="w-24 h-24 bg-gradient-to-br from-pink-400 to-rose-400 text-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-pink-200 text-5xl">
+                                🏆
+                            </div>
+                            
+                            <h1 className="text-3xl font-black text-gray-800 mb-2">연습 종료!</h1>
+                            <p className="text-gray-500 mb-8 font-medium">
+                                {isPracticeMode ? '자유 연습을 마쳤습니다. 실전 대결에 도전해보세요!' : '수고하셨습니다. 기록이 교무실로 전송되었습니다.'}
+                            </p>
+                            
+                            <div className="bg-white rounded-2xl p-6 mb-8 border border-pink-100 shadow-sm">
+                                <div className="text-sm text-gray-500 font-bold mb-1">최종 점수</div>
+                                <div className="text-6xl font-black text-pink-500 mb-6">{score.toLocaleString()}</div>
+                                
+                                <div className="grid grid-cols-2 gap-4 border-t border-gray-100 pt-5">
+                                    <div>
+                                        <div className="text-xs text-gray-400 font-bold">분당 타수(CPM)</div>
+                                        <div className="text-2xl font-black text-gray-700">{finalCpm} <span className="text-sm text-gray-400 font-medium">타</span></div>
+                                    </div>
+                                    <div>
+                                        <div className="text-xs text-gray-400 font-bold">정확히 친 글자</div>
+                                        <div className="text-2xl font-black text-gray-700">{correctChars} <span className="text-sm text-gray-400 font-medium">자</span></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button onClick={() => setView('login')} className="w-full py-4 bg-gray-800 hover:bg-gray-900 text-white rounded-2xl font-bold text-lg shadow-md transition-colors">
+                                처음으로 돌아가기
+                            </button>
+                        </div>
+                    </div>
+                );
+            
+        }
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
+
+
+
+
+
