@@ -1,6 +1,20 @@
 import AnnouncementModal from '../common/AnnouncementModal.jsx';
 import CherryBlossomBackground from '../common/CherryBlossomBackground.jsx';
 
+const VACATION_CEREMONY_DATE = '2026-07-20';
+
+function calculateVacationDday() {
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const targetDate = new Date(`${VACATION_CEREMONY_DATE}T00:00:00+09:00`);
+  const targetStart = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+  const diffDays = Math.ceil((targetStart.getTime() - todayStart.getTime()) / 86400000);
+
+  if (diffDays > 0) return `D-${diffDays}`;
+  if (diffDays === 0) return 'D-DAY';
+  return '방학 중';
+}
+
 export default function LoginView({
   announcements = [],
   showAnnouncementModal = false,
@@ -8,6 +22,8 @@ export default function LoginView({
   onStudentClick = () => {},
   onTeacherClick = () => {},
 }) {
+  const vacationDday = calculateVacationDday();
+
   return (
     <div className="min-h-screen spring-bg flex items-center justify-center p-4">
       <CherryBlossomBackground />
@@ -30,9 +46,17 @@ export default function LoginView({
           풍양중학교<br />키보드 배틀
         </h1>
 
-        <p className="text-teal-900/70 font-bold mb-8 tracking-wide">
+        <p className="text-teal-900/70 font-bold mb-5 tracking-wide">
           시원한 여름 숲속 타자 대결
         </p>
+
+        <div className="mb-8 bg-white/80 border border-cyan-100 rounded-2xl px-5 py-4 shadow-sm">
+          <div className="text-xs font-black text-teal-600 tracking-widest mb-1">여름방학 카운트다운</div>
+          <div className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-sky-500 to-emerald-500">
+            {vacationDday}
+          </div>
+          <div className="text-xs font-bold text-gray-400 mt-1">방학식 2026년 7월 20일</div>
+        </div>
 
         <div className="space-y-4">
           <button onClick={onStudentClick} className="w-full py-4 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 text-white rounded-2xl font-bold text-lg shadow-lg shadow-teal-300/60 transition-all flex items-center justify-center gap-2 transform hover:scale-105">

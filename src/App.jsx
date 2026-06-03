@@ -94,6 +94,7 @@ export default function App() {
   const lastProcessedSyncRef = useRef(0);
   const lastSyncedScoreRef = useRef(0);
   const isEndingRef = useRef(false);
+  const autoAnnouncementShownRef = useRef(false);
 
   const { user, authReady } = useFirebaseAuth();
   const firestoreReadsEnabled = !(view === 'playing' && isPracticeMode);
@@ -663,6 +664,15 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (autoAnnouncementShownRef.current) return;
+    if (view !== 'login') return;
+    if (!announcements.some((announcement) => announcement.isAlert === true)) return;
+
+    autoAnnouncementShownRef.current = true;
+    setShowAnnouncementModal(true);
+  }, [announcements, view]);
+
+  useEffect(() => {
     latestScoreRef.current = score;
     latestCharsRef.current = correctChars;
     latestQuizCorrectCountRef.current = quizCorrectCount;
@@ -784,8 +794,26 @@ export default function App() {
     if (!window.confirm(`[${roomName}] 반을 삭제할까요?`)) return;
 
     try {
+      const scoresRef = getPublicCollection(db, APP_ID, FIRESTORE_PATHS.scores);
+      const roomScoresQuery = query(scoresRef, where('roomId', '==', roomId));
+      const roomScoresSnapshot = await getDocs(roomScoresQuery);
+      await Promise.all(roomScoresSnapshot.docs.map((scoreDoc) => updateDoc(scoreDoc.ref, {
+        excludedFromHallOfFame: true,
+        roomDeleted: true,
+        updatedAt: serverTimestamp(),
+      })));
+
       const roomRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.rooms, roomId);
       await deleteDoc(roomRef);
+      setLocalScores((prevScores) => prevScores.map((scoreItem) => (
+        scoreItem.roomId === roomId
+          ? {
+            ...scoreItem,
+            excludedFromHallOfFame: true,
+            roomDeleted: true,
+          }
+          : scoreItem
+      )));
       setViewingRoomId((prevRoomId) => (prevRoomId === roomId ? '' : prevRoomId));
     } catch (error) {
       console.error(error);

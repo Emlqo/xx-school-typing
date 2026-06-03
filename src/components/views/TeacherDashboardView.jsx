@@ -102,6 +102,12 @@ export default function TeacherDashboardView({
   const participantCount = leaderboardScores.length;
   const roomAverageScore = participantCount > 0 ? Math.floor(roomTotalScore / participantCount) : 0;
   const selectedClass = classes.find((classItem) => classItem.id === selectedClassId) || null;
+  const scoreboardClassRooms = rooms
+    .filter((room) => room.entryType === 'class' && room.classId === selectedClassId)
+    .sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
+  const guestRooms = rooms
+    .filter((room) => room.entryType !== 'class')
+    .sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
   const selectedClassRooms = rooms.filter((room) => {
     if (room.entryType !== 'class' || room.classId !== selectedClassId) return false;
     if (room.status === 'waiting') return true;
@@ -137,7 +143,11 @@ export default function TeacherDashboardView({
               setRoomMode={setRoomMode}
               roomDuration={roomDuration}
               setRoomDuration={setRoomDuration}
-              rooms={rooms}
+              classes={classes}
+              selectedClassId={selectedClassId}
+              setSelectedClassId={setSelectedClassId}
+              classRooms={scoreboardClassRooms}
+              guestRooms={guestRooms}
               currentTime={currentTime}
               viewingRoomId={viewingRoomId}
               setViewingRoomId={setViewingRoomId}

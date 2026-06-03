@@ -21,6 +21,7 @@ export function getScoreCreatedMillis(score = {}) {
 }
 
 export function normalizeClassScore(score = {}) {
+  if (score.excludedFromHallOfFame === true || score.roomDeleted === true) return null;
   if (score.entryType !== 'class' || !score.classId || !score.studentId) return null;
 
   return {

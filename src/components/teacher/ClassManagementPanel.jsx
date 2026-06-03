@@ -1,3 +1,19 @@
+function toMillis(value) {
+  if (!value) return 0;
+  if (typeof value === 'number') return value;
+  if (typeof value.toMillis === 'function') return value.toMillis();
+  if (typeof value.seconds === 'number') return value.seconds * 1000;
+  return 0;
+}
+
+function formatRoomCreatedAt(value) {
+  const millis = toMillis(value);
+  if (!millis) return '생성 시간 준비 중';
+
+  const date = new Date(millis);
+  return `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일 ${date.getHours()}시`;
+}
+
 export default function ClassManagementPanel({
   classes = [],
   selectedClassId = '',
@@ -130,6 +146,9 @@ export default function ClassManagementPanel({
             >
               <div className="min-w-0">
                 <div className="text-sm font-black text-sky-800 truncate">{room.name}</div>
+                <div className="text-[11px] font-black text-teal-600 mt-0.5">
+                  {formatRoomCreatedAt(room.createdAt)}
+                </div>
                 <div className="text-xs font-bold text-gray-400">
                   {room.status === 'playing' ? '진행 중' : '입장 가능'} · {room.duration || 300}초
                 </div>
