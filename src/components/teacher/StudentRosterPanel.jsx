@@ -14,6 +14,8 @@ export default function StudentRosterPanel({
   setStudentBulkText = () => {},
   handleBulkAddStudents = () => {},
   handleDeleteStudent = () => {},
+  handleRegenerateStudentPin = () => {},
+  handleResetStudentPin = () => {},
 }) {
   const parsedNames = parseStudentNames(studentBulkText);
   const scoreByStudentId = new Map(
@@ -64,6 +66,7 @@ export default function StudentRosterPanel({
         {students.map((student) => {
           const scoreDoc = scoreByStudentId.get(student.id);
           const entered = Boolean(scoreDoc);
+          const studentPin = student.studentPin || '';
 
           return (
             <div key={student.id} className={`p-3 rounded-xl border flex justify-between items-center gap-3 transition-colors ${entered ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-teal-100 hover:border-teal-300'}`}>
@@ -71,6 +74,26 @@ export default function StudentRosterPanel({
                 <div className="font-black text-gray-800 truncate">{student.name}</div>
                 <div className={`text-xs font-bold mt-1 ${entered ? 'text-emerald-600' : 'text-gray-400'}`}>
                   {entered ? '입장 완료' : student.active === false ? '비활성' : '미입장'}
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <span className={`text-xs px-2 py-1 rounded-lg font-black border ${studentPin ? 'bg-cyan-50 border-cyan-100 text-cyan-700' : 'bg-gray-50 border-gray-100 text-gray-400'}`}>
+                    개인 PIN {studentPin || '미발급'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleRegenerateStudentPin(student.id)}
+                    className="text-xs px-2 py-1 rounded-lg bg-white hover:bg-cyan-50 border border-cyan-100 text-cyan-700 font-black transition-colors"
+                  >
+                    PIN 재생성
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleResetStudentPin(student.id)}
+                    disabled={!studentPin}
+                    className="text-xs px-2 py-1 rounded-lg bg-white hover:bg-rose-50 disabled:bg-gray-50 disabled:text-gray-300 disabled:cursor-not-allowed border border-rose-100 text-rose-600 font-black transition-colors"
+                  >
+                    PIN 초기화
+                  </button>
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">

@@ -1,5 +1,190 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import CherryBlossomBackground from '../common/CherryBlossomBackground.jsx';
+import { COSMETIC_ITEMS } from '../../constants/cosmetics.js';
+import { safeToLocaleNumber } from '../../utils/format.js';
+
+function StudentShopPanel({
+  student = null,
+  isVerified = false,
+  pinInput = '',
+  setPinInput = () => {},
+  newPin = '',
+  setNewPin = () => {},
+  newPinConfirm = '',
+  setNewPinConfirm = () => {},
+  pinError = '',
+  onVerifyPin = () => {},
+  onSetInitialPin = () => {},
+  onJoinClassStudent = () => {},
+  onBuyCosmetic = () => {},
+  onEquipCosmetic = () => {},
+}) {
+  if (!student) {
+    return (
+      <div className="bg-white rounded-2xl border border-pink-100 p-5 text-center text-gray-400 font-bold">
+        이름을 선택하면 내 포인트와 상점이 표시됩니다.
+      </div>
+    );
+  }
+
+  const ownedCosmetics = Array.isArray(student.ownedCosmetics) ? student.ownedCosmetics : [];
+  const hasStudentPin = Boolean(student.studentPin);
+
+  return (
+    <div className="bg-white rounded-2xl border border-cyan-100 p-5 space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="text-xs font-black text-teal-600 tracking-widest">내 상점</div>
+          <div className="text-2xl font-black text-gray-800">{student.name}</div>
+          <div className="text-xs text-gray-400 font-bold mt-1">최고 기록 {safeToLocaleNumber(student.bestScore || 0)}점</div>
+        </div>
+        <div className="text-right bg-emerald-50 border border-emerald-100 rounded-2xl px-4 py-3">
+          <div className="text-xs font-black text-emerald-600">보유 포인트</div>
+          <div className="text-3xl font-black text-emerald-700">{safeToLocaleNumber(student.totalPoints || 0)}P</div>
+        </div>
+      </div>
+
+      <div className={`rounded-2xl border p-4 ${isVerified ? 'bg-emerald-50 border-emerald-200' : 'bg-cyan-50/70 border-cyan-100'}`}>
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <div>
+            <div className="text-xs font-black text-teal-600 tracking-widest">개인 PIN 인증</div>
+            <div className={`text-sm font-black ${isVerified ? 'text-emerald-700' : 'text-gray-700'}`}>
+              {isVerified ? '인증 완료' : hasStudentPin ? '선생님이 알려준 개인 PIN을 입력하세요.' : '새 개인 PIN을 직접 설정하세요.'}
+            </div>
+          </div>
+          <span className={`text-xs px-3 py-1 rounded-full font-black ${isVerified ? 'bg-emerald-500 text-white' : 'bg-white text-gray-400 border border-cyan-100'}`}>
+            {isVerified ? 'OK' : 'LOCK'}
+          </span>
+        </div>
+
+        {hasStudentPin && !isVerified && (
+          <form onSubmit={onVerifyPin} className="flex gap-2">
+            <input
+              type="password"
+              inputMode="numeric"
+              value={pinInput}
+              onChange={(event) => setPinInput(event.target.value.replace(/[^0-9]/g, '').slice(0, 4))}
+              placeholder="4자리"
+              className="min-w-0 flex-1 px-4 py-3 bg-white border border-cyan-100 outline-none focus:ring-2 focus:ring-teal-400 text-gray-800 rounded-xl text-center text-lg tracking-[0.35em] font-black"
+              maxLength="4"
+            />
+            <button
+              type="submit"
+              disabled={pinInput.length !== 4}
+              className="px-4 py-3 bg-teal-500 hover:bg-teal-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl font-black transition-colors"
+            >
+              확인
+            </button>
+          </form>
+        )}
+
+        {!hasStudentPin && !isVerified && (
+          <form onSubmit={onSetInitialPin} className="space-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <input
+                type="password"
+                inputMode="numeric"
+                value={newPin}
+                onChange={(event) => setNewPin(event.target.value.replace(/[^0-9]/g, '').slice(0, 4))}
+                placeholder="새 PIN"
+                className="w-full px-4 py-3 bg-white border border-cyan-100 outline-none focus:ring-2 focus:ring-teal-400 text-gray-800 rounded-xl text-center text-lg tracking-[0.35em] font-black"
+                maxLength="4"
+              />
+              <input
+                type="password"
+                inputMode="numeric"
+                value={newPinConfirm}
+                onChange={(event) => setNewPinConfirm(event.target.value.replace(/[^0-9]/g, '').slice(0, 4))}
+                placeholder="PIN 확인"
+                className="w-full px-4 py-3 bg-white border border-cyan-100 outline-none focus:ring-2 focus:ring-teal-400 text-gray-800 rounded-xl text-center text-lg tracking-[0.35em] font-black"
+                maxLength="4"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={newPin.length !== 4 || newPinConfirm.length !== 4}
+              className="w-full py-3 bg-teal-500 hover:bg-teal-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl font-black transition-colors"
+            >
+              개인 PIN 설정
+            </button>
+          </form>
+        )}
+
+        {pinError && <div className="text-xs text-red-500 font-bold mt-2">{pinError}</div>}
+      </div>
+
+      <button
+        type="button"
+        onClick={() => onJoinClassStudent(student)}
+        disabled={!isVerified}
+        className="w-full py-4 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed text-white rounded-2xl font-black text-lg shadow-md transition-colors"
+      >
+        이 이름으로 입장하기
+      </button>
+
+      <div>
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div className="text-sm font-black text-gray-700">장식 아이템</div>
+          <div className="text-xs font-bold text-gray-400">클릭 시 포인트가 반영됩니다</div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {COSMETIC_ITEMS.map((item) => {
+            const owned = ownedCosmetics.includes(item.id);
+            const equipped = student.equippedCosmetic === item.id;
+            const canAfford = Number(student.totalPoints || 0) >= item.price;
+
+            return (
+              <div key={item.id} className={`rounded-2xl border p-4 ${item.previewClass}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="font-black text-gray-800 truncate">{item.name}</div>
+                    <div className="text-xs text-gray-500 font-bold mt-1 leading-relaxed">{item.description}</div>
+                  </div>
+                  <div className="text-sm font-black text-emerald-700 bg-white/80 border border-white rounded-xl px-2 py-1 shrink-0">
+                    {item.price}P
+                  </div>
+                </div>
+
+                <div className="flex gap-2 mt-4">
+                  {owned ? (
+                    <button
+                      type="button"
+                      onClick={() => onEquipCosmetic(student, item.id)}
+                      disabled={equipped || !isVerified}
+                      className={`flex-1 py-2 rounded-xl font-black text-sm ${
+                        equipped
+                          ? 'bg-emerald-500 text-white'
+                          : !isVerified
+                            ? 'bg-gray-200/80 text-gray-400'
+                          : 'bg-white/80 text-gray-600 hover:bg-white border border-white'
+                      }`}
+                    >
+                      {equipped ? '장착 중' : '장착하기'}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onBuyCosmetic(student, item.id)}
+                      disabled={!isVerified || !canAfford}
+                      className={`flex-1 py-2 rounded-xl font-black text-sm ${
+                        isVerified && canAfford
+                          ? 'bg-white/80 text-teal-700 hover:bg-white border border-white'
+                          : 'bg-gray-200/80 text-gray-400'
+                      }`}
+                    >
+                      {canAfford ? '구매' : '포인트 부족'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function StudentLobbyView({
   nickname = '',
@@ -12,20 +197,161 @@ export default function StudentLobbyView({
   classStudents = [],
   enteredStudentIds = [],
   onJoinClassStudent = () => {},
+  onBuyCosmetic = () => {},
+  onEquipCosmetic = () => {},
+  onSetStudentPin = async () => false,
   onBack = () => {},
   onJoinRoom = () => {},
   onPracticeStart = () => {},
 }) {
   const [activeTab, setActiveTab] = useState('class');
+  const [selectedStudentId, setSelectedStudentId] = useState('');
+  const [pinInput, setPinInput] = useState('');
+  const [newPin, setNewPin] = useState('');
+  const [newPinConfirm, setNewPinConfirm] = useState('');
+  const [pinError, setPinError] = useState('');
+  const [verifiedStudentId, setVerifiedStudentId] = useState('');
+  const previousStudentPinRef = useRef({ studentId: '', pin: '' });
   const selectedRoom = openClassRooms.find((room) => room.id === selectedOpenClassRoomId);
+  const selectedStudent = useMemo(
+    () => classStudents.find((student) => student.id === selectedStudentId) || null,
+    [classStudents, selectedStudentId],
+  );
+  const isSelectedStudentVerified = Boolean(selectedStudent && verifiedStudentId === selectedStudent.id);
+
+  const resetPinAuth = () => {
+    setPinInput('');
+    setNewPin('');
+    setNewPinConfirm('');
+    setPinError('');
+    setVerifiedStudentId('');
+  };
+
+  useEffect(() => {
+    if (!selectedStudent) {
+      previousStudentPinRef.current = { studentId: '', pin: '' };
+      return;
+    }
+
+    const nextPin = String(selectedStudent.studentPin || '');
+    const previousPinState = previousStudentPinRef.current;
+
+    if (
+      previousPinState.studentId === selectedStudent.id
+      && previousPinState.pin
+      && previousPinState.pin !== nextPin
+    ) {
+      resetPinAuth();
+    }
+
+    previousStudentPinRef.current = {
+      studentId: selectedStudent.id,
+      pin: nextPin,
+    };
+  }, [selectedStudent]);
+
+  const selectRoom = (roomId) => {
+    setSelectedOpenClassRoomId(roomId);
+    setSelectedStudentId('');
+    resetPinAuth();
+  };
+
+  const selectStudent = (studentId) => {
+    if (studentId !== selectedStudentId) {
+      resetPinAuth();
+    }
+    setSelectedStudentId(studentId);
+  };
+
+  const changeTab = (nextTab) => {
+    setActiveTab(nextTab);
+    if (nextTab === 'guest') {
+      setSelectedStudentId('');
+      resetPinAuth();
+    }
+  };
+
+  const handleVerifyPin = (event) => {
+    event.preventDefault();
+
+    if (!selectedStudent) return;
+    if (!selectedStudent.studentPin) {
+      setPinError('선생님에게 PIN 발급을 요청하세요.');
+      return;
+    }
+
+    if (pinInput.trim() === String(selectedStudent.studentPin)) {
+      setVerifiedStudentId(selectedStudent.id);
+      setPinError('');
+      return;
+    }
+
+    setVerifiedStudentId('');
+    setPinError('개인 PIN이 일치하지 않습니다.');
+  };
+
+  const handleSetInitialPin = async (event) => {
+    event.preventDefault();
+
+    if (!selectedStudent?.id) return;
+    if (selectedStudent.studentPin) {
+      setPinError('이미 PIN이 설정된 학생입니다.');
+      return;
+    }
+    if (!/^\d{4}$/.test(newPin)) {
+      setPinError('새 PIN은 숫자 4자리로 입력하세요.');
+      return;
+    }
+    if (newPin !== newPinConfirm) {
+      setPinError('새 PIN과 확인 PIN이 일치하지 않습니다.');
+      return;
+    }
+
+    const saved = await onSetStudentPin(selectedStudent.id, newPin);
+
+    if (saved === false) {
+      setPinError('PIN 저장 중 오류가 발생했습니다. 다시 시도하세요.');
+      return;
+    }
+
+    setVerifiedStudentId(selectedStudent.id);
+    setPinInput(newPin);
+    setNewPin('');
+    setNewPinConfirm('');
+    setPinError('');
+  };
+
+  const requireVerifiedStudent = (student) => {
+    if (!student?.id || verifiedStudentId !== student.id) {
+      setPinError('개인 PIN 인증을 먼저 완료하세요.');
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleVerifiedJoinClassStudent = (student) => {
+    if (!requireVerifiedStudent(student)) return;
+    onJoinClassStudent(student);
+  };
+
+  const handleVerifiedBuyCosmetic = (student, cosmeticId) => {
+    if (!requireVerifiedStudent(student)) return;
+    onBuyCosmetic(student, cosmeticId);
+  };
+
+  const handleVerifiedEquipCosmetic = (student, cosmeticId) => {
+    if (!requireVerifiedStudent(student)) return;
+    onEquipCosmetic(student, cosmeticId);
+  };
 
   return (
     <div className="min-h-screen spring-bg flex items-center justify-center p-4">
       <CherryBlossomBackground />
-      <div className="glass-box rounded-3xl p-6 md:p-10 max-w-5xl w-full z-10 relative shadow-xl">
+      <div className="glass-box rounded-3xl p-6 md:p-10 max-w-6xl w-full z-10 relative shadow-xl">
         <button onClick={onBack} className="absolute top-6 left-6 text-gray-400 hover:text-gray-600 font-medium">← 뒤로</button>
         <div className="text-center mb-8 mt-4">
-          <div className="text-5xl mb-2 animate-bounce">🎒</div>
+          <div className="text-5xl mb-2 animate-bounce">🎮</div>
           <h1 className="text-2xl font-bold text-gray-800">선수 입장</h1>
           <p className="text-gray-500 text-sm mt-1">학급을 선택하거나 게스트 코드로 입장하세요.</p>
         </div>
@@ -33,14 +359,14 @@ export default function StudentLobbyView({
         <div className="grid grid-cols-2 gap-2 bg-white/70 border border-pink-100 rounded-2xl p-2 mb-6">
           <button
             type="button"
-            onClick={() => setActiveTab('class')}
+            onClick={() => changeTab('class')}
             className={`py-3 rounded-xl font-black transition-colors ${activeTab === 'class' ? 'bg-pink-500 text-white shadow-md' : 'text-gray-500 hover:bg-pink-50'}`}
           >
             학급 입장
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('guest')}
+            onClick={() => changeTab('guest')}
             className={`py-3 rounded-xl font-black transition-colors ${activeTab === 'guest' ? 'bg-pink-500 text-white shadow-md' : 'text-gray-500 hover:bg-pink-50'}`}
           >
             게스트 입장
@@ -48,7 +374,7 @@ export default function StudentLobbyView({
         </div>
 
         {activeTab === 'class' ? (
-          <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-5">
+          <div className="grid grid-cols-1 xl:grid-cols-[300px_1fr] gap-5">
             <div className="bg-white rounded-2xl border border-pink-100 p-4">
               <div className="text-sm font-black text-gray-700 mb-3">열린 학급</div>
               <div className="space-y-2 max-h-80 overflow-y-auto custom-scrollbar pr-1">
@@ -56,7 +382,7 @@ export default function StudentLobbyView({
                   <button
                     key={room.id}
                     type="button"
-                    onClick={() => setSelectedOpenClassRoomId(room.id)}
+                    onClick={() => selectRoom(room.id)}
                     className={`w-full text-left p-4 rounded-xl border transition-colors ${selectedOpenClassRoomId === room.id ? 'bg-pink-50 border-pink-300 text-pink-700' : 'border-gray-100 hover:bg-pink-50 text-gray-600'}`}
                   >
                     <div className="font-black">{room.className || room.name}</div>
@@ -73,55 +399,85 @@ export default function StudentLobbyView({
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-pink-100 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-                <div>
-                  <div className="text-sm font-black text-gray-700">내 이름 선택</div>
-                  <div className="text-xs font-bold text-gray-400 mt-1">
-                    {selectedRoom ? `${selectedRoom.className || selectedRoom.name} 명단` : '먼저 학급을 선택하세요'}
+            <div className="grid grid-cols-1 lg:grid-cols-[minmax(280px,360px)_1fr] gap-5">
+              <div className="bg-white rounded-2xl border border-pink-100 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+                  <div>
+                    <div className="text-sm font-black text-gray-700">내 이름 선택</div>
+                    <div className="text-xs font-bold text-gray-400 mt-1">
+                      {selectedRoom ? `${selectedRoom.className || selectedRoom.name} 명단` : '먼저 학급을 선택하세요.'}
+                    </div>
                   </div>
+                  {selectedRoom && (
+                    <span className="text-xs px-3 py-1 rounded-full bg-pink-50 text-pink-600 font-black">
+                      입장 {enteredStudentIds.length}명
+                    </span>
+                  )}
                 </div>
-                {selectedRoom && (
-                  <span className="text-xs px-3 py-1 rounded-full bg-pink-50 text-pink-600 font-black">
-                    입장 {enteredStudentIds.length}명
-                  </span>
-                )}
+
+                <div className="grid grid-cols-2 gap-3 max-h-[520px] overflow-y-auto custom-scrollbar pr-1">
+                  {classStudents.map((student) => {
+                    const entered = enteredStudentIds.includes(student.id);
+                    const selected = selectedStudentId === student.id;
+
+                    return (
+                      <button
+                        key={student.id}
+                        type="button"
+                        onClick={() => selectStudent(student.id)}
+                        className={`p-4 rounded-xl border text-left transition-all hover:scale-[1.02] ${
+                          selected
+                            ? 'bg-pink-50 border-pink-300 text-pink-700 shadow-sm'
+                            : entered
+                              ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                              : 'bg-white border-gray-100 hover:border-pink-300 text-gray-700'
+                        }`}
+                      >
+                        <div className="font-black truncate">{student.name}</div>
+                        <div className="text-xs font-bold mt-2 text-gray-400">
+                          {safeToLocaleNumber(student.totalPoints || 0)}P
+                        </div>
+                        <div className={`text-xs font-bold mt-1 ${entered ? 'text-emerald-600' : 'text-gray-400'}`}>
+                          {entered ? '입장 완료 · 재입장 가능' : '선택해서 상점 보기'}
+                        </div>
+                      </button>
+                    );
+                  })}
+                  {selectedRoom && classStudents.length === 0 && (
+                    <div className="col-span-full text-center text-gray-400 py-12 bg-pink-50/50 rounded-xl border border-pink-100 font-bold">
+                      등록된 학생 명단이 없습니다.
+                    </div>
+                  )}
+                  {!selectedRoom && (
+                    <div className="col-span-full text-center text-gray-400 py-12 bg-pink-50/50 rounded-xl border border-pink-100 font-bold">
+                      왼쪽에서 학급을 선택하면 학생 명단이 표시됩니다.
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-96 overflow-y-auto custom-scrollbar pr-1">
-                {classStudents.map((student) => {
-                  const entered = enteredStudentIds.includes(student.id);
-                  return (
-                    <button
-                      key={student.id}
-                      type="button"
-                      onClick={() => onJoinClassStudent(student)}
-                      className={`p-4 rounded-xl border text-left transition-all hover:scale-[1.02] ${entered ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-white border-gray-100 hover:border-pink-300 text-gray-700'}`}
-                    >
-                      <div className="font-black truncate">{student.name}</div>
-                      <div className={`text-xs font-bold mt-2 ${entered ? 'text-emerald-600' : 'text-gray-400'}`}>
-                        {entered ? '입장함 · 다시 입장 가능' : '클릭해서 입장'}
-                      </div>
-                    </button>
-                  );
-                })}
-                {selectedRoom && classStudents.length === 0 && (
-                  <div className="col-span-full text-center text-gray-400 py-12 bg-pink-50/50 rounded-xl border border-pink-100 font-bold">
-                    등록된 학생 명단이 없습니다.
-                  </div>
-                )}
-                {!selectedRoom && (
-                  <div className="col-span-full text-center text-gray-400 py-12 bg-pink-50/50 rounded-xl border border-pink-100 font-bold">
-                    왼쪽에서 학급을 선택하면 학생 명단이 표시됩니다.
-                  </div>
-                )}
-              </div>
+              <StudentShopPanel
+                student={selectedStudent}
+                isVerified={isSelectedStudentVerified}
+                pinInput={pinInput}
+                setPinInput={setPinInput}
+                newPin={newPin}
+                setNewPin={setNewPin}
+                newPinConfirm={newPinConfirm}
+                setNewPinConfirm={setNewPinConfirm}
+                pinError={pinError}
+                onVerifyPin={handleVerifyPin}
+                onSetInitialPin={handleSetInitialPin}
+                onJoinClassStudent={handleVerifiedJoinClassStudent}
+                onBuyCosmetic={handleVerifiedBuyCosmetic}
+                onEquipCosmetic={handleVerifiedEquipCosmetic}
+              />
             </div>
           </div>
         ) : (
           <div className="max-w-md mx-auto space-y-4">
             <div>
-              <label className="text-sm font-bold text-gray-600 mb-1 block">내 닉네임 (이름)</label>
+              <label className="text-sm font-bold text-gray-600 mb-1 block">닉네임(이름)</label>
               <input
                 type="text"
                 value={nickname}

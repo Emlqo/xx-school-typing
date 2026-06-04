@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { addDoc, deleteDoc, getDocs, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
+import { addDoc, deleteDoc, getDoc, getDocs, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 import { APP_ID, GAME_RULES, TEACHER_PASSWORD } from './constants/gameRules.js';
 import { KOREAN_WORDS, ENGLISH_WORDS } from './constants/words.js';
+import { getCosmeticById } from './constants/cosmetics.js';
 import { FIRESTORE_PATHS } from './constants/firestorePaths.js';
 import { db } from './services/firebaseClient.js';
 import { getPublicCollection, getPublicDoc } from './utils/firestoreRefs.js';
 import { calculateHallOfFame, getMonthKey } from './utils/hallOfFame.js';
 import { calculateCpm, calculateQuizScore, calculateTypingScore, getQuizWrongPenalty } from './utils/scoring.js';
 import { formatTime } from './utils/format.js';
+import { normalizeClassStudent } from './utils/classStudents.js';
+import { calculateRewardPoints, getDefaultRewardState } from './utils/rewards.js';
 import useAnnouncements from './hooks/useAnnouncements.js';
 import useClasses from './hooks/useClasses.js';
 import useClassStudents from './hooks/useClassStudents.js';
@@ -78,6 +81,7 @@ export default function App() {
   const [studentBulkText, setStudentBulkText] = useState('');
   const [selectedOpenClassRoomId, setSelectedOpenClassRoomId] = useState('');
   const [hallOfFameMonthKey, setHallOfFameMonthKey] = useState(() => getMonthKey(new Date()));
+  const [lastReward, setLastReward] = useState(() => getDefaultRewardState());
   const [localRooms] = useState([]);
   const [localScores, setLocalScores] = useState([]);
   const [localAnnouncements] = useState([]);
@@ -194,6 +198,8 @@ export default function App() {
     return nextCode;
   };
 
+  const createStudentPin = () => String(Math.floor(1000 + Math.random() * 9000));
+
   const createLocalScoreSnapshot = (id, data) => {
     setLocalScores((prevScores) => [
       { id, ...data },
@@ -273,6 +279,7 @@ export default function App() {
     setBoosterActive(false);
     setBoosterTimeLeft(0);
     setIsPracticeMode(practiceMode);
+    setLastReward(getDefaultRewardState());
     pendingQuizzesRef.current = [];
     wordCountRef.current = 0;
     gameInfoRef.current = { elapsed: 0 };
@@ -459,6 +466,7 @@ export default function App() {
       }
 
       const duration = Number(roomData.duration || 300);
+      const normalizedStudent = normalizeClassStudent(student);
       const scoresRef = getPublicCollection(db, APP_ID, FIRESTORE_PATHS.scores);
       const existingScore = await findExistingClassScore({ roomId: roomData.id, studentId: student.id });
       let scoreDocId = existingScore?.id;
@@ -469,9 +477,10 @@ export default function App() {
           roomId: roomData.id,
           classId: roomData.classId,
           className: roomData.className || roomData.name,
-          studentId: student.id,
-          nickname: student.name,
+          studentId: normalizedStudent.id,
+          nickname: normalizedStudent.name,
           entryType: 'class',
+          equippedCosmetic: normalizedStudent.equippedCosmetic,
           score: 0,
           cpm: 0,
           correctChars: 0,
@@ -528,6 +537,8 @@ export default function App() {
       const elapsedSeconds = gameInfoRef.current.elapsed || gameDuration || 1;
       const finalCpm = calculateCpm({ chars: latestCharsRef.current, seconds: elapsedSeconds });
       const scoreRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.scores, currentScoreDocId);
+      const currentScoreInfo = scores.find((item) => item.id === currentScoreDocId) || {};
+
       await updateDoc(scoreRef, {
         score: latestScoreRef.current,
         cpm: finalCpm,
@@ -536,10 +547,59 @@ export default function App() {
         updatedAt: serverTimestamp(),
       });
       lastSyncedScoreRef.current = latestScoreRef.current;
+
+      if (
+        currentScoreInfo.entryType === 'class'
+        && currentScoreInfo.classId
+        && currentScoreInfo.studentId
+        && currentScoreInfo.rewardGranted !== true
+      ) {
+        const studentRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.classStudents, currentScoreInfo.studentId);
+        const studentSnapshot = await getDoc(studentRef);
+
+        if (studentSnapshot.exists()) {
+          const studentData = normalizeClassStudent({ id: studentSnapshot.id, ...studentSnapshot.data() });
+          const reward = calculateRewardPoints({
+            score: latestScoreRef.current,
+            quizCorrectCount: latestQuizCorrectCountRef.current,
+            previousBestScore: studentData.bestScore,
+          });
+          const nextTotalPoints = studentData.totalPoints + reward.totalEarned;
+          setLastReward(reward);
+
+          await updateDoc(studentRef, {
+            totalPoints: nextTotalPoints,
+            bestScore: reward.nextBestScore,
+            updatedAt: serverTimestamp(),
+          });
+
+          await updateDoc(scoreRef, {
+            rewardGranted: true,
+            rewardEarned: reward.totalEarned,
+            rewardBreakdown: reward,
+            updatedAt: serverTimestamp(),
+          });
+
+          setLocalScores((prevScores) => prevScores.map((scoreItem) => (
+            scoreItem.id === currentScoreDocId
+              ? {
+                ...scoreItem,
+                score: latestScoreRef.current,
+                cpm: finalCpm,
+                correctChars: latestCharsRef.current,
+                quizCorrectCount: latestQuizCorrectCountRef.current,
+                rewardGranted: true,
+                rewardEarned: reward.totalEarned,
+                rewardBreakdown: reward,
+              }
+              : scoreItem
+          )));
+        }
+      }
     } catch (error) {
       console.error(error);
     }
-  }, [currentScoreDocId, gameDuration, isPracticeMode]);
+  }, [currentScoreDocId, gameDuration, isPracticeMode, scores]);
 
   const handleKeyDown = useCallback((event) => {
     if (event.key === 'Backspace') {
@@ -1052,6 +1112,7 @@ export default function App() {
       await Promise.all(studentNames.map((name) => addDoc(studentsRef, {
         classId: selectedClassId,
         name,
+        studentPin: '',
         active: true,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -1072,6 +1133,179 @@ export default function App() {
     } catch (error) {
       console.error(error);
       alert('학생 삭제 중 오류가 발생했습니다.');
+    }
+  };
+
+  const handleRegenerateStudentPin = async (studentId) => {
+    if (!studentId) return;
+
+    try {
+      const studentRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.classStudents, studentId);
+      await updateDoc(studentRef, {
+        studentPin: createStudentPin(),
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error(error);
+      alert('학생 개인 PIN 재생성 중 오류가 발생했습니다.');
+    }
+  };
+
+  const handleResetStudentPin = async (studentId) => {
+    if (!studentId) return;
+
+    try {
+      const studentRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.classStudents, studentId);
+      await updateDoc(studentRef, {
+        studentPin: '',
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error(error);
+      alert('학생 개인 PIN 초기화 중 오류가 발생했습니다.');
+    }
+  };
+
+  const handleSetStudentPin = async (studentId, newPin) => {
+    if (!studentId || !/^\d{4}$/.test(String(newPin))) return false;
+
+    try {
+      const studentRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.classStudents, studentId);
+      await updateDoc(studentRef, {
+        studentPin: String(newPin),
+        updatedAt: serverTimestamp(),
+      });
+      return true;
+    } catch (error) {
+      console.error(error);
+      alert('학생 개인 PIN 설정 중 오류가 발생했습니다.');
+      return false;
+    }
+  };
+
+  const handleBuyCosmetic = async (student, cosmeticId) => {
+    const normalizedStudent = normalizeClassStudent(student);
+    const cosmetic = getCosmeticById(cosmeticId);
+
+    if (!normalizedStudent.id || !cosmetic) return;
+    if (normalizedStudent.ownedCosmetics.includes(cosmetic.id)) {
+      alert('이미 보유한 아이템입니다.');
+      return;
+    }
+    if (normalizedStudent.totalPoints < cosmetic.price) {
+      alert('포인트가 부족합니다.');
+      return;
+    }
+
+    try {
+      const studentRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.classStudents, normalizedStudent.id);
+      await updateDoc(studentRef, {
+        totalPoints: normalizedStudent.totalPoints - cosmetic.price,
+        ownedCosmetics: [...normalizedStudent.ownedCosmetics, cosmetic.id],
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error(error);
+      alert('아이템 구매 중 오류가 발생했습니다.');
+    }
+  };
+
+  const handleEquipCosmetic = async (student, cosmeticId) => {
+    const normalizedStudent = normalizeClassStudent(student);
+    const cosmetic = getCosmeticById(cosmeticId);
+
+    if (!normalizedStudent.id || !cosmetic) return;
+    if (!normalizedStudent.ownedCosmetics.includes(cosmetic.id)) {
+      alert('보유한 아이템만 장착할 수 있습니다.');
+      return;
+    }
+
+    try {
+      const studentRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.classStudents, normalizedStudent.id);
+      await updateDoc(studentRef, {
+        equippedCosmetic: cosmetic.id,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error(error);
+      alert('아이템 장착 중 오류가 발생했습니다.');
+    }
+  };
+
+  const normalizePoints = (value) => Math.max(0, Math.floor(Number(value) || 0));
+
+  const handleSetStudentPoints = async (studentId, nextPoints) => {
+    if (!studentId) return;
+
+    try {
+      const studentRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.classStudents, studentId);
+      await updateDoc(studentRef, {
+        totalPoints: normalizePoints(nextPoints),
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error(error);
+      alert('학생 포인트 수정 중 오류가 발생했습니다.');
+    }
+  };
+
+  const handleAdjustStudentPoints = async (studentId, currentPoints, delta) => {
+    await handleSetStudentPoints(studentId, normalizePoints(currentPoints) + Number(delta || 0));
+  };
+
+  const handleGrantStudentCosmetic = async (student, cosmeticId) => {
+    const normalizedStudent = normalizeClassStudent(student);
+    const cosmetic = getCosmeticById(cosmeticId);
+
+    if (!normalizedStudent.id || !cosmetic) return;
+    if (normalizedStudent.ownedCosmetics.includes(cosmetic.id)) return;
+
+    try {
+      const studentRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.classStudents, normalizedStudent.id);
+      await updateDoc(studentRef, {
+        ownedCosmetics: [...normalizedStudent.ownedCosmetics, cosmetic.id],
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error(error);
+      alert('학생 아이템 지급 중 오류가 발생했습니다.');
+    }
+  };
+
+  const handleRemoveStudentCosmetic = async (student, cosmeticId) => {
+    const normalizedStudent = normalizeClassStudent(student);
+    const cosmetic = getCosmeticById(cosmeticId);
+
+    if (!normalizedStudent.id || !cosmetic) return;
+
+    try {
+      const nextOwnedCosmetics = normalizedStudent.ownedCosmetics.filter((itemId) => itemId !== cosmetic.id);
+      const studentRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.classStudents, normalizedStudent.id);
+      await updateDoc(studentRef, {
+        ownedCosmetics: nextOwnedCosmetics,
+        equippedCosmetic: normalizedStudent.equippedCosmetic === cosmetic.id ? null : normalizedStudent.equippedCosmetic,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error(error);
+      alert('학생 아이템 회수 중 오류가 발생했습니다.');
+    }
+  };
+
+  const handleResetStudentCosmetics = async (studentId) => {
+    if (!studentId) return;
+    if (!window.confirm('이 학생의 보유 장식과 장착 장식을 모두 초기화할까요?')) return;
+
+    try {
+      const studentRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.classStudents, studentId);
+      await updateDoc(studentRef, {
+        ownedCosmetics: [],
+        equippedCosmetic: null,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error(error);
+      alert('학생 장식 초기화 중 오류가 발생했습니다.');
     }
   };
 
@@ -1183,6 +1417,9 @@ export default function App() {
         classStudents={classStudents}
         enteredStudentIds={enteredClassStudentIds}
         onJoinClassStudent={handleJoinClassStudent}
+        onBuyCosmetic={handleBuyCosmetic}
+        onEquipCosmetic={handleEquipCosmetic}
+        onSetStudentPin={handleSetStudentPin}
         onBack={() => setView('login')}
         onJoinRoom={handleJoinRoom}
         onPracticeStart={startPractice}
@@ -1233,6 +1470,7 @@ export default function App() {
         score={score}
         correctChars={correctChars}
         gameDuration={gameDuration}
+        lastReward={lastReward}
         onHome={handleBackToLogin}
         onPracticeAgain={startPractice}
       />
@@ -1309,6 +1547,13 @@ export default function App() {
         setStudentBulkText={setStudentBulkText}
         handleBulkAddStudents={handleBulkAddStudents}
         handleDeleteStudent={handleDeleteStudent}
+        handleRegenerateStudentPin={handleRegenerateStudentPin}
+        handleResetStudentPin={handleResetStudentPin}
+        handleSetStudentPoints={handleSetStudentPoints}
+        handleAdjustStudentPoints={handleAdjustStudentPoints}
+        handleGrantStudentCosmetic={handleGrantStudentCosmetic}
+        handleRemoveStudentCosmetic={handleRemoveStudentCosmetic}
+        handleResetStudentCosmetics={handleResetStudentCosmetics}
         classEntryCount={0}
         hallOfFameMonthKey={hallOfFameMonthKey}
         setHallOfFameMonthKey={setHallOfFameMonthKey}

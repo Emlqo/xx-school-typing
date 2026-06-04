@@ -6,6 +6,7 @@ import HallOfFamePanel from '../teacher/HallOfFamePanel.jsx';
 import LeaderboardPanel from '../teacher/LeaderboardPanel.jsx';
 import QuizManagementPanel from '../teacher/QuizManagementPanel.jsx';
 import RoomManagementPanel from '../teacher/RoomManagementPanel.jsx';
+import ShopPointManagementPanel from '../teacher/ShopPointManagementPanel.jsx';
 import StudentRosterPanel from '../teacher/StudentRosterPanel.jsx';
 import TeacherHeader from '../teacher/TeacherHeader.jsx';
 import WordManagementPanel from '../teacher/WordManagementPanel.jsx';
@@ -78,6 +79,13 @@ export default function TeacherDashboardView({
   setStudentBulkText = () => {},
   handleBulkAddStudents = () => {},
   handleDeleteStudent = () => {},
+  handleRegenerateStudentPin = () => {},
+  handleResetStudentPin = () => {},
+  handleSetStudentPoints = () => {},
+  handleAdjustStudentPoints = () => {},
+  handleGrantStudentCosmetic = () => {},
+  handleRemoveStudentCosmetic = () => {},
+  handleResetStudentCosmetics = () => {},
   classEntryCount = 0,
   hallOfFameMonthKey = '',
   setHallOfFameMonthKey = () => {},
@@ -200,6 +208,8 @@ export default function TeacherDashboardView({
               setStudentBulkText={setStudentBulkText}
               handleBulkAddStudents={handleBulkAddStudents}
               handleDeleteStudent={handleDeleteStudent}
+              handleRegenerateStudentPin={handleRegenerateStudentPin}
+              handleResetStudentPin={handleResetStudentPin}
             />
           </div>
         )}
@@ -231,6 +241,20 @@ export default function TeacherDashboardView({
               cancelEditAnnouncement={cancelEditAnnouncement}
             />
           </>
+        )}
+
+        {activeSection === 'shop' && (
+          <ShopPointManagementPanel
+            classes={classes}
+            selectedClassId={selectedClassId}
+            setSelectedClassId={setSelectedClassId}
+            students={students}
+            handleSetStudentPoints={handleSetStudentPoints}
+            handleAdjustStudentPoints={handleAdjustStudentPoints}
+            handleGrantStudentCosmetic={handleGrantStudentCosmetic}
+            handleRemoveStudentCosmetic={handleRemoveStudentCosmetic}
+            handleResetStudentCosmetics={handleResetStudentCosmetics}
+          />
         )}
 
         {activeSection === 'quizzes' && (

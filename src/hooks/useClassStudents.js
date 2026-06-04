@@ -3,6 +3,7 @@ import { onSnapshot, query, where } from 'firebase/firestore';
 import { APP_ID } from '../constants/gameRules.js';
 import { FIRESTORE_PATHS } from '../constants/firestorePaths.js';
 import { db } from '../services/firebaseClient.js';
+import { normalizeClassStudent } from '../utils/classStudents.js';
 import { getPublicCollection } from '../utils/firestoreRefs.js';
 
 export default function useClassStudents({
@@ -33,7 +34,7 @@ export default function useClassStudents({
       studentsQuery,
       (snapshot) => {
         const nextStudents = snapshot.docs
-          .map((doc) => ({ id: doc.id, ...doc.data() }))
+          .map((doc) => normalizeClassStudent({ id: doc.id, ...doc.data() }))
           .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
         setStudents(nextStudents);
         setError(null);

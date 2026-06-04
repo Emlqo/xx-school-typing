@@ -1,6 +1,7 @@
 const teacherSections = [
   { id: 'overview', label: '점수판', description: '방 관리와 실시간 점수' },
   { id: 'classes', label: '학급/명단', description: '학급 생성과 학생 등록' },
+  { id: 'shop', label: '상점/포인트', description: '포인트와 장식 관리' },
   { id: 'quizzes', label: '퀴즈', description: '돌발 퀴즈 등록' },
   { id: 'words', label: '단어장', description: '제시어 추가/삭제' },
   { id: 'records', label: '공지/명예', description: '공지와 명예의 전당' },
@@ -21,7 +22,7 @@ export default function TeacherHeader({
         <button onClick={onLogout} className="px-5 py-2 bg-white border border-gray-200 text-gray-600 rounded-xl font-medium hover:bg-gray-50">로그아웃</button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2">
         {teacherSections.map((section) => {
           const isActive = activeSection === section.id;
           return (

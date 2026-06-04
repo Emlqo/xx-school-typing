@@ -1,11 +1,45 @@
 import CherryBlossomBackground from '../common/CherryBlossomBackground.jsx';
+import { REWARD_RULES } from '../../constants/rewards.js';
 import { calculateCpm } from '../../utils/scoring.js';
 import { safeToLocaleNumber } from '../../utils/format.js';
+
+function RewardSummary({ reward }) {
+  if (!reward || !reward.totalEarned) return null;
+
+  const growthPercent = Math.round(REWARD_RULES.growthRateThreshold * 100);
+  const rows = [
+    ['게임 완료', reward.gameCompletePoints],
+    ['퀴즈 정답', reward.quizPoints],
+    ['최고 기록 갱신', reward.bestScoreBonus],
+    [`${growthPercent}% 성장 보너스`, reward.growthBonus],
+  ].filter(([, value]) => value > 0);
+
+  return (
+    <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5 mb-8 text-left shadow-sm">
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <div>
+          <div className="text-xs font-black text-emerald-600 tracking-widest">이번 게임 보상</div>
+          <div className="text-2xl font-black text-emerald-700">+{safeToLocaleNumber(reward.totalEarned)}P</div>
+        </div>
+        <div className="text-4xl">✨</div>
+      </div>
+      <div className="space-y-2">
+        {rows.map(([label, value]) => (
+          <div key={label} className="flex justify-between text-sm font-bold text-gray-600">
+            <span>{label}</span>
+            <span className="text-emerald-600">+{safeToLocaleNumber(value)}P</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function ResultView({
   score = 0,
   correctChars = 0,
   gameDuration = 0,
+  lastReward = null,
   onHome = () => {},
   onPracticeAgain = () => {},
 }) {
@@ -22,7 +56,7 @@ export default function ResultView({
 
         <h1 className="text-3xl font-black text-gray-800 mb-2">연습 종료!</h1>
         <p className="text-gray-500 mb-8 font-medium">
-          자유 연습을 마쳤습니다. 실전 대결에 도전해보세요!
+          오늘의 기록을 확인하고 다음 도전에 이어 가세요.
         </p>
 
         <div className="bg-white rounded-2xl p-6 mb-8 border border-pink-100 shadow-sm">
@@ -40,6 +74,8 @@ export default function ResultView({
             </div>
           </div>
         </div>
+
+        <RewardSummary reward={lastReward} />
 
         <div className="space-y-3">
           <button onClick={onHome} className="w-full py-4 bg-gray-800 hover:bg-gray-900 text-white rounded-2xl font-bold text-lg shadow-md transition-colors">

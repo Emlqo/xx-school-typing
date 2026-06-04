@@ -1,4 +1,5 @@
 import { safeToLocaleNumber } from '../../utils/format.js';
+import { getCosmeticById } from '../../constants/cosmetics.js';
 
 export default function LeaderboardPanel({
   leaderboardScores = [],
@@ -72,13 +73,27 @@ export default function LeaderboardPanel({
           <tbody>
             {leaderboardScores.length > 0 ? leaderboardScores.map((score, index) => {
               const isEditable = viewingRoomId !== 'all' && selectedRoom?.status === 'waiting';
+              const cosmetic = getCosmeticById(score.equippedCosmetic);
+              const rowCosmeticClass = cosmetic?.leaderboardClass || '';
 
               return (
-                <tr key={score.id} className="border-b border-gray-100 transition-colors hover:bg-white/50">
+                <tr key={score.id} className={`border-b border-gray-100 transition-colors hover:bg-white/50 ${rowCosmeticClass}`}>
                   <td className="py-3 px-4 text-center font-bold">
                     {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : <span className="text-gray-400">{index + 1}</span>}
                   </td>
-                  <td className="py-3 px-4 font-bold text-gray-800">{score.nickname}</td>
+                  <td className="py-3 px-4 font-bold text-gray-800 relative overflow-hidden">
+                    {cosmetic && (
+                      <span className={`cosmetic-effect ${cosmetic.effectClass || 'cosmetic-effect-aura'}`} aria-hidden="true" />
+                    )}
+                    <div className="cosmetic-name-content flex flex-wrap items-center gap-2">
+                      <span>{score.nickname}</span>
+                      {cosmetic && (
+                        <span className={`text-[11px] px-2 py-1 rounded-full font-black ${cosmetic.badgeClass || 'cosmetic-badge cosmetic-badge-teal'}`}>
+                          {cosmetic.name}
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td className="py-3 px-4 text-center">
                     {isEditable ? (
                       <div className="flex justify-center gap-1 flex-wrap">
