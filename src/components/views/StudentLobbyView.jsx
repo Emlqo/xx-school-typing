@@ -135,7 +135,7 @@ function StudentShopPanel({
         <div className="mt-4">
           <div className="text-sm font-black text-amber-700 mb-2">반별 한정 상품</div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {shopItems.filter((item) => item.active !== false).map((item) => {
+            {shopItems.filter((item) => item.itemType !== 'cosmetic' && item.active !== false).map((item) => {
               const stock = Math.max(0, Number(item.stock || 0));
               const canAfford = Number(student.totalPoints || 0) >= Number(item.price || 0);
               const soldOut = stock <= 0;
@@ -163,7 +163,7 @@ function StudentShopPanel({
                 </div>
               );
             })}
-            {shopItems.filter((item) => item.active !== false).length === 0 && (
+            {shopItems.filter((item) => item.itemType !== 'cosmetic' && item.active !== false).length === 0 && (
               <div className="md:col-span-2 text-center text-gray-400 py-6 rounded-xl border border-dashed border-amber-200 font-bold">
                 현재 판매 중인 한정 상품이 없습니다.
               </div>
@@ -177,7 +177,14 @@ function StudentShopPanel({
           {COSMETIC_ITEMS.map((item) => {
             const owned = ownedCosmetics.includes(item.id);
             const equipped = student.equippedCosmetic === item.id;
-            const canAfford = Number(student.totalPoints || 0) >= item.price;
+            const shopItem = shopItems.find(
+              (candidate) => candidate.itemType === 'cosmetic' && candidate.cosmeticId === item.id,
+            );
+            const price = Number(shopItem?.price ?? item.price);
+            const stock = Math.max(0, Number(shopItem?.stock || 0));
+            const isConfigured = Boolean(shopItem?.id);
+            const isAvailable = isConfigured && shopItem.active !== false && stock > 0;
+            const canAfford = Number(student.totalPoints || 0) >= price;
 
             return (
               <div key={item.id} className={`rounded-2xl border p-4 ${item.previewClass}`}>
@@ -187,9 +194,14 @@ function StudentShopPanel({
                     <div className="text-xs text-gray-500 font-bold mt-1 leading-relaxed">{item.description}</div>
                   </div>
                   <div className="text-sm font-black text-emerald-700 bg-white/80 border border-white rounded-xl px-2 py-1 shrink-0">
-                    {item.price}P
+                    {price}P
                   </div>
                 </div>
+                {!owned && (
+                  <div className={`text-xs font-black mt-3 ${isAvailable ? 'text-cyan-700' : 'text-red-500'}`}>
+                    {!isConfigured ? '판매 준비 중' : stock > 0 ? `남은 수량 ${stock}개` : '품절'}
+                  </div>
+                )}
 
                 <div className="flex gap-2 mt-4">
                   {owned ? (
@@ -210,15 +222,15 @@ function StudentShopPanel({
                   ) : (
                     <button
                       type="button"
-                      onClick={() => onBuyCosmetic(student, item.id)}
-                      disabled={!isVerified || !canAfford}
+                      onClick={() => onBuyCosmetic(student, item.id, shopItem)}
+                      disabled={!isVerified || !canAfford || !isAvailable}
                       className={`flex-1 py-2 rounded-xl font-black text-sm ${
-                        isVerified && canAfford
+                        isVerified && canAfford && isAvailable
                           ? 'bg-white/80 text-teal-700 hover:bg-white border border-white'
                           : 'bg-gray-200/80 text-gray-400'
                       }`}
                     >
-                      {canAfford ? '구매' : '포인트 부족'}
+                      {!isAvailable ? (stock <= 0 && isConfigured ? '품절' : '판매 준비 중') : canAfford ? '구매' : '포인트 부족'}
                     </button>
                   )}
                 </div>
@@ -383,9 +395,9 @@ export default function StudentLobbyView({
     onJoinClassStudent(student);
   };
 
-  const handleVerifiedBuyCosmetic = (student, cosmeticId) => {
+  const handleVerifiedBuyCosmetic = (student, cosmeticId, shopItem) => {
     if (!requireVerifiedStudent(student)) return;
-    onBuyCosmetic(student, cosmeticId);
+    onBuyCosmetic(student, cosmeticId, shopItem);
   };
 
   const handleVerifiedEquipCosmetic = (student, cosmeticId) => {

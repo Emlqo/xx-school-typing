@@ -18,6 +18,7 @@ export default function ShopPointManagementPanel({
 }) {
   const selectedClass = classes.find((classItem) => classItem.id === selectedClassId) || null;
   const [editingItemId, setEditingItemId] = useState(null);
+  const [editingCosmeticId, setEditingCosmeticId] = useState('');
   const [itemName, setItemName] = useState('');
   const [itemDescription, setItemDescription] = useState('');
   const [itemPrice, setItemPrice] = useState('');
@@ -26,6 +27,7 @@ export default function ShopPointManagementPanel({
 
   const resetItemForm = () => {
     setEditingItemId(null);
+    setEditingCosmeticId('');
     setItemName('');
     setItemDescription('');
     setItemPrice('');
@@ -41,18 +43,38 @@ export default function ShopPointManagementPanel({
       price: itemPrice,
       stock: itemStock,
       active: itemActive,
+      itemType: editingCosmeticId ? 'cosmetic' : 'stock',
+      cosmeticId: editingCosmeticId,
     }, editingItemId);
     if (saved) resetItemForm();
   };
 
   const editShopItem = (item) => {
-    setEditingItemId(item.id);
+    setEditingItemId(item.isVirtual ? null : item.id);
+    setEditingCosmeticId(item.cosmeticId || '');
     setItemName(item.name || '');
     setItemDescription(item.description || '');
     setItemPrice(String(item.price ?? ''));
     setItemStock(String(item.stock ?? ''));
     setItemActive(item.active !== false);
   };
+
+  const cosmeticShopItems = COSMETIC_ITEMS.map((cosmetic) => {
+    const savedItem = shopItems.find((item) => item.itemType === 'cosmetic' && item.cosmeticId === cosmetic.id);
+    return {
+      ...cosmetic,
+      ...savedItem,
+      id: savedItem?.id || `default-${cosmetic.id}`,
+      cosmeticId: cosmetic.id,
+      itemType: 'cosmetic',
+      stock: savedItem?.stock ?? 0,
+      active: savedItem?.active !== false,
+      isVirtual: !savedItem,
+    };
+  });
+  const stockShopItems = shopItems.filter((item) => item.itemType !== 'cosmetic');
+  const managedShopItems = [...cosmeticShopItems, ...stockShopItems];
+  const isEditing = Boolean(editingItemId || editingCosmeticId);
 
   return (
     <div className="glass-box p-6 rounded-3xl border border-teal-100">
@@ -86,17 +108,19 @@ export default function ShopPointManagementPanel({
         <form onSubmit={submitShopItem} className="bg-white rounded-2xl border border-amber-100 p-5 space-y-3">
           <div>
             <div className="text-xs font-black text-amber-600 tracking-widest">반별 재고 상품</div>
-            <h3 className="text-lg font-black text-gray-800">{editingItemId ? '상품 수정' : '새 상품 등록'}</h3>
+            <h3 className="text-lg font-black text-gray-800">{isEditing ? '상품 수정' : '새 상품 등록'}</h3>
           </div>
           <input
             value={itemName}
             onChange={(event) => setItemName(event.target.value)}
+            disabled={Boolean(editingCosmeticId)}
             placeholder="상품명 (예: 초코우유)"
             className="w-full px-4 py-3 border border-amber-200 rounded-xl outline-none focus:ring-2 focus:ring-amber-400"
           />
           <textarea
             value={itemDescription}
             onChange={(event) => setItemDescription(event.target.value)}
+            disabled={Boolean(editingCosmeticId)}
             placeholder="상품 설명"
             rows={3}
             className="w-full px-4 py-3 border border-amber-200 rounded-xl outline-none resize-none focus:ring-2 focus:ring-amber-400"
@@ -134,9 +158,9 @@ export default function ShopPointManagementPanel({
               disabled={!selectedClassId}
               className="flex-1 py-3 bg-amber-400 hover:bg-amber-500 disabled:bg-gray-300 text-amber-950 rounded-xl font-black"
             >
-              {editingItemId ? '수정 저장' : '상품 등록'}
+              {isEditing ? '수정 저장' : '상품 등록'}
             </button>
-            {editingItemId && (
+            {isEditing && (
               <button type="button" onClick={resetItemForm} className="px-4 py-3 bg-gray-100 text-gray-500 rounded-xl font-black">
                 취소
               </button>
@@ -147,14 +171,17 @@ export default function ShopPointManagementPanel({
         <div className="bg-white rounded-2xl border border-amber-100 p-5">
           <div className="flex items-center justify-between gap-3 mb-4">
             <h3 className="text-lg font-black text-gray-800">등록 상품</h3>
-            <span className="text-xs font-black text-amber-700">{shopItems.length}개</span>
+            <span className="text-xs font-black text-amber-700">{managedShopItems.length}개</span>
           </div>
           <div className="space-y-2 max-h-96 overflow-y-auto custom-scrollbar pr-1">
-            {shopItems.map((item) => (
+            {managedShopItems.map((item) => (
               <div key={item.id} className="rounded-xl border border-amber-100 bg-amber-50/50 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="font-black text-gray-800 truncate">{item.name}</div>
+                    {item.itemType === 'cosmetic' && (
+                      <div className="text-[11px] text-cyan-700 font-black mt-1">기본 장식 상품</div>
+                    )}
                     <div className="text-xs text-gray-500 font-bold mt-1">{item.description || '설명 없음'}</div>
                     <div className="flex flex-wrap gap-2 mt-2 text-xs font-black">
                       <span className="text-emerald-700">{safeToLocaleNumber(item.price || 0)}P</span>
@@ -170,16 +197,15 @@ export default function ShopPointManagementPanel({
                     <button type="button" onClick={() => editShopItem(item)} className="px-3 py-2 bg-white border border-amber-200 text-amber-700 rounded-lg text-xs font-black">
                       수정
                     </button>
-                    <button type="button" onClick={() => handleDeleteShopItem(item.id, item.name)} className="px-3 py-2 bg-white border border-red-100 text-red-500 rounded-lg text-xs font-black">
-                      삭제
-                    </button>
+                    {item.itemType !== 'cosmetic' && (
+                      <button type="button" onClick={() => handleDeleteShopItem(item.id, item.name)} className="px-3 py-2 bg-white border border-red-100 text-red-500 rounded-lg text-xs font-black">
+                        삭제
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
             ))}
-            {selectedClassId && shopItems.length === 0 && (
-              <div className="text-center text-gray-400 py-10 font-bold">이 반에 등록된 재고 상품이 없습니다.</div>
-            )}
           </div>
         </div>
       </div>

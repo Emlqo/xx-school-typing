@@ -1295,30 +1295,81 @@ export default function App() {
     }
   };
 
-  const handleBuyCosmetic = async (student, cosmeticId) => {
+  const handleBuyCosmetic = async (student, cosmeticId, shopItem) => {
     const normalizedStudent = normalizeClassStudent(student);
     const cosmetic = getCosmeticById(cosmeticId);
 
-    if (!normalizedStudent.id || !cosmetic) return;
-    if (normalizedStudent.ownedCosmetics.includes(cosmetic.id)) {
-      alert('이미 보유한 아이템입니다.');
+    if (!normalizedStudent.id || !cosmetic || !shopItem?.id) {
+      alert('선생님이 아직 이 장식의 가격과 수량을 설정하지 않았습니다.');
       return;
     }
-    if (normalizedStudent.totalPoints < cosmetic.price) {
-      alert('포인트가 부족합니다.');
+    if (normalizedStudent.ownedCosmetics.includes(cosmetic.id)) {
+      alert('이미 보유한 아이템입니다.');
       return;
     }
 
     try {
       const studentRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.classStudents, normalizedStudent.id);
-      await updateDoc(studentRef, {
-        totalPoints: normalizedStudent.totalPoints - cosmetic.price,
-        ownedCosmetics: [...normalizedStudent.ownedCosmetics, cosmetic.id],
-        updatedAt: serverTimestamp(),
+      const itemRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.shopItems, shopItem.id);
+      const purchasesRef = getPublicCollection(db, APP_ID, FIRESTORE_PATHS.shopPurchases);
+      const purchaseRef = doc(purchasesRef);
+
+      await runTransaction(db, async (transaction) => {
+        const [studentSnapshot, itemSnapshot] = await Promise.all([
+          transaction.get(studentRef),
+          transaction.get(itemRef),
+        ]);
+        if (!studentSnapshot.exists() || !itemSnapshot.exists()) throw new Error('NOT_FOUND');
+
+        const studentData = normalizeClassStudent({
+          id: studentSnapshot.id,
+          ...studentSnapshot.data(),
+        });
+        const itemData = itemSnapshot.data();
+        const price = Math.max(0, Number(itemData.price || 0));
+        const stock = Math.max(0, Number(itemData.stock || 0));
+
+        if (itemData.classId !== studentData.classId || itemData.cosmeticId !== cosmetic.id) {
+          throw new Error('INVALID_ITEM');
+        }
+        if (itemData.active === false) throw new Error('INACTIVE');
+        if (studentData.ownedCosmetics.includes(cosmetic.id)) throw new Error('ALREADY_OWNED');
+        if (stock <= 0) throw new Error('OUT_OF_STOCK');
+        if (studentData.totalPoints < price) throw new Error('NOT_ENOUGH_POINTS');
+
+        transaction.update(studentRef, {
+          totalPoints: studentData.totalPoints - price,
+          ownedCosmetics: [...studentData.ownedCosmetics, cosmetic.id],
+          updatedAt: serverTimestamp(),
+        });
+        transaction.update(itemRef, {
+          stock: stock - 1,
+          updatedAt: serverTimestamp(),
+        });
+        transaction.set(purchaseRef, {
+          itemId: itemSnapshot.id,
+          itemName: cosmetic.name,
+          itemType: 'cosmetic',
+          cosmeticId: cosmetic.id,
+          classId: studentData.classId,
+          studentId: studentData.id,
+          studentName: studentData.name || '',
+          quantity: 1,
+          pointsSpent: price,
+          status: 'completed',
+          userId: user?.uid || null,
+          createdAt: serverTimestamp(),
+        });
       });
     } catch (error) {
       console.error(error);
-      alert('아이템 구매 중 오류가 발생했습니다.');
+      const messages = {
+        ALREADY_OWNED: '이미 보유한 아이템입니다.',
+        OUT_OF_STOCK: '장식 아이템이 품절되었습니다.',
+        NOT_ENOUGH_POINTS: '포인트가 부족합니다.',
+        INACTIVE: '현재 판매하지 않는 장식입니다.',
+      };
+      alert(messages[error.message] || '아이템 구매 중 오류가 발생했습니다.');
     }
   };
 
@@ -1335,6 +1386,8 @@ export default function App() {
       price: Math.max(0, Math.floor(Number(itemData.price) || 0)),
       stock: Math.max(0, Math.floor(Number(itemData.stock) || 0)),
       active: itemData.active !== false,
+      itemType: itemData.itemType === 'cosmetic' ? 'cosmetic' : 'stock',
+      cosmeticId: itemData.itemType === 'cosmetic' ? String(itemData.cosmeticId || '') : null,
       updatedAt: serverTimestamp(),
     };
 
