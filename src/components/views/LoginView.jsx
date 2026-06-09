@@ -86,7 +86,7 @@ function AnnouncementBoard({ announcements = [], onOpenModal = () => {} }) {
 function RewardGuideBoard() {
   const growthPercent = Math.round(REWARD_RULES.growthRateThreshold * 100);
   const rewardItems = [
-    ['게임 완료', `+${REWARD_RULES.gameCompletePoints}P`, '학급 게임을 끝까지 마치면 기본 포인트를 받아요.'],
+    ['순위 보상', `1위 ${REWARD_RULES.rankPoints.first}P · 2위 ${REWARD_RULES.rankPoints.second}P · 3위 ${REWARD_RULES.rankPoints.third}P`, `상위 30%는 ${REWARD_RULES.rankPoints.topThirtyPercent}P, 나머지 완주자는 ${REWARD_RULES.rankPoints.completion}P를 받아요.`],
     ['퀴즈 정답', `정답 1개당 +${REWARD_RULES.quizCorrectPoints}P`, '돌발 퀴즈를 맞힐수록 포인트가 쌓여요.'],
     ['최고 기록 갱신', `+${REWARD_RULES.bestScoreBonus}P`, '내 이전 최고 점수를 넘으면 보너스가 있어요.'],
     [`${growthPercent}% 성장`, `+${REWARD_RULES.growthBonus}P`, '이전 최고 기록보다 크게 성장하면 추가 보상!'],

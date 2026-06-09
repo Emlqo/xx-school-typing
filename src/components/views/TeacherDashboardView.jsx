@@ -28,6 +28,7 @@ export default function TeacherDashboardView({
   handleDeleteRoom = () => {},
   startRoomGame = () => {},
   requestScoreSync = () => {},
+  finalizeRankRewards = () => {},
   toggleBoosterPower = () => {},
   toggleWeight = () => {},
   toggleDifficulty = () => {},
@@ -86,6 +87,9 @@ export default function TeacherDashboardView({
   handleGrantStudentCosmetic = () => {},
   handleRemoveStudentCosmetic = () => {},
   handleResetStudentCosmetics = () => {},
+  shopItems = [],
+  handleSaveShopItem = () => {},
+  handleDeleteShopItem = () => {},
   classEntryCount = 0,
   hallOfFameMonthKey = '',
   setHallOfFameMonthKey = () => {},
@@ -169,8 +173,10 @@ export default function TeacherDashboardView({
               viewingRoomId={viewingRoomId}
               participantCount={participantCount}
               roomAverageScore={roomAverageScore}
+              currentTime={currentTime}
               startRoomGame={startRoomGame}
               requestScoreSync={requestScoreSync}
+              finalizeRankRewards={finalizeRankRewards}
               toggleBoosterPower={toggleBoosterPower}
               toggleWeight={toggleWeight}
               toggleDifficulty={toggleDifficulty}
@@ -258,6 +264,9 @@ export default function TeacherDashboardView({
             handleGrantStudentCosmetic={handleGrantStudentCosmetic}
             handleRemoveStudentCosmetic={handleRemoveStudentCosmetic}
             handleResetStudentCosmetics={handleResetStudentCosmetics}
+            shopItems={shopItems}
+            handleSaveShopItem={handleSaveShopItem}
+            handleDeleteShopItem={handleDeleteShopItem}
           />
         )}
 

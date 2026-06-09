@@ -1,5 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { addDoc, deleteDoc, getDoc, getDocs, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
+import {
+  addDoc,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  increment,
+  query,
+  runTransaction,
+  serverTimestamp,
+  updateDoc,
+  where,
+  writeBatch,
+} from 'firebase/firestore';
 import { APP_ID, GAME_RULES, TEACHER_PASSWORD } from './constants/gameRules.js';
 import { KOREAN_WORDS, ENGLISH_WORDS } from './constants/words.js';
 import { getCosmeticById } from './constants/cosmetics.js';
@@ -10,7 +23,7 @@ import { calculateHallOfFame, getMonthKey } from './utils/hallOfFame.js';
 import { calculateCpm, calculateQuizScore, calculateTypingScore, getQuizWrongPenalty } from './utils/scoring.js';
 import { formatTime } from './utils/format.js';
 import { normalizeClassStudent } from './utils/classStudents.js';
-import { calculateRewardPoints, getDefaultRewardState } from './utils/rewards.js';
+import { calculateRankRewards, calculateRewardPoints, getDefaultRewardState } from './utils/rewards.js';
 import useAnnouncements from './hooks/useAnnouncements.js';
 import useClasses from './hooks/useClasses.js';
 import useClassStudents from './hooks/useClassStudents.js';
@@ -20,6 +33,7 @@ import useOpenClassRooms from './hooks/useOpenClassRooms.js';
 import useQuizzes from './hooks/useQuizzes.js';
 import useRoomScores from './hooks/useRoomScores.js';
 import useScores from './hooks/useScores.js';
+import useShopItems from './hooks/useShopItems.js';
 import useScoreSyncRequest from './hooks/useScoreSyncRequest.js';
 import useStudentRoomWatcher from './hooks/useStudentRoomWatcher.js';
 import useTeacherRooms from './hooks/useTeacherRooms.js';
@@ -123,6 +137,16 @@ export default function App() {
     user,
     view,
     roomId: selectedOpenClassRoomId,
+    isPracticeMode,
+    enabled: firestoreReadsEnabled,
+  });
+  const shopClassId = view === 'teacher'
+    ? selectedClassId
+    : selectedOpenClassRoom?.classId || '';
+  const { shopItems } = useShopItems({
+    user,
+    view,
+    classId: shopClassId,
     isPracticeMode,
     enabled: firestoreReadsEnabled,
   });
@@ -569,6 +593,7 @@ export default function App() {
             score: latestScoreRef.current,
             quizCorrectCount: latestQuizCorrectCountRef.current,
             previousBestScore: studentData.bestScore,
+            includeGameComplete: false,
           });
           const nextTotalPoints = studentData.totalPoints + reward.totalEarned;
           setLastReward(reward);
@@ -853,6 +878,87 @@ export default function App() {
     } catch (error) {
       console.error(error);
       alert('점수 수집 요청 중 오류가 발생했습니다.');
+    }
+  };
+
+  const finalizeRankRewards = async (roomId) => {
+    if (!roomId || roomId === 'all') return;
+
+    const room = rooms.find((item) => item.id === roomId);
+    if (room?.rewardFinalized === true) {
+      alert('이미 순위 보상이 지급된 게임입니다.');
+      return;
+    }
+    if (!window.confirm('현재 점수 순위로 포인트를 확정 지급할까요? 지급 후에는 다시 지급할 수 없습니다.')) return;
+
+    const roomRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.rooms, roomId);
+    let rewardClaimed = false;
+
+    try {
+      const scoresRef = getPublicCollection(db, APP_ID, FIRESTORE_PATHS.scores);
+      const scoreSnapshot = await getDocs(query(scoresRef, where('roomId', '==', roomId)));
+      const roomScores = scoreSnapshot.docs.map((scoreDoc) => ({ id: scoreDoc.id, ...scoreDoc.data() }));
+      const rankRewards = calculateRankRewards(roomScores);
+
+      if (rankRewards.length === 0) {
+        alert('순위 보상을 지급할 학급 학생 기록이 없습니다.');
+        return;
+      }
+
+      await runTransaction(db, async (transaction) => {
+        const roomSnapshot = await transaction.get(roomRef);
+        if (!roomSnapshot.exists()) throw new Error('ROOM_NOT_FOUND');
+
+        const roomData = roomSnapshot.data();
+        if (roomData.rewardFinalized === true || roomData.rewardFinalizing === true) {
+          throw new Error('REWARD_ALREADY_CLAIMED');
+        }
+
+        transaction.update(roomRef, {
+          rewardFinalizing: true,
+          rewardFinalizingAt: serverTimestamp(),
+          rewardFinalizingBy: user?.uid || null,
+        });
+      });
+      rewardClaimed = true;
+
+      const batch = writeBatch(db);
+      rankRewards.forEach((reward) => {
+        const studentRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.classStudents, reward.studentId);
+        const scoreRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.scores, reward.scoreId);
+        batch.update(studentRef, {
+          totalPoints: increment(reward.points),
+          updatedAt: serverTimestamp(),
+        });
+        batch.update(scoreRef, {
+          rank: reward.rank,
+          rankRewardPoints: reward.points,
+          rankRewardGranted: true,
+          rewardEarned: increment(reward.points),
+          updatedAt: serverTimestamp(),
+        });
+      });
+
+      batch.update(roomRef, {
+        rewardFinalized: true,
+        rewardFinalizing: false,
+        rewardFinalizedAt: serverTimestamp(),
+        rewardFinalizedBy: user?.uid || null,
+      });
+      await batch.commit();
+      alert('순위 보상 지급이 완료되었습니다.');
+    } catch (error) {
+      console.error(error);
+      if (rewardClaimed) {
+        await updateDoc(roomRef, {
+          rewardFinalizing: false,
+          rewardFinalizingAt: null,
+          rewardFinalizingBy: null,
+        }).catch((unlockError) => console.error(unlockError));
+      }
+      alert(error?.message === 'REWARD_ALREADY_CLAIMED'
+        ? '이미 다른 화면에서 순위 보상 지급을 처리 중이거나 완료했습니다.'
+        : '순위 보상 지급 중 오류가 발생했습니다.');
     }
   };
 
@@ -1216,6 +1322,124 @@ export default function App() {
     }
   };
 
+  const handleSaveShopItem = async (itemData, editingItemId = null) => {
+    if (!selectedClassId) {
+      alert('상품을 등록할 학급을 선택해주세요.');
+      return false;
+    }
+
+    const normalizedItem = {
+      classId: selectedClassId,
+      name: String(itemData.name || '').trim(),
+      description: String(itemData.description || '').trim(),
+      price: Math.max(0, Math.floor(Number(itemData.price) || 0)),
+      stock: Math.max(0, Math.floor(Number(itemData.stock) || 0)),
+      active: itemData.active !== false,
+      updatedAt: serverTimestamp(),
+    };
+
+    if (!normalizedItem.name || normalizedItem.price <= 0) {
+      alert('상품명과 1P 이상의 가격을 입력해주세요.');
+      return false;
+    }
+
+    try {
+      if (editingItemId) {
+        const itemRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.shopItems, editingItemId);
+        await updateDoc(itemRef, normalizedItem);
+      } else {
+        const itemsRef = getPublicCollection(db, APP_ID, FIRESTORE_PATHS.shopItems);
+        await addDoc(itemsRef, {
+          ...normalizedItem,
+          createdAt: serverTimestamp(),
+          createdBy: user?.uid || null,
+        });
+      }
+      return true;
+    } catch (error) {
+      console.error(error);
+      alert('상품 저장 중 오류가 발생했습니다.');
+      return false;
+    }
+  };
+
+  const handleDeleteShopItem = async (itemId, itemName) => {
+    if (!window.confirm(`[${itemName || '상품'}]을 삭제할까요?`)) return;
+
+    try {
+      const itemRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.shopItems, itemId);
+      await deleteDoc(itemRef);
+    } catch (error) {
+      console.error(error);
+      alert('상품 삭제 중 오류가 발생했습니다.');
+    }
+  };
+
+  const handleBuyStockItem = async (student, item) => {
+    const normalizedStudent = normalizeClassStudent(student);
+    if (!normalizedStudent.id || !item?.id || item.classId !== normalizedStudent.classId) return;
+
+    try {
+      const studentRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.classStudents, normalizedStudent.id);
+      const itemRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.shopItems, item.id);
+      const purchasesRef = getPublicCollection(db, APP_ID, FIRESTORE_PATHS.shopPurchases);
+      const purchaseRef = doc(purchasesRef);
+
+      await runTransaction(db, async (transaction) => {
+        const [studentSnapshot, itemSnapshot] = await Promise.all([
+          transaction.get(studentRef),
+          transaction.get(itemRef),
+        ]);
+
+        if (!studentSnapshot.exists() || !itemSnapshot.exists()) throw new Error('NOT_FOUND');
+
+        const studentData = normalizeClassStudent({
+          id: studentSnapshot.id,
+          ...studentSnapshot.data(),
+        });
+        const currentItem = itemSnapshot.data();
+        const price = Math.max(0, Number(currentItem.price || 0));
+        const stock = Math.max(0, Number(currentItem.stock || 0));
+
+        if (currentItem.active === false) throw new Error('INACTIVE');
+        if (currentItem.classId !== studentData.classId) throw new Error('WRONG_CLASS');
+        if (stock < 1) throw new Error('OUT_OF_STOCK');
+        if (studentData.totalPoints < price) throw new Error('NOT_ENOUGH_POINTS');
+
+        transaction.update(studentRef, {
+          totalPoints: studentData.totalPoints - price,
+          updatedAt: serverTimestamp(),
+        });
+        transaction.update(itemRef, {
+          stock: stock - 1,
+          updatedAt: serverTimestamp(),
+        });
+        transaction.set(purchaseRef, {
+          itemId: itemSnapshot.id,
+          itemName: currentItem.name || '',
+          classId: studentData.classId,
+          studentId: studentData.id,
+          studentName: studentData.name || '',
+          quantity: 1,
+          pointsSpent: price,
+          status: 'completed',
+          userId: user?.uid || null,
+          createdAt: serverTimestamp(),
+        });
+      });
+
+      alert(`${item.name} 구매가 완료되었습니다.`);
+    } catch (error) {
+      console.error(error);
+      const messages = {
+        OUT_OF_STOCK: '상품이 품절되었습니다.',
+        NOT_ENOUGH_POINTS: '포인트가 부족합니다.',
+        INACTIVE: '현재 판매하지 않는 상품입니다.',
+      };
+      alert(messages[error.message] || '상품 구매 중 오류가 발생했습니다.');
+    }
+  };
+
   const handleEquipCosmetic = async (student, cosmeticId) => {
     const normalizedStudent = normalizeClassStudent(student);
     const cosmetic = getCosmeticById(cosmeticId);
@@ -1421,9 +1645,11 @@ export default function App() {
         selectedOpenClassRoomId={selectedOpenClassRoomId}
         setSelectedOpenClassRoomId={setSelectedOpenClassRoomId}
         classStudents={classStudents}
+        shopItems={shopItems}
         enteredStudentIds={enteredClassStudentIds}
         onJoinClassStudent={handleJoinClassStudent}
         onBuyCosmetic={handleBuyCosmetic}
+        onBuyStockItem={handleBuyStockItem}
         onEquipCosmetic={handleEquipCosmetic}
         onSetStudentPin={handleSetStudentPin}
         onBack={() => setView('login')}
@@ -1502,6 +1728,7 @@ export default function App() {
         handleDeleteRoom={handleDeleteRoom}
         startRoomGame={startRoomGame}
         requestScoreSync={requestScoreSync}
+        finalizeRankRewards={finalizeRankRewards}
         toggleBoosterPower={toggleBoosterPower}
         toggleWeight={toggleWeight}
         toggleDifficulty={toggleDifficulty}
@@ -1560,6 +1787,9 @@ export default function App() {
         handleGrantStudentCosmetic={handleGrantStudentCosmetic}
         handleRemoveStudentCosmetic={handleRemoveStudentCosmetic}
         handleResetStudentCosmetics={handleResetStudentCosmetics}
+        shopItems={shopItems}
+        handleSaveShopItem={handleSaveShopItem}
+        handleDeleteShopItem={handleDeleteShopItem}
         classEntryCount={0}
         hallOfFameMonthKey={hallOfFameMonthKey}
         setHallOfFameMonthKey={setHallOfFameMonthKey}

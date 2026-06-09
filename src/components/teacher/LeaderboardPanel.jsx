@@ -7,13 +7,19 @@ export default function LeaderboardPanel({
   viewingRoomId = '',
   participantCount = 0,
   roomAverageScore = 0,
+  currentTime = Date.now(),
   startRoomGame = () => {},
   requestScoreSync = () => {},
+  finalizeRankRewards = () => {},
   toggleBoosterPower = () => {},
   toggleWeight = () => {},
   toggleDifficulty = () => {},
 }) {
   const selectedRoom = rooms.find((room) => room.id === viewingRoomId);
+  const expiresAt = typeof selectedRoom?.expiresAt?.toMillis === 'function'
+    ? selectedRoom.expiresAt.toMillis()
+    : Number(selectedRoom?.expiresAt || 0);
+  const gameEnded = selectedRoom?.status === 'playing' && expiresAt > 0 && expiresAt <= currentTime;
   const title = viewingRoomId === 'all'
     ? '풍양중 전체 명예의 전당'
     : viewingRoomId === ''
@@ -37,9 +43,24 @@ export default function LeaderboardPanel({
                 </button>
               )}
               {selectedRoom?.status === 'playing' && (
-                <button onClick={() => requestScoreSync(viewingRoomId)} className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-bold shadow-lg transition-all">
-                  📡 실시간 가져오기
-                </button>
+                <>
+                  <button onClick={() => requestScoreSync(viewingRoomId)} className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-bold shadow-lg transition-all">
+                    📡 실시간 가져오기
+                  </button>
+                  {selectedRoom.entryType === 'class' && (
+                    <button
+                      onClick={() => finalizeRankRewards(viewingRoomId)}
+                      disabled={!gameEnded || selectedRoom.rewardFinalized === true || participantCount === 0}
+                      className="px-5 py-3 bg-amber-400 hover:bg-amber-500 disabled:bg-gray-300 disabled:cursor-not-allowed text-amber-950 rounded-xl font-black shadow-lg transition-all"
+                    >
+                      {selectedRoom.rewardFinalized === true
+                        ? '보상 지급 완료'
+                        : gameEnded
+                          ? '순위 보상 확정'
+                          : '게임 종료 후 지급'}
+                    </button>
+                  )}
+                </>
               )}
             </div>
           )}

@@ -18,6 +18,8 @@ function StudentShopPanel({
   onJoinClassStudent = () => {},
   onBuyCosmetic = () => {},
   onEquipCosmetic = () => {},
+  shopItems = [],
+  onBuyStockItem = () => {},
 }) {
   if (!student) {
     return (
@@ -130,6 +132,47 @@ function StudentShopPanel({
         </summary>
         <div className="text-xs font-bold text-gray-400 mt-2">클릭 시 포인트가 반영됩니다</div>
 
+        <div className="mt-4">
+          <div className="text-sm font-black text-amber-700 mb-2">반별 한정 상품</div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {shopItems.filter((item) => item.active !== false).map((item) => {
+              const stock = Math.max(0, Number(item.stock || 0));
+              const canAfford = Number(student.totalPoints || 0) >= Number(item.price || 0);
+              const soldOut = stock <= 0;
+
+              return (
+                <div key={item.id} className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-black text-gray-800 truncate">{item.name}</div>
+                      <div className="text-xs text-gray-500 font-bold mt-1">{item.description || '한정 상품'}</div>
+                    </div>
+                    <div className="text-sm font-black text-amber-700">{safeToLocaleNumber(item.price || 0)}P</div>
+                  </div>
+                  <div className={`text-xs font-black mt-3 ${soldOut ? 'text-red-500' : 'text-amber-600'}`}>
+                    {soldOut ? '품절' : `남은 수량 ${stock}개`}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onBuyStockItem(student, item)}
+                    disabled={!isVerified || soldOut || !canAfford}
+                    className="w-full mt-3 py-2 rounded-xl bg-amber-400 hover:bg-amber-500 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-amber-950 font-black"
+                  >
+                    {soldOut ? '품절' : canAfford ? '즉시 구매' : '포인트 부족'}
+                  </button>
+                </div>
+              );
+            })}
+            {shopItems.filter((item) => item.active !== false).length === 0 && (
+              <div className="md:col-span-2 text-center text-gray-400 py-6 rounded-xl border border-dashed border-amber-200 font-bold">
+                현재 판매 중인 한정 상품이 없습니다.
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="border-t border-cyan-100 mt-5 pt-4">
+          <div className="text-sm font-black text-gray-700 mb-3">장식 아이템</div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
           {COSMETIC_ITEMS.map((item) => {
             const owned = ownedCosmetics.includes(item.id);
@@ -183,6 +226,7 @@ function StudentShopPanel({
             );
           })}
         </div>
+        </div>
       </details>
     </div>
   );
@@ -197,10 +241,12 @@ export default function StudentLobbyView({
   selectedOpenClassRoomId = '',
   setSelectedOpenClassRoomId = () => {},
   classStudents = [],
+  shopItems = [],
   enteredStudentIds = [],
   onJoinClassStudent = () => {},
   onBuyCosmetic = () => {},
   onEquipCosmetic = () => {},
+  onBuyStockItem = () => {},
   onSetStudentPin = async () => false,
   onBack = () => {},
   onJoinRoom = () => {},
@@ -345,6 +391,11 @@ export default function StudentLobbyView({
   const handleVerifiedEquipCosmetic = (student, cosmeticId) => {
     if (!requireVerifiedStudent(student)) return;
     onEquipCosmetic(student, cosmeticId);
+  };
+
+  const handleVerifiedBuyStockItem = (student, item) => {
+    if (!requireVerifiedStudent(student)) return;
+    onBuyStockItem(student, item);
   };
 
   return (
@@ -511,6 +562,8 @@ export default function StudentLobbyView({
                   onJoinClassStudent={handleVerifiedJoinClassStudent}
                   onBuyCosmetic={handleVerifiedBuyCosmetic}
                   onEquipCosmetic={handleVerifiedEquipCosmetic}
+                  shopItems={shopItems}
+                  onBuyStockItem={handleVerifiedBuyStockItem}
                 />
               </div>
             </div>

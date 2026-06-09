@@ -7,4 +7,6 @@ export const FIRESTORE_PATHS = {
   classes: 'typing_classes',
   classStudents: 'typing_class_students',
   hallOfFame: 'typing_hall_of_fame',
+  shopItems: 'typing_shop_items',
+  shopPurchases: 'typing_shop_purchases',
 };
