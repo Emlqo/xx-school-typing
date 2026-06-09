@@ -115,26 +115,55 @@ function ClassMvpSection({ items = [] }) {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-        {items.length > 0 ? items.map((item) => (
-          <div
-            key={`${item.classId}-${item.studentId}`}
-            className={`bg-white/95 text-gray-800 rounded-xl p-4 border shadow-sm ${
-              overallMvp?.classId === item.classId && overallMvp?.studentId === item.studentId
-                ? 'border-yellow-300 ring-2 ring-yellow-200 shadow-yellow-200'
-                : 'border-white/80'
-            }`}
-          >
-            <div className="text-xs font-black text-pink-500 mb-1">{item.className || '학급 미지정'}</div>
-            <div className="font-black text-xl truncate">{item.nickname || '이름 없음'}</div>
-            <div className="mt-3 flex items-end justify-between gap-3">
-              <div>
-                <div className="text-xs text-gray-400 font-bold">월간 최고 점수</div>
-                <div className="text-2xl font-black text-pink-500">{safeToLocaleNumber(item.value || item.bestScore || 0)}</div>
+        {items.length > 0 ? items.map((item) => {
+          const isOverallMvp = overallMvp?.classId === item.classId
+            && overallMvp?.studentId === item.studentId;
+
+          return (
+            <div
+              key={`${item.classId}-${item.studentId}`}
+              className={`relative text-gray-800 rounded-xl p-4 border shadow-sm ${
+                isOverallMvp
+                  ? 'hall-mvp-champion'
+                  : 'bg-white/95 border-white/80'
+              }`}
+            >
+              {isOverallMvp && (
+                <>
+                  <div className="hall-mvp-crown" aria-hidden="true">👑</div>
+                  <span className="hall-mvp-spark hall-mvp-spark-one" aria-hidden="true">✦</span>
+                  <span className="hall-mvp-spark hall-mvp-spark-two" aria-hidden="true">✧</span>
+                  <span className="hall-mvp-spark hall-mvp-spark-three" aria-hidden="true">✦</span>
+                </>
+              )}
+
+              <div className="relative z-10">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <div className={`text-xs font-black ${isOverallMvp ? 'text-amber-700' : 'text-pink-500'}`}>
+                    {item.className || '학급 미지정'}
+                  </div>
+                  {isOverallMvp && (
+                    <span className="hall-mvp-badge">전체 1위</span>
+                  )}
+                </div>
+                <div className={`font-black text-xl truncate ${isOverallMvp ? 'text-amber-950 drop-shadow-sm' : ''}`}>
+                  {item.nickname || '이름 없음'}
+                </div>
+                <div className="mt-3 flex items-end justify-between gap-3">
+                  <div>
+                    <div className={`text-xs font-bold ${isOverallMvp ? 'text-amber-700' : 'text-gray-400'}`}>월간 최고 점수</div>
+                    <div className={`text-2xl font-black ${isOverallMvp ? 'text-amber-700' : 'text-pink-500'}`}>
+                      {safeToLocaleNumber(item.value || item.bestScore || 0)}
+                    </div>
+                  </div>
+                  <div className={`text-xs font-bold ${isOverallMvp ? 'text-amber-700' : 'text-gray-400'}`}>
+                    {item.gamesPlayed || 0}회 참여
+                  </div>
+                </div>
               </div>
-              <div className="text-xs font-bold text-gray-400">{item.gamesPlayed || 0}회 참여</div>
             </div>
-          </div>
-        )) : (
+          );
+        }) : (
           <div className="md:col-span-2 xl:col-span-3 text-center py-10 bg-white/20 rounded-xl border border-white/30 font-bold">
             아직 선정된 MVP 기록이 없습니다.
           </div>
