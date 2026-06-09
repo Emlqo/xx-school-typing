@@ -91,6 +91,8 @@ export default function TeacherDashboardView({
   setHallOfFameMonthKey = () => {},
   hallOfFame = {},
   monthlyScores = [],
+  hallOfFameScoreCount = 0,
+  hallOfFameSavedAt = null,
   refreshHallOfFame = () => {},
   isHallOfFameLoading = false,
   hallOfFameError = null,
@@ -221,6 +223,8 @@ export default function TeacherDashboardView({
               setMonthKey={setHallOfFameMonthKey}
               hallOfFame={hallOfFame}
               monthlyScores={monthlyScores}
+              scoreCount={hallOfFameScoreCount}
+              savedAt={hallOfFameSavedAt}
               onRefresh={refreshHallOfFame}
               isLoading={isHallOfFameLoading}
               error={hallOfFameError}

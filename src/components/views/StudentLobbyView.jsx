@@ -122,13 +122,15 @@ function StudentShopPanel({
         이 이름으로 입장하기
       </button>
 
-      <div>
-        <div className="flex items-center justify-between gap-3 mb-3">
+      <details className="group rounded-2xl border border-cyan-100 bg-cyan-50/40 p-4">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
           <div className="text-sm font-black text-gray-700">장식 아이템</div>
-          <div className="text-xs font-bold text-gray-400">클릭 시 포인트가 반영됩니다</div>
-        </div>
+          <div className="text-xs font-bold text-teal-600 group-open:hidden">상점 열기</div>
+          <div className="hidden text-xs font-bold text-teal-600 group-open:block">상점 닫기</div>
+        </summary>
+        <div className="text-xs font-bold text-gray-400 mt-2">클릭 시 포인트가 반영됩니다</div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
           {COSMETIC_ITEMS.map((item) => {
             const owned = ownedCosmetics.includes(item.id);
             const equipped = student.equippedCosmetic === item.id;
@@ -181,7 +183,7 @@ function StudentShopPanel({
             );
           })}
         </div>
-      </div>
+      </details>
     </div>
   );
 }
@@ -373,11 +375,33 @@ export default function StudentLobbyView({
           </button>
         </div>
 
+        {activeTab === 'class' && (
+          <div className="grid grid-cols-3 gap-2 mb-6">
+            {[
+              ['1', '학급 선택', Boolean(selectedRoom)],
+              ['2', '이름 선택', Boolean(selectedStudent)],
+              ['3', 'PIN 인증', isSelectedStudentVerified],
+            ].map(([step, label, done]) => (
+              <div
+                key={step}
+                className={`rounded-2xl border px-3 py-3 text-center ${
+                  done
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                    : 'bg-white/80 border-cyan-100 text-gray-400'
+                }`}
+              >
+                <div className="text-xs font-black">{step}</div>
+                <div className="text-sm font-black truncate">{label}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {activeTab === 'class' ? (
-          <div className="grid grid-cols-1 xl:grid-cols-[300px_1fr] gap-5">
-            <div className="bg-white rounded-2xl border border-pink-100 p-4">
+          <div className="space-y-5">
+            <div className={`${selectedRoom ? 'hidden' : ''} bg-white rounded-2xl border border-pink-100 p-5`}>
               <div className="text-sm font-black text-gray-700 mb-3">열린 학급</div>
-              <div className="space-y-2 max-h-80 overflow-y-auto custom-scrollbar pr-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 max-h-[520px] overflow-y-auto custom-scrollbar pr-1">
                 {openClassRooms.map((room) => (
                   <button
                     key={room.id}
@@ -399,8 +423,8 @@ export default function StudentLobbyView({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-[minmax(280px,360px)_1fr] gap-5">
-              <div className="bg-white rounded-2xl border border-pink-100 p-4">
+            <div className={`${selectedRoom ? 'grid' : 'hidden'} grid-cols-1 gap-5`}>
+              <div className={`${selectedStudent ? 'hidden' : ''} bg-white rounded-2xl border border-pink-100 p-5`}>
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                   <div>
                     <div className="text-sm font-black text-gray-700">내 이름 선택</div>
@@ -415,7 +439,15 @@ export default function StudentLobbyView({
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 max-h-[520px] overflow-y-auto custom-scrollbar pr-1">
+                <button
+                  type="button"
+                  onClick={() => selectRoom('')}
+                  className="mb-4 text-xs px-3 py-2 rounded-xl bg-cyan-50 hover:bg-cyan-100 text-teal-700 border border-cyan-100 font-black transition-colors"
+                >
+                  ← 학급 다시 선택
+                </button>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[520px] overflow-y-auto custom-scrollbar pr-1">
                   {classStudents.map((student) => {
                     const entered = enteredStudentIds.includes(student.id);
                     const selected = selectedStudentId === student.id;
@@ -456,22 +488,31 @@ export default function StudentLobbyView({
                 </div>
               </div>
 
-              <StudentShopPanel
-                student={selectedStudent}
-                isVerified={isSelectedStudentVerified}
-                pinInput={pinInput}
-                setPinInput={setPinInput}
-                newPin={newPin}
-                setNewPin={setNewPin}
-                newPinConfirm={newPinConfirm}
-                setNewPinConfirm={setNewPinConfirm}
-                pinError={pinError}
-                onVerifyPin={handleVerifyPin}
-                onSetInitialPin={handleSetInitialPin}
-                onJoinClassStudent={handleVerifiedJoinClassStudent}
-                onBuyCosmetic={handleVerifiedBuyCosmetic}
-                onEquipCosmetic={handleVerifiedEquipCosmetic}
-              />
+              <div className={`${selectedStudent ? 'block' : 'hidden'} space-y-4`}>
+                <button
+                  type="button"
+                  onClick={() => selectStudent('')}
+                  className="text-xs px-3 py-2 rounded-xl bg-cyan-50 hover:bg-cyan-100 text-teal-700 border border-cyan-100 font-black transition-colors"
+                >
+                  ← 이름 다시 선택
+                </button>
+                <StudentShopPanel
+                  student={selectedStudent}
+                  isVerified={isSelectedStudentVerified}
+                  pinInput={pinInput}
+                  setPinInput={setPinInput}
+                  newPin={newPin}
+                  setNewPin={setNewPin}
+                  newPinConfirm={newPinConfirm}
+                  setNewPinConfirm={setNewPinConfirm}
+                  pinError={pinError}
+                  onVerifyPin={handleVerifyPin}
+                  onSetInitialPin={handleSetInitialPin}
+                  onJoinClassStudent={handleVerifiedJoinClassStudent}
+                  onBuyCosmetic={handleVerifiedBuyCosmetic}
+                  onEquipCosmetic={handleVerifiedEquipCosmetic}
+                />
+              </div>
             </div>
           </div>
         ) : (

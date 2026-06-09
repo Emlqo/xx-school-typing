@@ -94,27 +94,46 @@ function sortRankings(items, getValue) {
 }
 
 export function calculateClassMvp(monthlyScores = []) {
-  const summaries = summarizeByStudent(monthlyScores);
+  const classScores = getClassScores(monthlyScores);
+  const summariesByStudent = new Map(
+    summarizeByStudent(monthlyScores).map((summary) => [getStudentKey(summary), summary]),
+  );
   const bestByClass = new Map();
 
-  summaries.forEach((summary) => {
-    const previous = bestByClass.get(summary.classId);
-    if (!previous || summary.totalScore > previous.totalScore) {
-      bestByClass.set(summary.classId, summary);
+  classScores.forEach((score) => {
+    const previous = bestByClass.get(score.classId);
+    if (!previous || score.score > previous.score) {
+      bestByClass.set(score.classId, score);
       return;
     }
 
-    if (summary.totalScore === previous.totalScore && summary.gamesPlayed > previous.gamesPlayed) {
-      bestByClass.set(summary.classId, summary);
+    if (score.score === previous.score && score.cpm > previous.cpm) {
+      bestByClass.set(score.classId, score);
+      return;
+    }
+
+    if (
+      score.score === previous.score
+      && score.cpm === previous.cpm
+      && score.createdMillis < previous.createdMillis
+    ) {
+      bestByClass.set(score.classId, score);
     }
   });
 
   return [...bestByClass.values()]
     .sort((a, b) => String(a.className || a.classId).localeCompare(String(b.className || b.classId)))
-    .map((summary) => ({
-      ...summary,
-      value: summary.totalScore,
-    }));
+    .map((score) => {
+      const summary = summariesByStudent.get(getStudentKey(score)) || createStudentSummary(score);
+
+      return {
+        ...summary,
+        bestScore: score.score,
+        bestCpm: score.cpm,
+        achievedAt: score.createdMillis,
+        value: score.score,
+      };
+    });
 }
 
 export function calculateQuizKing(monthlyScores = []) {

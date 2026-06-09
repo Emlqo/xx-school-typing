@@ -135,6 +135,9 @@ export default function App() {
   });
   const {
     monthlyScores,
+    savedHallOfFame,
+    savedScoreCount,
+    lastSavedAt: hallOfFameSavedAt,
     refreshMonthlyScores,
     isLoading: isHallOfFameLoading,
     error: hallOfFameError,
@@ -156,7 +159,10 @@ export default function App() {
       .map((scoreItem) => scoreItem.studentId),
     [selectedOpenClassRoomScores],
   );
-  const hallOfFame = useMemo(() => calculateHallOfFame(monthlyScores), [monthlyScores]);
+  const hallOfFame = useMemo(
+    () => savedHallOfFame || calculateHallOfFame(monthlyScores),
+    [monthlyScores, savedHallOfFame],
+  );
   const customWordPools = useMemo(() => {
     const activeWords = words
       .filter((word) => word.active !== false)
@@ -1559,6 +1565,8 @@ export default function App() {
         setHallOfFameMonthKey={setHallOfFameMonthKey}
         hallOfFame={hallOfFame}
         monthlyScores={monthlyScores}
+        hallOfFameScoreCount={savedScoreCount}
+        hallOfFameSavedAt={hallOfFameSavedAt}
         refreshHallOfFame={refreshMonthlyScores}
         isHallOfFameLoading={isHallOfFameLoading}
         hallOfFameError={hallOfFameError}

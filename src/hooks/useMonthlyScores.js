@@ -1,9 +1,10 @@
-import { useCallback, useMemo, useState } from 'react';
-import { getDocs, query, where } from 'firebase/firestore';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { getDoc, getDocs, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { APP_ID } from '../constants/gameRules.js';
 import { FIRESTORE_PATHS } from '../constants/firestorePaths.js';
 import { db } from '../services/firebaseClient.js';
-import { getPublicCollection } from '../utils/firestoreRefs.js';
+import { calculateHallOfFame } from '../utils/hallOfFame.js';
+import { getPublicCollection, getPublicDoc } from '../utils/firestoreRefs.js';
 
 function getMonthRange(monthKey) {
   const [yearText, monthText] = String(monthKey || '').split('-');
@@ -24,6 +25,38 @@ function getMonthRange(monthKey) {
   };
 }
 
+function compactRankingItem(item = {}) {
+  return {
+    classId: String(item.classId || ''),
+    className: String(item.className || ''),
+    studentId: String(item.studentId || ''),
+    nickname: String(item.nickname || ''),
+    value: Number(item.value || 0),
+    totalScore: Number(item.totalScore || 0),
+    totalQuizCorrectCount: Number(item.totalQuizCorrectCount || 0),
+    maxCpm: Number(item.maxCpm || 0),
+    gamesPlayed: Number(item.gamesPlayed || 0),
+    bestScore: Number(item.bestScore || 0),
+    bestCpm: Number(item.bestCpm || 0),
+    achievedAt: Number(item.achievedAt || 0),
+    firstScore: Number(item.firstScore || 0),
+    lastScore: Number(item.lastScore || 0),
+    growth: Number(item.growth || 0),
+  };
+}
+
+function compactHallOfFame(hallOfFame = {}) {
+  const compactList = (items) => (Array.isArray(items) ? items.map(compactRankingItem) : []);
+
+  return {
+    classMvp: compactList(hallOfFame.classMvp),
+    quizKing: compactList(hallOfFame.quizKing),
+    speedKing: compactList(hallOfFame.speedKing),
+    participationKing: compactList(hallOfFame.participationKing),
+    growthKing: compactList(hallOfFame.growthKing),
+  };
+}
+
 export default function useMonthlyScores({
   user,
   view,
@@ -32,9 +65,60 @@ export default function useMonthlyScores({
   enabled = true,
 }) {
   const [monthlyScores, setMonthlyScores] = useState([]);
+  const [savedHallOfFame, setSavedHallOfFame] = useState(null);
+  const [savedScoreCount, setSavedScoreCount] = useState(0);
+  const [lastSavedAt, setLastSavedAt] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const { monthStart, nextMonthStart } = useMemo(() => getMonthRange(monthKey), [monthKey]);
+
+  useEffect(() => {
+    if (!enabled || !user || !db || view !== 'teacher' || isPracticeMode || !monthKey) {
+      setMonthlyScores([]);
+      setSavedHallOfFame(null);
+      setSavedScoreCount(0);
+      setLastSavedAt(null);
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    const loadSavedHallOfFame = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const savedRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.hallOfFame, monthKey);
+        const snapshot = await getDoc(savedRef);
+
+        if (cancelled) return;
+        if (!snapshot.exists()) {
+          setMonthlyScores([]);
+          setSavedHallOfFame(null);
+          setSavedScoreCount(0);
+          setLastSavedAt(null);
+          return;
+        }
+
+        const savedData = snapshot.data();
+        setMonthlyScores([]);
+        setSavedHallOfFame(savedData.hallOfFame || null);
+        setSavedScoreCount(Number(savedData.sourceScoreCount || 0));
+        setLastSavedAt(savedData.updatedAt || null);
+      } catch (loadError) {
+        if (cancelled) return;
+        console.error(loadError);
+        setError(loadError);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
+    loadSavedHallOfFame();
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled, isPracticeMode, monthKey, user, view]);
 
   const refreshMonthlyScores = useCallback(async () => {
     if (!enabled || !user || !db || view !== 'teacher' || isPracticeMode) {
@@ -54,7 +138,22 @@ export default function useMonthlyScores({
       );
       const snapshot = await getDocs(monthlyScoresQuery);
       const nextScores = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      const nextHallOfFame = compactHallOfFame(calculateHallOfFame(nextScores));
+      const savedRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.hallOfFame, monthKey);
+
       setMonthlyScores(nextScores);
+      setSavedHallOfFame(nextHallOfFame);
+      setSavedScoreCount(nextScores.length);
+      setLastSavedAt(Date.now());
+
+      await setDoc(savedRef, {
+        monthKey,
+        hallOfFame: nextHallOfFame,
+        sourceScoreCount: nextScores.length,
+        updatedBy: user.uid,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+
       return nextScores;
     } catch (fetchError) {
       console.error(fetchError);
@@ -63,10 +162,13 @@ export default function useMonthlyScores({
     } finally {
       setIsLoading(false);
     }
-  }, [enabled, isPracticeMode, monthStart, nextMonthStart, user, view]);
+  }, [enabled, isPracticeMode, monthKey, monthStart, nextMonthStart, user, view]);
 
   return {
     monthlyScores,
+    savedHallOfFame,
+    savedScoreCount,
+    lastSavedAt,
     monthStart,
     nextMonthStart,
     refreshMonthlyScores,
