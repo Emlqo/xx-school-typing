@@ -8,10 +8,29 @@ export default function GameStatusBar({
   boosterActive = false,
   timeLeft = 0,
   formatTime = (value) => value,
+  inputLanguage = 'ko',
 }) {
+  const languageStatus = inputLanguage === 'quiz'
+    ? {
+      label: '퀴즈 진행 중',
+      detail: '답을 선택하세요',
+      className: 'bg-amber-50 border-amber-300 text-amber-700',
+    }
+    : inputLanguage === 'ko'
+      ? {
+        label: '한글 입력',
+        detail: '한/영 키를 한글로',
+        className: 'bg-sky-50 border-sky-300 text-sky-700',
+      }
+      : {
+        label: 'English',
+        detail: '한/영 키를 영어로',
+        className: 'bg-emerald-50 border-emerald-300 text-emerald-700',
+      };
+
   return (
     <div className="max-w-5xl w-full mx-auto glass-box rounded-3xl p-5 mb-8 flex flex-wrap justify-between items-center gap-4 z-10 shadow-sm">
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-3">
         <div className="bg-white px-4 py-2 rounded-xl font-bold text-gray-700 border border-pink-100 shadow-sm flex items-center gap-2">
           🧑‍🎓 {nickname || '선수'}
         </div>
@@ -23,6 +42,10 @@ export default function GameStatusBar({
             ✨ 점수 x{pointWeight}
           </div>
         )}
+        <div className={`min-w-32 px-4 py-2 rounded-xl border shadow-sm transition-colors ${languageStatus.className}`}>
+          <div className="text-sm font-black leading-tight">{languageStatus.label}</div>
+          <div className="text-[11px] font-bold opacity-75 mt-0.5">{languageStatus.detail}</div>
+        </div>
       </div>
       <div className="flex items-center gap-6">
         <div className="text-gray-500 font-medium text-lg">
