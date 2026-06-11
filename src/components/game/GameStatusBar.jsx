@@ -9,22 +9,39 @@ export default function GameStatusBar({
   timeLeft = 0,
   formatTime = (value) => value,
   inputLanguage = 'ko',
+  detectedInputLanguage = '',
+  postQuizLanguageCheck = false,
 }) {
+  const languageMatches = detectedInputLanguage && detectedInputLanguage === inputLanguage;
   const languageStatus = inputLanguage === 'quiz'
     ? {
       label: '퀴즈 진행 중',
       detail: '답을 선택하세요',
       className: 'bg-amber-50 border-amber-300 text-amber-700',
     }
+    : postQuizLanguageCheck && !detectedInputLanguage
+      ? {
+        label: '한/영 상태 확인',
+        detail: '첫 글자를 입력해 확인하세요',
+        className: 'bg-violet-50 border-violet-300 text-violet-700',
+      }
+      : postQuizLanguageCheck
+        ? {
+          label: detectedInputLanguage === 'ko' ? '현재 한글 입력' : '현재 English 입력',
+          detail: languageMatches ? '입력 상태가 맞아요' : `한/영 키를 ${inputLanguage === 'ko' ? '한글' : '영어'}로 바꾸세요`,
+          className: languageMatches
+            ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+            : 'bg-red-50 border-red-300 text-red-600 animate-pulse',
+        }
     : inputLanguage === 'ko'
       ? {
-        label: '한글 입력',
-        detail: '한/영 키를 한글로',
+        label: '한글 입력 확인',
+        detail: '현재 한글로 입력됩니다',
         className: 'bg-sky-50 border-sky-300 text-sky-700',
       }
       : {
-        label: 'English',
-        detail: '한/영 키를 영어로',
+        label: 'English 입력 확인',
+        detail: '현재 영어로 입력됩니다',
         className: 'bg-emerald-50 border-emerald-300 text-emerald-700',
       };
 

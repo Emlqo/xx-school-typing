@@ -19,6 +19,7 @@ export default function PlayingView({
   isError = false,
   setIsError = () => {},
   currentQuiz = null,
+  postQuizLanguageCheck = false,
   handleKeyDown = () => {},
   handleQuizAnswer = () => {},
   boosterAvailable = true,
@@ -35,6 +36,11 @@ export default function PlayingView({
     : /[ㄱ-ㅎㅏ-ㅣ가-힣]/.test(currentWord)
       ? 'ko'
       : 'en';
+  const detectedInputLanguage = /[ㄱ-ㅎㅏ-ㅣ가-힣]/.test(inputValue)
+    ? 'ko'
+    : /[A-Za-z]/.test(inputValue)
+      ? 'en'
+      : '';
 
   return (
     <div className={`min-h-screen flex flex-col p-4 md:p-8 relative overflow-hidden transition-colors duration-500 ${boosterActive ? 'booster-bg' : 'spring-bg'}`}>
@@ -66,6 +72,8 @@ export default function PlayingView({
         timeLeft={timeLeft}
         formatTime={formatTime}
         inputLanguage={inputLanguage}
+        detectedInputLanguage={detectedInputLanguage}
+        postQuizLanguageCheck={postQuizLanguageCheck}
       />
 
       <div className="flex-1 flex flex-col items-center justify-center max-w-4xl w-full mx-auto -mt-10 md:-mt-20 z-10">
