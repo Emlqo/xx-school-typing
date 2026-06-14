@@ -1,3 +1,5 @@
+import { findLanguageMismatch } from '../../utils/inputLanguage.js';
+
 export default function TypingInput({
   currentWord = '',
   inputValue = '',
@@ -8,6 +10,8 @@ export default function TypingInput({
   boosterActive = false,
   combo = 0,
   isError = false,
+  onLanguageMismatch = () => {},
+  onLanguageAccepted = () => {},
 }) {
   return (
     <div className={`w-full max-w-3xl relative rounded-2xl overflow-hidden transition-all duration-200 ${boosterActive ? 'shadow-[0_0_40px_rgba(251,191,36,0.5)] border-4 border-yellow-400 bg-white' : combo > 2 ? 'input-success' : 'glass-box'} ${isError ? 'border-2 border-red-400 animate-shake shadow-lg shadow-red-200' : 'border-2 border-transparent'}`}>
@@ -16,8 +20,17 @@ export default function TypingInput({
         type="text"
         value={inputValue}
         onChange={(e) => {
-          setInputValue(e.target.value);
+          const nextValue = e.target.value;
+          const mismatch = findLanguageMismatch(nextValue, currentWord);
+
+          if (mismatch) {
+            onLanguageMismatch(mismatch);
+            return;
+          }
+
+          setInputValue(nextValue);
           setIsError(false);
+          onLanguageAccepted();
         }}
         onKeyDown={handleKeyDown}
         onPaste={(e) => {

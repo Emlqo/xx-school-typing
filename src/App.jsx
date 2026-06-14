@@ -46,12 +46,6 @@ import TeacherDashboardView from './components/views/TeacherDashboardView.jsx';
 import TeacherLoginView from './components/views/TeacherLoginView.jsx';
 import WaitingView from './components/views/WaitingView.jsx';
 
-function detectTextLanguage(value = '') {
-  if (/[ㄱ-ㅎㅏ-ㅣ가-힣]/.test(value)) return 'ko';
-  if (/[A-Za-z]/.test(value)) return 'en';
-  return '';
-}
-
 export default function App() {
   const [view, setView] = useState('login');
   const [teacherPwd, setTeacherPwd] = useState('');
@@ -75,7 +69,6 @@ export default function App() {
   const [lastEarned, setLastEarned] = useState(0);
   const [isError, setIsError] = useState(false);
   const [currentQuiz, setCurrentQuiz] = useState(null);
-  const [postQuizLanguageCheck, setPostQuizLanguageCheck] = useState(false);
   const [boosterAvailable, setBoosterAvailable] = useState(true);
   const [boosterActive, setBoosterActive] = useState(false);
   const [boosterTimeLeft, setBoosterTimeLeft] = useState(0);
@@ -312,7 +305,6 @@ export default function App() {
     setLastEarned(0);
     setIsError(false);
     setCurrentQuiz(null);
-    setPostQuizLanguageCheck(false);
     setBoosterAvailable(true);
     setBoosterActive(false);
     setBoosterTimeLeft(0);
@@ -642,7 +634,7 @@ export default function App() {
 
   const handleKeyDown = useCallback((event) => {
     if (event.key === 'Backspace') {
-      if (!postQuizLanguageCheck) setCombo(0);
+      setCombo(0);
       return;
     }
 
@@ -650,15 +642,6 @@ export default function App() {
     if (!shouldSubmit || currentQuiz || !currentWord) return;
 
     event.preventDefault();
-
-    if (
-      postQuizLanguageCheck
-      && detectTextLanguage(inputValue) !== detectTextLanguage(currentWord)
-    ) {
-      setInputValue('');
-      setIsError(true);
-      return;
-    }
 
     if (inputValue.trim() === currentWord) {
       const myInfo = scores.find((item) => item.id === currentScoreDocId) || {};
@@ -686,7 +669,7 @@ export default function App() {
 
     setCombo(0);
     setIsError(true);
-  }, [boosterActive, combo, currentQuiz, currentScoreDocId, currentWord, gameMode, inputValue, pickRandomWord, playComboSound, postQuizLanguageCheck, scores]);
+  }, [boosterActive, combo, currentQuiz, currentScoreDocId, currentWord, gameMode, inputValue, pickRandomWord, playComboSound, scores]);
 
   const handleQuizAnswer = useCallback((answerIndex) => {
     if (!currentQuiz) return;
@@ -717,19 +700,8 @@ export default function App() {
     }
 
     setCurrentQuiz(null);
-    setPostQuizLanguageCheck(true);
     pickRandomWord(gameMode);
   }, [boosterActive, currentQuiz, currentScoreDocId, gameMode, pickRandomWord, scores]);
-
-  useEffect(() => {
-    if (!postQuizLanguageCheck || !inputValue || !currentWord) return;
-
-    const typedLanguage = detectTextLanguage(inputValue);
-    const targetLanguage = detectTextLanguage(currentWord);
-    if (typedLanguage && typedLanguage === targetLanguage) {
-      setPostQuizLanguageCheck(false);
-    }
-  }, [currentWord, inputValue, postQuizLanguageCheck]);
 
   const activateBooster = useCallback(() => {
     if (!boosterAvailable || boosterActive) return;
@@ -1766,7 +1738,6 @@ export default function App() {
         isError={isError}
         setIsError={setIsError}
         currentQuiz={currentQuiz}
-        postQuizLanguageCheck={postQuizLanguageCheck}
         handleKeyDown={handleKeyDown}
         handleQuizAnswer={handleQuizAnswer}
         boosterAvailable={boosterAvailable}

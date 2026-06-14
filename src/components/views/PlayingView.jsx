@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+import { getExpectedInputLanguage } from '../../utils/inputLanguage.js';
 import CherryBlossomBackground from '../common/CherryBlossomBackground.jsx';
 import BoosterButton from '../game/BoosterButton.jsx';
 import GameStatusBar from '../game/GameStatusBar.jsx';
@@ -19,7 +21,6 @@ export default function PlayingView({
   isError = false,
   setIsError = () => {},
   currentQuiz = null,
-  postQuizLanguageCheck = false,
   handleKeyDown = () => {},
   handleQuizAnswer = () => {},
   boosterAvailable = true,
@@ -28,19 +29,24 @@ export default function PlayingView({
   activateBooster = () => {},
   inputRef = null,
 }) {
+  const [languageMismatch, setLanguageMismatch] = useState(null);
   const progress = currentWord.length > 0
     ? Math.min((inputValue.length / currentWord.length) * 100, 100)
     : 0;
-  const inputLanguage = currentQuiz
-    ? 'quiz'
-    : /[ㄱ-ㅎㅏ-ㅣ가-힣]/.test(currentWord)
-      ? 'ko'
-      : 'en';
-  const detectedInputLanguage = /[ㄱ-ㅎㅏ-ㅣ가-힣]/.test(inputValue)
-    ? 'ko'
-    : /[A-Za-z]/.test(inputValue)
-      ? 'en'
-      : '';
+  const inputLanguage = currentQuiz ? 'quiz' : getExpectedInputLanguage(currentWord, inputValue.length);
+
+  useEffect(() => {
+    setLanguageMismatch(null);
+  }, [currentQuiz, currentWord]);
+
+  const handleProtectedKeyDown = (event) => {
+    const isSubmitKey = event.key === 'Enter' || event.key === ' ';
+    if (languageMismatch && isSubmitKey) {
+      event.preventDefault();
+      return;
+    }
+    handleKeyDown(event);
+  };
 
   return (
     <div className={`min-h-screen flex flex-col p-4 md:p-8 relative overflow-hidden transition-colors duration-500 ${boosterActive ? 'booster-bg' : 'spring-bg'}`}>
@@ -72,8 +78,7 @@ export default function PlayingView({
         timeLeft={timeLeft}
         formatTime={formatTime}
         inputLanguage={inputLanguage}
-        detectedInputLanguage={detectedInputLanguage}
-        postQuizLanguageCheck={postQuizLanguageCheck}
+        languageMismatch={languageMismatch}
       />
 
       <div className="flex-1 flex flex-col items-center justify-center max-w-4xl w-full mx-auto -mt-10 md:-mt-20 z-10">
@@ -94,11 +99,13 @@ export default function PlayingView({
               inputValue={inputValue}
               setInputValue={setInputValue}
               setIsError={setIsError}
-              handleKeyDown={handleKeyDown}
+              handleKeyDown={handleProtectedKeyDown}
               inputRef={inputRef}
               boosterActive={boosterActive}
               combo={combo}
               isError={isError}
+              onLanguageMismatch={setLanguageMismatch}
+              onLanguageAccepted={() => setLanguageMismatch(null)}
             />
 
             <p className="mt-8 text-gray-500 text-sm font-medium">
