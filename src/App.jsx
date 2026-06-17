@@ -13,7 +13,7 @@ import {
   where,
   writeBatch,
 } from 'firebase/firestore';
-import { APP_ID, GAME_RULES, TEACHER_PASSWORD } from './constants/gameRules.js';
+import { APP_ID, GAME_RULES, TEACHER_PASSWORD_HASH } from './constants/gameRules.js';
 import { KOREAN_WORDS, ENGLISH_WORDS } from './constants/words.js';
 import { getCosmeticById } from './constants/cosmetics.js';
 import { FIRESTORE_PATHS } from './constants/firestorePaths.js';
@@ -23,6 +23,7 @@ import { calculateHallOfFame, getMonthKey } from './utils/hallOfFame.js';
 import { calculateCpm, calculateQuizScore, calculateTypingScore, getQuizWrongPenalty } from './utils/scoring.js';
 import { formatTime } from './utils/format.js';
 import { normalizeClassStudent } from './utils/classStudents.js';
+import { verifyTeacherPassword } from './utils/teacherAuth.js';
 import { calculateRankRewards, calculateRewardPoints, getDefaultRewardState } from './utils/rewards.js';
 import useAnnouncements from './hooks/useAnnouncements.js';
 import useClasses from './hooks/useClasses.js';
@@ -811,16 +812,22 @@ export default function App() {
     setSelectedOpenClassRoomId('');
   }, [openClassRooms, selectedOpenClassRoomId]);
 
-  const handleTeacherSubmit = () => {
-    if (teacherPwd === TEACHER_PASSWORD) {
-      setView('teacher');
-      setTeacherPwd('');
-      setPwdError('');
-      setIsPracticeMode(false);
-      return;
-    }
+  const handleTeacherSubmit = async () => {
+    try {
+      const isVerified = await verifyTeacherPassword(teacherPwd, TEACHER_PASSWORD_HASH);
+      if (isVerified) {
+        setView('teacher');
+        setTeacherPwd('');
+        setPwdError('');
+        setIsPracticeMode(false);
+        return;
+      }
 
-    setPwdError('비밀번호가 일치하지 않습니다.');
+      setPwdError('비밀번호가 일치하지 않습니다.');
+    } catch (error) {
+      console.error(error);
+      setPwdError('인증 처리 중 오류가 발생했습니다.');
+    }
   };
 
   const handleCreateRoom = async (event) => {
