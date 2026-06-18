@@ -725,6 +725,7 @@ export default function App() {
 
   const requireTeacherAccess = useCallback(() => {
     if (teacherAuthorized) return true;
+    window.alert('관리자가 아닌데 누구인가요? 관리자 계정으로 다시 로그인해 주세요.');
     setPwdError('관리자 세션이 없거나 만료되었습니다. Google 계정으로 다시 로그인해주세요.');
     setView('teacherLogin');
     return false;
