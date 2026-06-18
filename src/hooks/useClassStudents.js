@@ -24,7 +24,10 @@ export default function useClassStudents({
       return undefined;
     }
 
-    const studentsRef = getPublicCollection(db, APP_ID, FIRESTORE_PATHS.classStudents);
+    const collectionName = view === 'teacher'
+      ? FIRESTORE_PATHS.classStudents
+      : FIRESTORE_PATHS.classRoster;
+    const studentsRef = getPublicCollection(db, APP_ID, collectionName);
     const studentsQuery = query(
       studentsRef,
       where('classId', '==', classId),

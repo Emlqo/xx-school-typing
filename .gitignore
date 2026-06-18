@@ -2,3 +2,11 @@ node_modules
 dist
 .env
 .env.local
+.firebase/
+firebase-debug.log
+firestore-debug.log
+functions-debug.log
+*firebase-adminsdk*.json
+service-account*.json
+
+.vercel

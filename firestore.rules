@@ -1,0 +1,127 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSupportedApp(appId) {
+      return appId == 'xx-school-typing-app';
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isTeacher() {
+      return isSignedIn()
+        && request.auth.uid == 'hnjJNGDuydcd4SfQ2Xq5cE6IujD3';
+    }
+
+    function isOwner(data) {
+      return isSignedIn() && data.userId == request.auth.uid;
+    }
+
+    function scoreIdentityIsUnchanged() {
+      return request.resource.data.userId == resource.data.userId
+        && request.resource.data.roomId == resource.data.roomId
+        && request.resource.data.nickname == resource.data.nickname
+        && request.resource.data.get('studentId', null) == resource.data.get('studentId', null)
+        && request.resource.data.get('classId', null) == resource.data.get('classId', null)
+        && request.resource.data.get('entryType', null) == resource.data.get('entryType', null);
+    }
+
+    function studentScoreUpdateOnly() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'score',
+        'cpm',
+        'correctChars',
+        'quizCorrectCount',
+        'updatedAt'
+      ]);
+    }
+
+    match /artifacts/{appId}/public/data/typing_announcements/{announcementId} {
+      allow read: if isSupportedApp(appId) && isSignedIn();
+      allow create, update, delete: if isSupportedApp(appId) && isTeacher();
+    }
+
+    match /artifacts/{appId}/public/data/typing_quizzes/{quizId} {
+      allow read: if isSupportedApp(appId) && isSignedIn();
+      allow create, update, delete: if isSupportedApp(appId) && isTeacher();
+    }
+
+    match /artifacts/{appId}/public/data/typing_words/{wordId} {
+      allow read: if isSupportedApp(appId) && isSignedIn();
+      allow create, update, delete: if isSupportedApp(appId) && isTeacher();
+    }
+
+    match /artifacts/{appId}/public/data/typing_rooms/{roomId} {
+      allow read: if isSupportedApp(appId) && isSignedIn();
+      allow create, update, delete: if isSupportedApp(appId) && isTeacher();
+    }
+
+    match /artifacts/{appId}/public/data/typing_scores/{scoreId} {
+      allow create: if false;
+      allow read: if isSupportedApp(appId)
+        && (isTeacher() || isOwner(resource.data));
+      allow update: if isSupportedApp(appId)
+        && (
+          isTeacher()
+          || (
+            isOwner(resource.data)
+            && scoreIdentityIsUnchanged()
+            && studentScoreUpdateOnly()
+          )
+        );
+      allow delete: if isSupportedApp(appId) && isTeacher();
+    }
+
+    match /artifacts/{appId}/public/data/typing_classes/{classId} {
+      allow read, create, update, delete: if isSupportedApp(appId) && isTeacher();
+    }
+
+    // PIN, points, and owned cosmetics make this collection private.
+    match /artifacts/{appId}/public/data/typing_class_students/{studentId} {
+      allow read, create, update, delete: if isSupportedApp(appId) && isTeacher();
+    }
+
+    match /artifacts/{appId}/public/data/typing_class_roster/{studentId} {
+      allow read: if isSupportedApp(appId) && isSignedIn();
+      allow create, update, delete: if isSupportedApp(appId) && isTeacher();
+    }
+
+    match /artifacts/{appId}/public/data/typing_student_sessions/{userId} {
+      allow read: if isSupportedApp(appId)
+        && isSignedIn()
+        && request.auth.uid == userId;
+      allow create, update, delete: if false;
+    }
+
+    match /artifacts/{appId}/public/data/typing_room_presence/{presenceId} {
+      allow read: if isSupportedApp(appId) && isSignedIn();
+      allow create, update, delete: if false;
+    }
+
+    match /artifacts/{appId}/public/data/typing_hall_of_fame/{monthKey} {
+      allow read: if isSupportedApp(appId) && isSignedIn();
+      allow create, update, delete: if isSupportedApp(appId) && isTeacher();
+    }
+
+    match /artifacts/{appId}/public/data/typing_shop_items/{itemId} {
+      allow read: if isSupportedApp(appId) && isSignedIn();
+      allow create, update, delete: if isSupportedApp(appId) && isTeacher();
+    }
+
+    // Purchases and stock changes must move to a trusted server endpoint.
+    match /artifacts/{appId}/public/data/typing_shop_purchases/{purchaseId} {
+      allow read: if isSupportedApp(appId) && isTeacher();
+      allow create, update, delete: if false;
+    }
+
+    match /artifacts/{appId}/users/{userId}/{document=**} {
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

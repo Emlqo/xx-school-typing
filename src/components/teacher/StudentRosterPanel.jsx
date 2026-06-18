@@ -16,6 +16,7 @@ export default function StudentRosterPanel({
   handleDeleteStudent = () => {},
   handleRegenerateStudentPin = () => {},
   handleResetStudentPin = () => {},
+  handleSyncPublicRoster = () => {},
 }) {
   const parsedNames = parseStudentNames(studentBulkText);
   const scoreByStudentId = new Map(
@@ -29,9 +30,18 @@ export default function StudentRosterPanel({
     <div className="glass-box p-6 rounded-3xl border border-teal-100">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h2 className="text-lg font-bold text-teal-800 flex items-center gap-2">🧑‍🎓 학생 명단 관리</h2>
-        <span className="text-xs font-bold px-3 py-1 rounded-full bg-white border border-teal-100 text-teal-700">
-          입장 {classEntryCount}명 / 명단 {students.length}명
-        </span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleSyncPublicRoster}
+            className="text-xs font-black px-3 py-2 rounded-xl bg-cyan-50 hover:bg-cyan-100 border border-cyan-100 text-cyan-700"
+          >
+            보안 명단 동기화
+          </button>
+          <span className="text-xs font-bold px-3 py-1 rounded-full bg-white border border-teal-100 text-teal-700">
+            입장 {classEntryCount}명 / 명단 {students.length}명
+          </span>
+        </div>
       </div>
 
       <form onSubmit={handleBulkAddStudents} className="space-y-3 mb-6 border-b border-teal-100 pb-6">

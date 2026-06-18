@@ -3,7 +3,6 @@ import {
   addDoc,
   deleteDoc,
   doc,
-  getDoc,
   getDocs,
   increment,
   query,
@@ -13,18 +12,28 @@ import {
   where,
   writeBatch,
 } from 'firebase/firestore';
-import { APP_ID, GAME_RULES, TEACHER_PASSWORD_HASH } from './constants/gameRules.js';
+import { APP_ID, GAME_RULES } from './constants/gameRules.js';
+import { isTeacherUser, TEACHER_IDLE_TIMEOUT_MS, TEACHER_UID } from './constants/admin.js';
 import { KOREAN_WORDS, ENGLISH_WORDS } from './constants/words.js';
 import { getCosmeticById } from './constants/cosmetics.js';
 import { FIRESTORE_PATHS } from './constants/firestorePaths.js';
-import { db } from './services/firebaseClient.js';
+import { db, signInTeacherWithGoogle, signOutFirebaseUser } from './services/firebaseClient.js';
+import {
+  buyStudentShopItem,
+  equipStudentCosmetic,
+  finalizeStudentReward,
+  joinClassGame,
+  joinGuestGame,
+  setInitialStudentPin,
+  syncPublicClassRoster,
+  verifyStudentPin,
+} from './services/studentSecurityApi.js';
 import { getPublicCollection, getPublicDoc } from './utils/firestoreRefs.js';
 import { calculateHallOfFame, getMonthKey } from './utils/hallOfFame.js';
 import { calculateCpm, calculateQuizScore, calculateTypingScore, getQuizWrongPenalty } from './utils/scoring.js';
 import { formatTime } from './utils/format.js';
 import { normalizeClassStudent } from './utils/classStudents.js';
-import { verifyTeacherPassword } from './utils/teacherAuth.js';
-import { calculateRankRewards, calculateRewardPoints, getDefaultRewardState } from './utils/rewards.js';
+import { calculateRankRewards, getDefaultRewardState } from './utils/rewards.js';
 import useAnnouncements from './hooks/useAnnouncements.js';
 import useClasses from './hooks/useClasses.js';
 import useClassStudents from './hooks/useClassStudents.js';
@@ -49,8 +58,8 @@ import WaitingView from './components/views/WaitingView.jsx';
 
 export default function App() {
   const [view, setView] = useState('login');
-  const [teacherPwd, setTeacherPwd] = useState('');
   const [pwdError, setPwdError] = useState('');
+  const [teacherLoginLoading, setTeacherLoginLoading] = useState(false);
   const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
   const [nickname, setNickname] = useState('');
   const [roomCodeInput, setRoomCodeInput] = useState('');
@@ -116,26 +125,28 @@ export default function App() {
   const autoAnnouncementShownRef = useRef(false);
 
   const { user, authReady } = useFirebaseAuth();
+  const teacherAuthorized = useMemo(() => isTeacherUser(user), [user]);
+  const scopedUser = view === 'teacher' && !teacherAuthorized ? null : user;
   const firestoreReadsEnabled = !(view === 'playing' && isPracticeMode);
-  const { announcements: subscribedAnnouncements } = useAnnouncements({ user, enabled: firestoreReadsEnabled });
-  const { quizzes: subscribedQuizzes } = useQuizzes({ user, enabled: firestoreReadsEnabled });
-  const { rooms: subscribedRooms } = useTeacherRooms({ user, view, enabled: firestoreReadsEnabled });
-  const { words } = useWords({ user, view, isPracticeMode, enabled: firestoreReadsEnabled });
-  const { classes } = useClasses({ user, view, isPracticeMode, enabled: firestoreReadsEnabled });
-  const { openClassRooms } = useOpenClassRooms({ user, view, isPracticeMode, enabled: firestoreReadsEnabled });
+  const { announcements: subscribedAnnouncements } = useAnnouncements({ user: scopedUser, enabled: firestoreReadsEnabled });
+  const { quizzes: subscribedQuizzes } = useQuizzes({ user: scopedUser, enabled: firestoreReadsEnabled });
+  const { rooms: subscribedRooms } = useTeacherRooms({ user: scopedUser, view, enabled: firestoreReadsEnabled });
+  const { words } = useWords({ user: scopedUser, view, isPracticeMode, enabled: firestoreReadsEnabled });
+  const { classes } = useClasses({ user: scopedUser, view, isPracticeMode, enabled: firestoreReadsEnabled });
+  const { openClassRooms } = useOpenClassRooms({ user: scopedUser, view, isPracticeMode, enabled: firestoreReadsEnabled });
   const selectedOpenClassRoom = useMemo(
     () => openClassRooms.find((room) => room.id === selectedOpenClassRoomId) || null,
     [openClassRooms, selectedOpenClassRoomId],
   );
   const { students: classStudents } = useClassStudents({
-    user,
+    user: scopedUser,
     view,
     classId: view === 'studentLobby' ? selectedOpenClassRoom?.classId || '' : selectedClassId,
     isPracticeMode,
     enabled: firestoreReadsEnabled,
   });
   const { roomScores: selectedOpenClassRoomScores } = useRoomScores({
-    user,
+    user: scopedUser,
     view,
     roomId: selectedOpenClassRoomId,
     isPracticeMode,
@@ -145,14 +156,14 @@ export default function App() {
     ? selectedClassId
     : selectedOpenClassRoom?.classId || '';
   const { shopItems } = useShopItems({
-    user,
+    user: scopedUser,
     view,
     classId: shopClassId,
     isPracticeMode,
     enabled: firestoreReadsEnabled,
   });
   const { scores: subscribedScores } = useScores({
-    user,
+    user: scopedUser,
     view,
     viewingRoomId,
     currentScoreDocId,
@@ -167,7 +178,7 @@ export default function App() {
     isLoading: isHallOfFameLoading,
     error: hallOfFameError,
   } = useMonthlyScores({
-    user,
+    user: scopedUser,
     view,
     monthKey: hallOfFameMonthKey,
     isPracticeMode,
@@ -336,38 +347,6 @@ export default function App() {
     lastSyncedScoreRef.current = restoredScore;
   };
 
-  const findExistingScore = async ({ roomId, studentName }) => {
-    const scoresRef = getPublicCollection(db, APP_ID, FIRESTORE_PATHS.scores);
-    const scoreQuery = query(
-      scoresRef,
-      where('roomId', '==', roomId),
-      where('nickname', '==', studentName),
-    );
-    const scoreSnapshot = await getDocs(scoreQuery);
-
-    if (scoreSnapshot.empty) return null;
-
-    return scoreSnapshot.docs
-      .map((doc) => ({ id: doc.id, ...doc.data() }))
-      .sort((a, b) => getTimestampMillis(b.createdAt) - getTimestampMillis(a.createdAt))[0];
-  };
-
-  const findExistingClassScore = async ({ roomId, studentId }) => {
-    const scoresRef = getPublicCollection(db, APP_ID, FIRESTORE_PATHS.scores);
-    const scoreQuery = query(
-      scoresRef,
-      where('roomId', '==', roomId),
-      where('studentId', '==', studentId),
-    );
-    const scoreSnapshot = await getDocs(scoreQuery);
-
-    if (scoreSnapshot.empty) return null;
-
-    return scoreSnapshot.docs
-      .map((doc) => ({ id: doc.id, ...doc.data() }))
-      .sort((a, b) => getTimestampMillis(b.createdAt) - getTimestampMillis(a.createdAt))[0];
-  };
-
   const startPractice = useCallback(() => {
     if (!nickname.trim()) {
       alert('닉네임을 입력해주세요.');
@@ -403,51 +382,12 @@ export default function App() {
     }
 
     try {
-      const roomsRef = getPublicCollection(db, APP_ID, FIRESTORE_PATHS.rooms);
-      const roomQuery = query(roomsRef, where('roomCode', '==', roomCodeInput));
-      const roomSnapshot = await getDocs(roomQuery);
-
-      const candidateRooms = roomSnapshot.docs
-        .map((doc) => ({ id: doc.id, ...doc.data() }))
-        .filter((roomData) => {
-          if (roomData.status === 'waiting') return true;
-          if (roomData.status !== 'playing') return false;
-          return getRemainingSeconds(roomData) > 0;
-        })
-        .sort((a, b) => getTimestampMillis(b.createdAt) - getTimestampMillis(a.createdAt));
-
-      if (candidateRooms.length === 0) {
-        alert('입장 가능한 방을 찾을 수 없습니다.');
-        return;
-      }
-
-      const roomData = candidateRooms[0];
+      const joined = await joinGuestGame(roomCodeInput, studentName);
+      const roomData = joined.room;
       const duration = Number(roomData.duration || 300);
       const remainingSeconds = getRemainingSeconds(roomData);
-      const scoresRef = getPublicCollection(db, APP_ID, FIRESTORE_PATHS.scores);
-      const existingScore = await findExistingScore({ roomId: roomData.id, studentName });
-      let scoreDocId = existingScore?.id;
-      let scoreData = existingScore;
-
-      if (!scoreDocId) {
-        const initialScoreData = {
-          roomId: roomData.id,
-          nickname: studentName,
-          score: 0,
-          cpm: 0,
-          correctChars: 0,
-          difficulty: 'normal',
-          boosterEnabled: true,
-          pointWeight: 1.0,
-          userId: user.uid,
-          quizCorrectCount: 0,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        };
-        const scoreDoc = await addDoc(scoresRef, initialScoreData);
-        scoreDocId = scoreDoc.id;
-        scoreData = { ...initialScoreData, createdAt: Date.now(), updatedAt: Date.now() };
-      }
+      const scoreData = joined.score;
+      const scoreDocId = scoreData.id;
 
       const difficulty = scoreData?.difficulty || 'normal';
       const nextGameMode = difficulty === 'hell' ? 'en' : difficulty === 'hard' ? 'mixed' : roomData.mode || 'ko';
@@ -497,36 +437,10 @@ export default function App() {
       }
 
       const duration = Number(roomData.duration || 300);
-      const normalizedStudent = normalizeClassStudent(student);
-      const scoresRef = getPublicCollection(db, APP_ID, FIRESTORE_PATHS.scores);
-      const existingScore = await findExistingClassScore({ roomId: roomData.id, studentId: student.id });
-      let scoreDocId = existingScore?.id;
-      let scoreData = existingScore;
-
-      if (!scoreDocId) {
-        const initialScoreData = {
-          roomId: roomData.id,
-          classId: roomData.classId,
-          className: roomData.className || roomData.name,
-          studentId: normalizedStudent.id,
-          nickname: normalizedStudent.name,
-          entryType: 'class',
-          equippedCosmetic: normalizedStudent.equippedCosmetic,
-          score: 0,
-          cpm: 0,
-          correctChars: 0,
-          difficulty: 'normal',
-          boosterEnabled: true,
-          pointWeight: 1.0,
-          userId: user.uid,
-          quizCorrectCount: 0,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        };
-        const scoreDoc = await addDoc(scoresRef, initialScoreData);
-        scoreDocId = scoreDoc.id;
-        scoreData = { ...initialScoreData, createdAt: Date.now(), updatedAt: Date.now() };
-      }
+      const joined = await joinClassGame(roomData.id, student.id);
+      const normalizedStudent = normalizeClassStudent({ ...student, ...joined.profile });
+      const scoreData = joined.score;
+      const scoreDocId = scoreData.id;
 
       const difficulty = scoreData?.difficulty || 'normal';
       const nextGameMode = difficulty === 'hell' ? 'en' : difficulty === 'hard' ? 'mixed' : roomData.mode || 'ko';
@@ -585,48 +499,22 @@ export default function App() {
         && currentScoreInfo.studentId
         && currentScoreInfo.rewardGranted !== true
       ) {
-        const studentRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.classStudents, currentScoreInfo.studentId);
-        const studentSnapshot = await getDoc(studentRef);
-
-        if (studentSnapshot.exists()) {
-          const studentData = normalizeClassStudent({ id: studentSnapshot.id, ...studentSnapshot.data() });
-          const reward = calculateRewardPoints({
-            score: latestScoreRef.current,
-            quizCorrectCount: latestQuizCorrectCountRef.current,
-            previousBestScore: studentData.bestScore,
-            includeGameComplete: false,
-          });
-          const nextTotalPoints = studentData.totalPoints + reward.totalEarned;
-          setLastReward(reward);
-
-          await updateDoc(studentRef, {
-            totalPoints: nextTotalPoints,
-            bestScore: reward.nextBestScore,
-            updatedAt: serverTimestamp(),
-          });
-
-          await updateDoc(scoreRef, {
-            rewardGranted: true,
-            rewardEarned: reward.totalEarned,
-            rewardBreakdown: reward,
-            updatedAt: serverTimestamp(),
-          });
-
-          setLocalScores((prevScores) => prevScores.map((scoreItem) => (
-            scoreItem.id === currentScoreDocId
-              ? {
-                ...scoreItem,
-                score: latestScoreRef.current,
-                cpm: finalCpm,
-                correctChars: latestCharsRef.current,
-                quizCorrectCount: latestQuizCorrectCountRef.current,
-                rewardGranted: true,
-                rewardEarned: reward.totalEarned,
-                rewardBreakdown: reward,
-              }
-              : scoreItem
-          )));
-        }
+        const { reward } = await finalizeStudentReward(currentScoreDocId);
+        setLastReward(reward);
+        setLocalScores((prevScores) => prevScores.map((scoreItem) => (
+          scoreItem.id === currentScoreDocId
+            ? {
+              ...scoreItem,
+              score: latestScoreRef.current,
+              cpm: finalCpm,
+              correctChars: latestCharsRef.current,
+              quizCorrectCount: latestQuizCorrectCountRef.current,
+              rewardGranted: true,
+              rewardEarned: reward.totalEarned,
+              rewardBreakdown: reward,
+            }
+            : scoreItem
+        )));
       }
     } catch (error) {
       console.error(error);
@@ -812,26 +700,76 @@ export default function App() {
     setSelectedOpenClassRoomId('');
   }, [openClassRooms, selectedOpenClassRoomId]);
 
+  useEffect(() => {
+    if (view !== 'teacher' || !teacherAuthorized) return undefined;
+
+    let logoutTimer;
+    const resetIdleTimer = () => {
+      window.clearTimeout(logoutTimer);
+      logoutTimer = window.setTimeout(async () => {
+        await signOutFirebaseUser().catch((error) => console.error(error));
+        setView('login');
+        setPwdError('관리자 세션이 만료되었습니다. 다시 로그인해주세요.');
+      }, TEACHER_IDLE_TIMEOUT_MS);
+    };
+
+    const activityEvents = ['pointerdown', 'keydown', 'touchstart'];
+    activityEvents.forEach((eventName) => window.addEventListener(eventName, resetIdleTimer));
+    resetIdleTimer();
+
+    return () => {
+      window.clearTimeout(logoutTimer);
+      activityEvents.forEach((eventName) => window.removeEventListener(eventName, resetIdleTimer));
+    };
+  }, [teacherAuthorized, view]);
+
+  const requireTeacherAccess = useCallback(() => {
+    if (teacherAuthorized) return true;
+    setPwdError('관리자 세션이 없거나 만료되었습니다. Google 계정으로 다시 로그인해주세요.');
+    setView('teacherLogin');
+    return false;
+  }, [teacherAuthorized]);
+
   const handleTeacherSubmit = async () => {
+    if (teacherAuthorized) {
+      setView('teacher');
+      setPwdError('');
+      return;
+    }
+
+    setTeacherLoginLoading(true);
+    setPwdError('');
+
     try {
-      const isVerified = await verifyTeacherPassword(teacherPwd, TEACHER_PASSWORD_HASH);
-      if (isVerified) {
+      const googleUser = await signInTeacherWithGoogle();
+
+      if (!TEACHER_UID) {
+        setPwdError('관리자 UID가 아직 설정되지 않았습니다. 아래 UID를 설정한 뒤 다시 배포해주세요.');
+        return;
+      }
+
+      if (isTeacherUser(googleUser)) {
         setView('teacher');
-        setTeacherPwd('');
         setPwdError('');
         setIsPracticeMode(false);
         return;
       }
 
-      setPwdError('비밀번호가 일치하지 않습니다.');
+      await signOutFirebaseUser();
+      setPwdError('등록되지 않은 Google 계정입니다. 관리자 계정으로 다시 로그인해주세요.');
     } catch (error) {
       console.error(error);
-      setPwdError('인증 처리 중 오류가 발생했습니다.');
+      if (error?.code !== 'auth/popup-closed-by-user') {
+        setPwdError('Google 로그인 중 오류가 발생했습니다. Firebase 인증 설정을 확인해주세요.');
+      }
+    } finally {
+      setTeacherLoginLoading(false);
     }
   };
 
   const handleCreateRoom = async (event) => {
     event.preventDefault();
+    if (!requireTeacherAccess()) return;
 
     const trimmedName = newRoomName.trim();
     if (!trimmedName) return;
@@ -858,6 +796,7 @@ export default function App() {
   };
 
   const startRoomGame = async (roomId) => {
+    if (!requireTeacherAccess()) return;
     const room = rooms.find((item) => item.id === roomId);
     const duration = Number(room?.duration || roomDuration || 300);
 
@@ -874,6 +813,7 @@ export default function App() {
   };
 
   const requestScoreSync = async (roomId) => {
+    if (!requireTeacherAccess()) return;
     if (!roomId || roomId === 'all') {
       alert('특정 반을 선택한 뒤 실시간 점수를 가져올 수 있습니다.');
       return;
@@ -889,6 +829,7 @@ export default function App() {
   };
 
   const finalizeRankRewards = async (roomId) => {
+    if (!requireTeacherAccess()) return;
     if (!roomId || roomId === 'all') return;
 
     const room = rooms.find((item) => item.id === roomId);
@@ -970,6 +911,7 @@ export default function App() {
   };
 
   const handleDeleteRoom = async (roomId, roomName) => {
+    if (!requireTeacherAccess()) return;
     if (!window.confirm(`[${roomName}] 반을 삭제할까요?`)) return;
 
     try {
@@ -1001,6 +943,7 @@ export default function App() {
   };
 
   const toggleDifficulty = async (scoreId, currentDifficulty = 'normal') => {
+    if (!requireTeacherAccess()) return;
     const nextDifficulty = currentDifficulty === 'normal' ? 'hard' : currentDifficulty === 'hard' ? 'hell' : 'normal';
 
     try {
@@ -1013,6 +956,7 @@ export default function App() {
   };
 
   const toggleBoosterPower = async (scoreId, boosterEnabled = true) => {
+    if (!requireTeacherAccess()) return;
     try {
       const scoreRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.scores, scoreId);
       await updateDoc(scoreRef, { boosterEnabled: boosterEnabled === false });
@@ -1023,6 +967,7 @@ export default function App() {
   };
 
   const toggleWeight = async (scoreId, currentWeight = 1.0) => {
+    if (!requireTeacherAccess()) return;
     const nextWeight = currentWeight === 1.0 ? 1.5 : currentWeight === 1.5 ? 2.0 : 1.0;
 
     try {
@@ -1043,6 +988,7 @@ export default function App() {
 
   const handleSaveAnnouncement = async (event) => {
     event.preventDefault();
+    if (!requireTeacherAccess()) return;
 
     const trimmedTitle = annTitle.trim();
     const trimmedContent = annContent.trim();
@@ -1076,6 +1022,7 @@ export default function App() {
   };
 
   const handleDeleteAnnouncement = async (announcementId) => {
+    if (!requireTeacherAccess()) return;
     if (!window.confirm('공지사항을 삭제할까요?')) return;
 
     try {
@@ -1101,6 +1048,7 @@ export default function App() {
 
   const handleSaveQuiz = async (event) => {
     event.preventDefault();
+    if (!requireTeacherAccess()) return;
 
     const trimmedQuestion = quizQuestion.trim();
     const trimmedOptions = quizOptions.map((option) => option.trim());
@@ -1127,6 +1075,7 @@ export default function App() {
   };
 
   const handleDeleteQuiz = async (quizId) => {
+    if (!requireTeacherAccess()) return;
     if (!window.confirm('퀴즈를 삭제할까요?')) return;
 
     try {
@@ -1140,6 +1089,7 @@ export default function App() {
 
   const handleSaveWord = async (event) => {
     event.preventDefault();
+    if (!requireTeacherAccess()) return;
 
     const trimmedText = wordText.trim();
     if (!trimmedText) return;
@@ -1161,6 +1111,7 @@ export default function App() {
   };
 
   const handleDeleteWord = async (wordId) => {
+    if (!requireTeacherAccess()) return;
     if (!window.confirm('단어를 삭제할까요?')) return;
 
     try {
@@ -1174,6 +1125,7 @@ export default function App() {
 
   const handleCreateClass = async (event) => {
     event.preventDefault();
+    if (!requireTeacherAccess()) return;
 
     const grade = Number(classGrade);
     const classNo = Number(classNumber);
@@ -1197,6 +1149,7 @@ export default function App() {
   };
 
   const handleDeleteClass = async (classId, className) => {
+    if (!requireTeacherAccess()) return;
     if (!window.confirm(`[${className || '선택한 학급'}] 학급을 삭제할까요?`)) return;
 
     try {
@@ -1211,6 +1164,7 @@ export default function App() {
 
   const handleBulkAddStudents = async (event) => {
     event.preventDefault();
+    if (!requireTeacherAccess()) return;
 
     if (!selectedClassId) {
       alert('학생을 등록할 학급을 먼저 선택해주세요.');
@@ -1228,14 +1182,32 @@ export default function App() {
 
     try {
       const studentsRef = getPublicCollection(db, APP_ID, FIRESTORE_PATHS.classStudents);
-      await Promise.all(studentNames.map((name) => addDoc(studentsRef, {
-        classId: selectedClassId,
-        name,
-        studentPin: '',
-        active: true,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      })));
+      const rosterRef = getPublicCollection(db, APP_ID, FIRESTORE_PATHS.classRoster);
+      const batch = writeBatch(db);
+      studentNames.forEach((name) => {
+        const studentRef = doc(studentsRef);
+        batch.set(studentRef, {
+          classId: selectedClassId,
+          name,
+          studentPin: '',
+          active: true,
+          totalPoints: 0,
+          bestScore: 0,
+          ownedCosmetics: [],
+          equippedCosmetic: null,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+        batch.set(doc(rosterRef, studentRef.id), {
+          classId: selectedClassId,
+          name,
+          active: true,
+          hasPin: false,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      });
+      await batch.commit();
       setStudentBulkText('');
     } catch (error) {
       console.error(error);
@@ -1244,11 +1216,16 @@ export default function App() {
   };
 
   const handleDeleteStudent = async (studentId, studentName) => {
+    if (!requireTeacherAccess()) return;
     if (!window.confirm(`[${studentName || '선택한 학생'}] 학생을 삭제할까요?`)) return;
 
     try {
       const studentRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.classStudents, studentId);
-      await deleteDoc(studentRef);
+      const rosterRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.classRoster, studentId);
+      const batch = writeBatch(db);
+      batch.delete(studentRef);
+      batch.delete(rosterRef);
+      await batch.commit();
     } catch (error) {
       console.error(error);
       alert('학생 삭제 중 오류가 발생했습니다.');
@@ -1256,14 +1233,19 @@ export default function App() {
   };
 
   const handleRegenerateStudentPin = async (studentId) => {
+    if (!requireTeacherAccess()) return;
     if (!studentId) return;
 
     try {
       const studentRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.classStudents, studentId);
-      await updateDoc(studentRef, {
+      const rosterRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.classRoster, studentId);
+      const batch = writeBatch(db);
+      batch.update(studentRef, {
         studentPin: createStudentPin(),
         updatedAt: serverTimestamp(),
       });
+      batch.set(rosterRef, { hasPin: true, updatedAt: serverTimestamp() }, { merge: true });
+      await batch.commit();
     } catch (error) {
       console.error(error);
       alert('학생 개인 PIN 재생성 중 오류가 발생했습니다.');
@@ -1271,14 +1253,19 @@ export default function App() {
   };
 
   const handleResetStudentPin = async (studentId) => {
+    if (!requireTeacherAccess()) return;
     if (!studentId) return;
 
     try {
       const studentRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.classStudents, studentId);
-      await updateDoc(studentRef, {
+      const rosterRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.classRoster, studentId);
+      const batch = writeBatch(db);
+      batch.update(studentRef, {
         studentPin: '',
         updatedAt: serverTimestamp(),
       });
+      batch.set(rosterRef, { hasPin: false, updatedAt: serverTimestamp() }, { merge: true });
+      await batch.commit();
     } catch (error) {
       console.error(error);
       alert('학생 개인 PIN 초기화 중 오류가 발생했습니다.');
@@ -1289,16 +1276,28 @@ export default function App() {
     if (!studentId || !/^\d{4}$/.test(String(newPin))) return false;
 
     try {
-      const studentRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.classStudents, studentId);
-      await updateDoc(studentRef, {
-        studentPin: String(newPin),
-        updatedAt: serverTimestamp(),
-      });
-      return true;
+      if (!selectedOpenClassRoom?.id) return false;
+      return await setInitialStudentPin(selectedOpenClassRoom.id, studentId, String(newPin));
     } catch (error) {
       console.error(error);
       alert('학생 개인 PIN 설정 중 오류가 발생했습니다.');
       return false;
+    }
+  };
+
+  const handleVerifyStudentPin = async (studentId, pin) => {
+    if (!selectedOpenClassRoom?.id) return false;
+    return verifyStudentPin(selectedOpenClassRoom.id, studentId, pin);
+  };
+
+  const handleSyncPublicRoster = async () => {
+    if (!requireTeacherAccess()) return;
+    try {
+      const result = await syncPublicClassRoster();
+      alert(`보안용 공개 명단 ${result.synced || 0}명이 동기화되었습니다.`);
+    } catch (error) {
+      console.error(error);
+      alert('공개 명단 동기화 중 오류가 발생했습니다.');
     }
   };
 
@@ -1316,71 +1315,22 @@ export default function App() {
     }
 
     try {
-      const studentRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.classStudents, normalizedStudent.id);
-      const itemRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.shopItems, shopItem.id);
-      const purchasesRef = getPublicCollection(db, APP_ID, FIRESTORE_PATHS.shopPurchases);
-      const purchaseRef = doc(purchasesRef);
-
-      await runTransaction(db, async (transaction) => {
-        const [studentSnapshot, itemSnapshot] = await Promise.all([
-          transaction.get(studentRef),
-          transaction.get(itemRef),
-        ]);
-        if (!studentSnapshot.exists() || !itemSnapshot.exists()) throw new Error('NOT_FOUND');
-
-        const studentData = normalizeClassStudent({
-          id: studentSnapshot.id,
-          ...studentSnapshot.data(),
-        });
-        const itemData = itemSnapshot.data();
-        const price = Math.max(0, Number(itemData.price || 0));
-        const stock = Math.max(0, Number(itemData.stock || 0));
-
-        if (itemData.classId !== studentData.classId || itemData.cosmeticId !== cosmetic.id) {
-          throw new Error('INVALID_ITEM');
-        }
-        if (itemData.active === false) throw new Error('INACTIVE');
-        if (studentData.ownedCosmetics.includes(cosmetic.id)) throw new Error('ALREADY_OWNED');
-        if (stock <= 0) throw new Error('OUT_OF_STOCK');
-        if (studentData.totalPoints < price) throw new Error('NOT_ENOUGH_POINTS');
-
-        transaction.update(studentRef, {
-          totalPoints: studentData.totalPoints - price,
-          ownedCosmetics: [...studentData.ownedCosmetics, cosmetic.id],
-          updatedAt: serverTimestamp(),
-        });
-        transaction.update(itemRef, {
-          stock: stock - 1,
-          updatedAt: serverTimestamp(),
-        });
-        transaction.set(purchaseRef, {
-          itemId: itemSnapshot.id,
-          itemName: cosmetic.name,
-          itemType: 'cosmetic',
-          cosmeticId: cosmetic.id,
-          classId: studentData.classId,
-          studentId: studentData.id,
-          studentName: studentData.name || '',
-          quantity: 1,
-          pointsSpent: price,
-          status: 'completed',
-          userId: user?.uid || null,
-          createdAt: serverTimestamp(),
-        });
-      });
+      return await buyStudentShopItem(normalizedStudent.id, shopItem.id);
     } catch (error) {
       console.error(error);
       const messages = {
-        ALREADY_OWNED: '이미 보유한 아이템입니다.',
-        OUT_OF_STOCK: '장식 아이템이 품절되었습니다.',
-        NOT_ENOUGH_POINTS: '포인트가 부족합니다.',
-        INACTIVE: '현재 판매하지 않는 장식입니다.',
+        'api/already-exists': '이미 보유한 아이템입니다.',
+        'api/resource-exhausted': '장식 아이템이 품절되었습니다.',
+        'api/failed-precondition': '포인트가 부족하거나 현재 판매하지 않는 장식입니다.',
+        'api/permission-denied': '학생 PIN 인증이 만료되었습니다. 다시 인증해주세요.',
       };
-      alert(messages[error.message] || '아이템 구매 중 오류가 발생했습니다.');
+      alert(messages[error.code] || '아이템 구매 중 오류가 발생했습니다.');
+      return null;
     }
   };
 
   const handleSaveShopItem = async (itemData, editingItemId = null) => {
+    if (!requireTeacherAccess()) return false;
     if (!selectedClassId) {
       alert('상품을 등록할 학급을 선택해주세요.');
       return false;
@@ -1424,6 +1374,7 @@ export default function App() {
   };
 
   const handleDeleteShopItem = async (itemId, itemName) => {
+    if (!requireTeacherAccess()) return;
     if (!window.confirm(`[${itemName || '상품'}]을 삭제할까요?`)) return;
 
     try {
@@ -1440,63 +1391,18 @@ export default function App() {
     if (!normalizedStudent.id || !item?.id || item.classId !== normalizedStudent.classId) return;
 
     try {
-      const studentRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.classStudents, normalizedStudent.id);
-      const itemRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.shopItems, item.id);
-      const purchasesRef = getPublicCollection(db, APP_ID, FIRESTORE_PATHS.shopPurchases);
-      const purchaseRef = doc(purchasesRef);
-
-      await runTransaction(db, async (transaction) => {
-        const [studentSnapshot, itemSnapshot] = await Promise.all([
-          transaction.get(studentRef),
-          transaction.get(itemRef),
-        ]);
-
-        if (!studentSnapshot.exists() || !itemSnapshot.exists()) throw new Error('NOT_FOUND');
-
-        const studentData = normalizeClassStudent({
-          id: studentSnapshot.id,
-          ...studentSnapshot.data(),
-        });
-        const currentItem = itemSnapshot.data();
-        const price = Math.max(0, Number(currentItem.price || 0));
-        const stock = Math.max(0, Number(currentItem.stock || 0));
-
-        if (currentItem.active === false) throw new Error('INACTIVE');
-        if (currentItem.classId !== studentData.classId) throw new Error('WRONG_CLASS');
-        if (stock < 1) throw new Error('OUT_OF_STOCK');
-        if (studentData.totalPoints < price) throw new Error('NOT_ENOUGH_POINTS');
-
-        transaction.update(studentRef, {
-          totalPoints: studentData.totalPoints - price,
-          updatedAt: serverTimestamp(),
-        });
-        transaction.update(itemRef, {
-          stock: stock - 1,
-          updatedAt: serverTimestamp(),
-        });
-        transaction.set(purchaseRef, {
-          itemId: itemSnapshot.id,
-          itemName: currentItem.name || '',
-          classId: studentData.classId,
-          studentId: studentData.id,
-          studentName: studentData.name || '',
-          quantity: 1,
-          pointsSpent: price,
-          status: 'completed',
-          userId: user?.uid || null,
-          createdAt: serverTimestamp(),
-        });
-      });
-
+      const result = await buyStudentShopItem(normalizedStudent.id, item.id);
       alert(`${item.name} 구매가 완료되었습니다.`);
+      return result;
     } catch (error) {
       console.error(error);
       const messages = {
-        OUT_OF_STOCK: '상품이 품절되었습니다.',
-        NOT_ENOUGH_POINTS: '포인트가 부족합니다.',
-        INACTIVE: '현재 판매하지 않는 상품입니다.',
+        'api/resource-exhausted': '상품이 품절되었습니다.',
+        'api/failed-precondition': '포인트가 부족하거나 현재 판매하지 않는 상품입니다.',
+        'api/permission-denied': '학생 PIN 인증이 만료되었습니다. 다시 인증해주세요.',
       };
-      alert(messages[error.message] || '상품 구매 중 오류가 발생했습니다.');
+      alert(messages[error.code] || '상품 구매 중 오류가 발생했습니다.');
+      return null;
     }
   };
 
@@ -1511,20 +1417,20 @@ export default function App() {
     }
 
     try {
-      const studentRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.classStudents, normalizedStudent.id);
-      await updateDoc(studentRef, {
-        equippedCosmetic: cosmetic.id,
-        updatedAt: serverTimestamp(),
-      });
+      return await equipStudentCosmetic(normalizedStudent.id, cosmetic.id);
     } catch (error) {
       console.error(error);
-      alert('아이템 장착 중 오류가 발생했습니다.');
+      alert(error.code === 'api/permission-denied'
+        ? '학생 PIN 인증이 만료되었습니다. 다시 인증해주세요.'
+        : '아이템 장착 중 오류가 발생했습니다.');
+      return null;
     }
   };
 
   const normalizePoints = (value) => Math.max(0, Math.floor(Number(value) || 0));
 
   const handleSetStudentPoints = async (studentId, nextPoints) => {
+    if (!requireTeacherAccess()) return;
     if (!studentId) return;
 
     try {
@@ -1544,6 +1450,7 @@ export default function App() {
   };
 
   const handleGrantStudentCosmetic = async (student, cosmeticId) => {
+    if (!requireTeacherAccess()) return;
     const normalizedStudent = normalizeClassStudent(student);
     const cosmetic = getCosmeticById(cosmeticId);
 
@@ -1563,6 +1470,7 @@ export default function App() {
   };
 
   const handleRemoveStudentCosmetic = async (student, cosmeticId) => {
+    if (!requireTeacherAccess()) return;
     const normalizedStudent = normalizeClassStudent(student);
     const cosmetic = getCosmeticById(cosmeticId);
 
@@ -1583,6 +1491,7 @@ export default function App() {
   };
 
   const handleResetStudentCosmetics = async (studentId) => {
+    if (!requireTeacherAccess()) return;
     if (!studentId) return;
     if (!window.confirm('이 학생의 보유 장식과 장착 장식을 모두 초기화할까요?')) return;
 
@@ -1600,6 +1509,7 @@ export default function App() {
   };
 
   const openClassRoom = async (classItem) => {
+    if (!requireTeacherAccess()) return;
     if (!classItem?.id) {
       alert('방을 열 학급을 먼저 선택해주세요.');
       return;
@@ -1628,6 +1538,7 @@ export default function App() {
   };
 
   const deleteClassRoomSession = async (roomId, roomName) => {
+    if (!requireTeacherAccess()) return;
     if (!window.confirm(`[${roomName || '선택한 학급 방'}] 방을 닫을까요?`)) return;
 
     try {
@@ -1666,9 +1577,20 @@ export default function App() {
   const handleBackToLogin = () => {
     setView('login');
     setPwdError('');
-    setTeacherPwd('');
     setIsPracticeMode(false);
     setSelectedOpenClassRoomId('');
+  };
+
+  const handleTeacherLogout = async () => {
+    await signOutFirebaseUser().catch((error) => console.error(error));
+    handleBackToLogin();
+  };
+
+  const handleTeacherLoginBack = async () => {
+    if (user && !user.isAnonymous) {
+      await signOutFirebaseUser().catch((error) => console.error(error));
+    }
+    handleBackToLogin();
   };
 
   if (!authReady) {
@@ -1682,14 +1604,15 @@ export default function App() {
     );
   }
 
-  if (view === 'teacherLogin') {
+  if (view === 'teacherLogin' || (view === 'teacher' && !teacherAuthorized)) {
     return (
       <TeacherLoginView
-        teacherPwd={teacherPwd}
-        setTeacherPwd={setTeacherPwd}
-        pwdError={pwdError}
-        onBack={handleBackToLogin}
-        onSubmit={handleTeacherSubmit}
+        error={pwdError}
+        isLoading={teacherLoginLoading}
+        teacherUidConfigured={Boolean(TEACHER_UID)}
+        currentUser={user}
+        onBack={handleTeacherLoginBack}
+        onGoogleSignIn={handleTeacherSubmit}
       />
     );
   }
@@ -1712,6 +1635,7 @@ export default function App() {
         onBuyStockItem={handleBuyStockItem}
         onEquipCosmetic={handleEquipCosmetic}
         onSetStudentPin={handleSetStudentPin}
+        onVerifyStudentPin={handleVerifyStudentPin}
         onBack={() => setView('login')}
         onJoinRoom={handleJoinRoom}
         onPracticeStart={startPractice}
@@ -1774,7 +1698,7 @@ export default function App() {
       <TeacherDashboardView
         getLeaderboard={getLeaderboard}
         currentTime={currentTime}
-        onLogout={handleBackToLogin}
+        onLogout={handleTeacherLogout}
         handleCreateRoom={handleCreateRoom}
         newRoomName={newRoomName}
         setNewRoomName={setNewRoomName}
@@ -1842,6 +1766,7 @@ export default function App() {
         handleDeleteStudent={handleDeleteStudent}
         handleRegenerateStudentPin={handleRegenerateStudentPin}
         handleResetStudentPin={handleResetStudentPin}
+        handleSyncPublicRoster={handleSyncPublicRoster}
         handleSetStudentPoints={handleSetStudentPoints}
         handleAdjustStudentPoints={handleAdjustStudentPoints}
         handleGrantStudentCosmetic={handleGrantStudentCosmetic}
@@ -1876,7 +1801,7 @@ export default function App() {
       onTeacherClick={() => {
         setIsPracticeMode(false);
         setPwdError('');
-        setView('teacherLogin');
+        setView(teacherAuthorized ? 'teacher' : 'teacherLogin');
       }}
     />
   );

@@ -82,6 +82,7 @@ export default function TeacherDashboardView({
   handleDeleteStudent = () => {},
   handleRegenerateStudentPin = () => {},
   handleResetStudentPin = () => {},
+  handleSyncPublicRoster = () => {},
   handleSetStudentPoints = () => {},
   handleAdjustStudentPoints = () => {},
   handleGrantStudentCosmetic = () => {},
@@ -218,6 +219,7 @@ export default function TeacherDashboardView({
               handleDeleteStudent={handleDeleteStudent}
               handleRegenerateStudentPin={handleRegenerateStudentPin}
               handleResetStudentPin={handleResetStudentPin}
+              handleSyncPublicRoster={handleSyncPublicRoster}
             />
           </div>
         )}

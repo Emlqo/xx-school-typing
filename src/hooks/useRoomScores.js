@@ -21,7 +21,7 @@ export default function useRoomScores({
       return undefined;
     }
 
-    const scoresRef = getPublicCollection(db, APP_ID, FIRESTORE_PATHS.scores);
+    const scoresRef = getPublicCollection(db, APP_ID, FIRESTORE_PATHS.roomPresence);
     const scoresQuery = query(scoresRef, where('roomId', '==', roomId));
     const unsubscribe = onSnapshot(
       scoresQuery,

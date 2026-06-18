@@ -10,10 +10,18 @@ export default function useFirebaseAuth() {
     let unsubscribe = () => {};
 
     try {
-      unsubscribe = initAnonymousAuth((nextUser) => {
-        setUser(nextUser);
-        setAuthReady(true);
-      });
+      unsubscribe = initAnonymousAuth(
+        (nextUser) => {
+          setUser(nextUser);
+          setError(null);
+          setAuthReady(true);
+        },
+        (authError) => {
+          console.error(authError);
+          setError(authError);
+          setAuthReady(true);
+        },
+      );
     } catch (authError) {
       console.error(authError);
       setError(authError);

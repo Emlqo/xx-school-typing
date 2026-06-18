@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/student-security.js": {
+      "maxDuration": 10
+    }
+  }
+}

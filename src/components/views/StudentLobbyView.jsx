@@ -30,7 +30,7 @@ function StudentShopPanel({
   }
 
   const ownedCosmetics = Array.isArray(student.ownedCosmetics) ? student.ownedCosmetics : [];
-  const hasStudentPin = Boolean(student.studentPin);
+  const hasStudentPin = Boolean(student.hasPin || student.studentPin);
 
   return (
     <div className="bg-white rounded-2xl border border-cyan-100 p-5 space-y-5">
@@ -42,7 +42,9 @@ function StudentShopPanel({
         </div>
         <div className="text-right bg-emerald-50 border border-emerald-100 rounded-2xl px-4 py-3">
           <div className="text-xs font-black text-emerald-600">보유 포인트</div>
-          <div className="text-3xl font-black text-emerald-700">{safeToLocaleNumber(student.totalPoints || 0)}P</div>
+          <div className="text-3xl font-black text-emerald-700">
+            {isVerified ? `${safeToLocaleNumber(student.totalPoints || 0)}P` : 'LOCK'}
+          </div>
         </div>
       </div>
 
@@ -260,6 +262,7 @@ export default function StudentLobbyView({
   onEquipCosmetic = () => {},
   onBuyStockItem = () => {},
   onSetStudentPin = async () => false,
+  onVerifyStudentPin = async () => false,
   onBack = () => {},
   onJoinRoom = () => {},
   onPracticeStart = () => {},
@@ -271,6 +274,7 @@ export default function StudentLobbyView({
   const [newPinConfirm, setNewPinConfirm] = useState('');
   const [pinError, setPinError] = useState('');
   const [verifiedStudentId, setVerifiedStudentId] = useState('');
+  const [verifiedProfile, setVerifiedProfile] = useState(null);
   const previousStudentPinRef = useRef({ studentId: '', pin: '' });
   const selectedRoom = openClassRooms.find((room) => room.id === selectedOpenClassRoomId);
   const selectedStudent = useMemo(
@@ -278,6 +282,9 @@ export default function StudentLobbyView({
     [classStudents, selectedStudentId],
   );
   const isSelectedStudentVerified = Boolean(selectedStudent && verifiedStudentId === selectedStudent.id);
+  const effectiveStudent = isSelectedStudentVerified && verifiedProfile
+    ? { ...selectedStudent, ...verifiedProfile }
+    : selectedStudent;
 
   const resetPinAuth = () => {
     setPinInput('');
@@ -285,6 +292,7 @@ export default function StudentLobbyView({
     setNewPinConfirm('');
     setPinError('');
     setVerifiedStudentId('');
+    setVerifiedProfile(null);
   };
 
   useEffect(() => {
@@ -293,7 +301,7 @@ export default function StudentLobbyView({
       return;
     }
 
-    const nextPin = String(selectedStudent.studentPin || '');
+    const nextPin = selectedStudent.hasPin || selectedStudent.studentPin ? 'set' : '';
     const previousPinState = previousStudentPinRef.current;
 
     if (
@@ -331,19 +339,24 @@ export default function StudentLobbyView({
     }
   };
 
-  const handleVerifyPin = (event) => {
+  const handleVerifyPin = async (event) => {
     event.preventDefault();
 
     if (!selectedStudent) return;
-    if (!selectedStudent.studentPin) {
+    if (!selectedStudent.hasPin && !selectedStudent.studentPin) {
       setPinError('선생님에게 PIN 발급을 요청하세요.');
       return;
     }
 
-    if (pinInput.trim() === String(selectedStudent.studentPin)) {
+    try {
+      const result = await onVerifyStudentPin(selectedStudent.id, pinInput.trim());
+      if (!result?.profile) throw new Error('INVALID_PROFILE');
+      setVerifiedProfile(result.profile);
       setVerifiedStudentId(selectedStudent.id);
       setPinError('');
       return;
+    } catch (error) {
+      console.error(error);
     }
 
     setVerifiedStudentId('');
@@ -354,7 +367,7 @@ export default function StudentLobbyView({
     event.preventDefault();
 
     if (!selectedStudent?.id) return;
-    if (selectedStudent.studentPin) {
+    if (selectedStudent.hasPin || selectedStudent.studentPin) {
       setPinError('이미 PIN이 설정된 학생입니다.');
       return;
     }
@@ -374,6 +387,7 @@ export default function StudentLobbyView({
       return;
     }
 
+    setVerifiedProfile(saved.profile || { ...selectedStudent, hasPin: true });
     setVerifiedStudentId(selectedStudent.id);
     setPinInput(newPin);
     setNewPin('');
@@ -392,22 +406,25 @@ export default function StudentLobbyView({
 
   const handleVerifiedJoinClassStudent = (student) => {
     if (!requireVerifiedStudent(student)) return;
-    onJoinClassStudent(student);
+    onJoinClassStudent(effectiveStudent);
   };
 
-  const handleVerifiedBuyCosmetic = (student, cosmeticId, shopItem) => {
+  const handleVerifiedBuyCosmetic = async (student, cosmeticId, shopItem) => {
     if (!requireVerifiedStudent(student)) return;
-    onBuyCosmetic(student, cosmeticId, shopItem);
+    const result = await onBuyCosmetic(effectiveStudent, cosmeticId, shopItem);
+    if (result?.profile) setVerifiedProfile(result.profile);
   };
 
-  const handleVerifiedEquipCosmetic = (student, cosmeticId) => {
+  const handleVerifiedEquipCosmetic = async (student, cosmeticId) => {
     if (!requireVerifiedStudent(student)) return;
-    onEquipCosmetic(student, cosmeticId);
+    const result = await onEquipCosmetic(effectiveStudent, cosmeticId);
+    if (result?.profile) setVerifiedProfile(result.profile);
   };
 
-  const handleVerifiedBuyStockItem = (student, item) => {
+  const handleVerifiedBuyStockItem = async (student, item) => {
     if (!requireVerifiedStudent(student)) return;
-    onBuyStockItem(student, item);
+    const result = await onBuyStockItem(effectiveStudent, item);
+    if (result?.profile) setVerifiedProfile(result.profile);
   };
 
   return (
@@ -530,7 +547,7 @@ export default function StudentLobbyView({
                       >
                         <div className="font-black truncate">{student.name}</div>
                         <div className="text-xs font-bold mt-2 text-gray-400">
-                          {safeToLocaleNumber(student.totalPoints || 0)}P
+                          PIN 인증 후 포인트 확인
                         </div>
                         <div className={`text-xs font-bold mt-1 ${entered ? 'text-emerald-600' : 'text-gray-400'}`}>
                           {entered ? '입장 완료 · 재입장 가능' : '선택해서 상점 보기'}
@@ -560,7 +577,7 @@ export default function StudentLobbyView({
                   ← 이름 다시 선택
                 </button>
                 <StudentShopPanel
-                  student={selectedStudent}
+                  student={effectiveStudent}
                   isVerified={isSelectedStudentVerified}
                   pinInput={pinInput}
                   setPinInput={setPinInput}

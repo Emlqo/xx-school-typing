@@ -25,6 +25,8 @@
 - Firebase v10
 - Firestore
 - Firebase Anonymous Auth
+- Firebase Google Auth
+- Vercel Serverless Functions
 
 ## 설치 방법
 
@@ -58,6 +60,16 @@ npm run build
 6. Output Directory는 `dist`를 사용합니다.
 7. 배포 후 발급된 URL에서 첫 화면과 교사/학생 흐름을 확인합니다.
 
+Vercel 환경변수:
+
+- `VITE_TEACHER_UID`: 허용할 교사 Firebase UID
+- `TEACHER_UID`: 서버 API에서 허용할 교사 Firebase UID
+- `FIREBASE_ADMIN_PROJECT_ID`: Firebase 프로젝트 ID
+- `FIREBASE_ADMIN_CLIENT_EMAIL`: Firebase 서비스 계정 이메일
+- `FIREBASE_ADMIN_PRIVATE_KEY`: Firebase 서비스 계정 비공개 키, Sensitive 설정 필수
+
+서비스 계정 JSON과 비공개 키는 Git에 커밋하지 않습니다.
+
 ## Firebase 컬렉션 구조
 
 Firestore 경로는 아래 구조를 유지합니다.
@@ -67,6 +79,10 @@ artifacts/[appId]/public/data/typing_rooms
 artifacts/[appId]/public/data/typing_scores
 artifacts/[appId]/public/data/typing_announcements
 artifacts/[appId]/public/data/typing_quizzes
+artifacts/[appId]/public/data/typing_class_students
+artifacts/[appId]/public/data/typing_class_roster
+artifacts/[appId]/public/data/typing_student_sessions
+artifacts/[appId]/public/data/typing_room_presence
 ```
 
 컬렉션 역할:
@@ -75,11 +91,17 @@ artifacts/[appId]/public/data/typing_quizzes
 - `typing_scores`: 학생별 점수, CPM, 난이도, 부스터, 점수 배율
 - `typing_announcements`: 교사 공지사항
 - `typing_quizzes`: 돌발 4지선다 퀴즈
+- `typing_class_students`: 교사와 서버만 접근하는 PIN, 포인트, 장식 데이터
+- `typing_class_roster`: 학생이 읽을 수 있는 이름, 학급, PIN 설정 여부
+- `typing_student_sessions`: PIN 인증 후 서버가 발급하는 학생 세션
+- `typing_room_presence`: 방별 최소 입장 현황
+
+PIN 검증, 학생 입장, 포인트 보상, 구매, 장착은 `/api/student-security`에서 Firebase ID 토큰을 검증한 후 처리합니다.
 
 ## 트래픽 최적화 주의사항
 
 - 자유 연습 모드에서는 Firestore Read/Write가 발생하지 않아야 합니다.
-- 학생 PIN 입장은 전체 방 목록을 읽지 않고 `roomCode`와 `status` 조건으로 특정 방만 query해야 합니다.
+- 학생 PIN 입장은 Vercel API에서 `roomCode` 조건으로 필요한 방만 query해야 합니다.
 - 학생 화면에서 전체 점수 목록을 구독하면 안 됩니다.
 - 학생은 본인 점수 문서 1개만 구독해야 합니다.
 - 교사 방 목록 구독은 교사 대시보드에서만 실행되어야 합니다.

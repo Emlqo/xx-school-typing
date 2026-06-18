@@ -6,16 +6,20 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-pw-typing-security \"node --test tests/firestore.rules.test.mjs\""
   },
   "dependencies": {
     "firebase": "^10.14.1",
+    "firebase-admin": "^13.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^3.0.4",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
+    "firebase-tools": "^14.27.0",
     "postcss": "^8.5.0",
     "tailwindcss": "^3.4.17",
     "vite": "^5.4.11"
