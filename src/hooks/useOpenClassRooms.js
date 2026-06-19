@@ -32,7 +32,8 @@ export default function useOpenClassRooms({
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!enabled || !user || !db || view !== 'studentLobby' || isPracticeMode) {
+    const canSubscribe = view === 'studentRoomEntry';
+    if (!enabled || !user || !db || !canSubscribe || isPracticeMode) {
       setOpenClassRooms([]);
       return undefined;
     }

@@ -75,7 +75,8 @@ service cloud.firestore {
     }
 
     match /artifacts/{appId}/public/data/typing_classes/{classId} {
-      allow read, create, update, delete: if isSupportedApp(appId) && isTeacher();
+      allow read: if isSupportedApp(appId) && isSignedIn();
+      allow create, update, delete: if isSupportedApp(appId) && isTeacher();
     }
 
     // PIN, points, and owned cosmetics make this collection private.

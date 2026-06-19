@@ -266,8 +266,10 @@ export default function StudentLobbyView({
   onBack = () => {},
   onJoinRoom = () => {},
   onPracticeStart = () => {},
+  initialTab = 'class',
+  guestOnly = false,
 }) {
-  const [activeTab, setActiveTab] = useState('class');
+  const [activeTab, setActiveTab] = useState(guestOnly ? 'guest' : initialTab);
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [pinInput, setPinInput] = useState('');
   const [newPin, setNewPin] = useState('');
@@ -438,7 +440,7 @@ export default function StudentLobbyView({
           <p className="text-gray-500 text-sm mt-1">학급을 선택하거나 게스트 코드로 입장하세요.</p>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 bg-white/70 border border-pink-100 rounded-2xl p-2 mb-6">
+        {!guestOnly && <div className="grid grid-cols-2 gap-2 bg-white/70 border border-pink-100 rounded-2xl p-2 mb-6">
           <button
             type="button"
             onClick={() => changeTab('class')}
@@ -453,9 +455,9 @@ export default function StudentLobbyView({
           >
             게스트 입장
           </button>
-        </div>
+        </div>}
 
-        {activeTab === 'class' && (
+        {!guestOnly && activeTab === 'class' && (
           <div className="grid grid-cols-3 gap-2 mb-6">
             {[
               ['1', '학급 선택', Boolean(selectedRoom)],
@@ -477,7 +479,7 @@ export default function StudentLobbyView({
           </div>
         )}
 
-        {activeTab === 'class' ? (
+        {!guestOnly && activeTab === 'class' ? (
           <div className="space-y-5">
             <div className={`${selectedRoom ? 'hidden' : ''} bg-white rounded-2xl border border-pink-100 p-5`}>
               <div className="text-sm font-black text-gray-700 mb-3">열린 학급</div>

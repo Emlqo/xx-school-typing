@@ -81,6 +81,13 @@ describe('public content', () => {
 });
 
 describe('private student roster', () => {
+  test('signed-in students can read class directory but cannot change it', async () => {
+    await seed('typing_classes', 'class-1', { name: '1학년 1반', active: true });
+    const db = testEnv.authenticatedContext(STUDENT_UID).firestore();
+    await assertSucceeds(getDoc(publicDoc(db, 'typing_classes', 'class-1')));
+    await assertFails(updateDoc(publicDoc(db, 'typing_classes', 'class-1'), { name: '변조된 학급' }));
+  });
+
   test('student cannot read or change class student documents', async () => {
     await seed('typing_class_students', 'student-1', {
       classId: 'class-1',

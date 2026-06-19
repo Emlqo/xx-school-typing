@@ -16,7 +16,7 @@ export default function useShopItems({
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const canSubscribe = view === 'teacher' || view === 'studentLobby';
+    const canSubscribe = view === 'teacher' || view === 'login';
 
     if (!enabled || !user || !db || !classId || !canSubscribe || isPracticeMode) {
       setShopItems([]);

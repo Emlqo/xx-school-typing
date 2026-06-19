@@ -15,7 +15,8 @@ export default function useClasses({
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!enabled || !user || !db || view !== 'teacher' || isPracticeMode) {
+    const canSubscribe = view === 'teacher' || view === 'studentLogin';
+    if (!enabled || !user || !db || !canSubscribe || isPracticeMode) {
       setClasses([]);
       return undefined;
     }

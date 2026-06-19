@@ -1,6 +1,7 @@
 import AnnouncementModal from '../common/AnnouncementModal.jsx';
 import CherryBlossomBackground from '../common/CherryBlossomBackground.jsx';
 import { REWARD_RULES } from '../../constants/rewards.js';
+import StudentHomeShopPanel from '../common/StudentHomeShopPanel.jsx';
 
 const VACATION_CEREMONY_DATE = '2026-07-20';
 
@@ -122,7 +123,15 @@ export default function LoginView({
   showAnnouncementModal = false,
   setShowAnnouncementModal = () => {},
   onStudentClick = () => {},
+  onPracticeClick = () => {},
+  onGuestClick = () => {},
+  onStudentLogout = () => {},
   onTeacherClick = () => {},
+  studentProfile = null,
+  shopItems = [],
+  onBuyCosmetic = async () => null,
+  onBuyStockItem = async () => null,
+  onEquipCosmetic = async () => null,
 }) {
   const vacationDday = calculateVacationDday();
 
@@ -149,7 +158,8 @@ export default function LoginView({
         )}
       </button>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[420px_minmax(0,1fr)] gap-6 max-w-6xl w-full z-10 relative">
+      <div className="max-w-6xl w-full z-10 relative space-y-6">
+      <div className="grid grid-cols-1 xl:grid-cols-[420px_minmax(0,1fr)] gap-6">
         <div className="glass-box rounded-3xl p-8 md:p-10 text-center shadow-2xl border-2 border-cyan-100">
           <div className="text-6xl mb-3 animate-bounce">🎮🏔️</div>
 
@@ -173,9 +183,14 @@ export default function LoginView({
             <button onClick={onStudentClick} className="w-full py-4 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 text-white rounded-2xl font-bold text-lg shadow-lg shadow-teal-300/60 transition-all flex items-center justify-center gap-2 transform hover:scale-105">
               🎒 선수 입장
             </button>
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={onPracticeClick} className="py-3 bg-cyan-50 hover:bg-cyan-100 text-teal-700 rounded-2xl font-black border border-cyan-100">자유 연습</button>
+              <button onClick={onGuestClick} className="py-3 bg-sky-50 hover:bg-sky-100 text-sky-700 rounded-2xl font-black border border-sky-100">게스트 입장</button>
+            </div>
             <button onClick={onTeacherClick} className="w-full py-4 bg-white/85 hover:bg-white text-slate-700 rounded-2xl font-bold text-lg border-2 border-cyan-100 transition-all flex items-center justify-center gap-2">
               🧑‍🏫 교무실(관리자) 접속
             </button>
+            <button onClick={onStudentLogout} className="w-full py-2 text-sm font-bold text-gray-400 hover:text-red-500 transition-colors">학생 로그아웃</button>
           </div>
         </div>
 
@@ -186,6 +201,14 @@ export default function LoginView({
           />
           <RewardGuideBoard />
         </div>
+      </div>
+      <StudentHomeShopPanel
+        student={studentProfile}
+        shopItems={shopItems}
+        onBuyCosmetic={onBuyCosmetic}
+        onBuyStockItem={onBuyStockItem}
+        onEquipCosmetic={onEquipCosmetic}
+      />
       </div>
     </div>
   );

@@ -24,6 +24,10 @@ async function call(action, payload = {}) {
 
 export const verifyStudentPin = (roomId, studentId, pin) => call('verifyStudentPin', { roomId, studentId, pin });
 export const setInitialStudentPin = (roomId, studentId, pin) => call('setInitialStudentPin', { roomId, studentId, pin });
+export const getStudentSession = () => call('getStudentSession');
+export const logoutStudentSession = () => call('logoutStudentSession');
+export const verifyStudentLoginPin = (studentId, pin) => call('verifyStudentLoginPin', { studentId, pin });
+export const setInitialStudentLoginPin = (studentId, pin) => call('setInitialStudentLoginPin', { studentId, pin });
 export const joinClassGame = (roomId, studentId) => call('joinClassGame', { roomId, studentId });
 export const joinGuestGame = (roomCode, nickname) => call('joinGuestGame', { roomCode, nickname });
 export const buyStudentShopItem = (studentId, itemId) => call('buyStudentShopItem', { studentId, itemId });

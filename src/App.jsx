@@ -22,10 +22,14 @@ import {
   buyStudentShopItem,
   equipStudentCosmetic,
   finalizeStudentReward,
+  getStudentSession,
   joinClassGame,
   joinGuestGame,
+  logoutStudentSession,
+  setInitialStudentLoginPin,
   setInitialStudentPin,
   syncPublicClassRoster,
+  verifyStudentLoginPin,
   verifyStudentPin,
 } from './services/studentSecurityApi.js';
 import { getPublicCollection, getPublicDoc } from './utils/firestoreRefs.js';
@@ -49,15 +53,18 @@ import useStudentRoomWatcher from './hooks/useStudentRoomWatcher.js';
 import useTeacherRooms from './hooks/useTeacherRooms.js';
 import useWords from './hooks/useWords.js';
 import LoginView from './components/views/LoginView.jsx';
+import EntryView from './components/views/EntryView.jsx';
 import PlayingView from './components/views/PlayingView.jsx';
 import ResultView from './components/views/ResultView.jsx';
 import StudentLobbyView from './components/views/StudentLobbyView.jsx';
+import StudentLoginView from './components/views/StudentLoginView.jsx';
+import StudentRoomEntryView from './components/views/StudentRoomEntryView.jsx';
 import TeacherDashboardView from './components/views/TeacherDashboardView.jsx';
 import TeacherLoginView from './components/views/TeacherLoginView.jsx';
 import WaitingView from './components/views/WaitingView.jsx';
 
 export default function App() {
-  const [view, setView] = useState('login');
+  const [view, setView] = useState('entry');
   const [pwdError, setPwdError] = useState('');
   const [teacherLoginLoading, setTeacherLoginLoading] = useState(false);
   const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
@@ -104,6 +111,10 @@ export default function App() {
   const [classRoomDuration, setClassRoomDuration] = useState('300');
   const [studentBulkText, setStudentBulkText] = useState('');
   const [selectedOpenClassRoomId, setSelectedOpenClassRoomId] = useState('');
+  const [studentLoginClassId, setStudentLoginClassId] = useState('');
+  const [studentProfile, setStudentProfile] = useState(null);
+  const [studentSessionExpiresAt, setStudentSessionExpiresAt] = useState(0);
+  const [studentSessionChecked, setStudentSessionChecked] = useState(false);
   const [hallOfFameMonthKey, setHallOfFameMonthKey] = useState(() => getMonthKey(new Date()));
   const [lastReward, setLastReward] = useState(() => getDefaultRewardState());
   const [localRooms] = useState([]);
@@ -141,7 +152,11 @@ export default function App() {
   const { students: classStudents } = useClassStudents({
     user: scopedUser,
     view,
-    classId: view === 'studentLobby' ? selectedOpenClassRoom?.classId || '' : selectedClassId,
+    classId: view === 'studentLogin'
+      ? studentLoginClassId
+      : view === 'studentLobby'
+        ? selectedOpenClassRoom?.classId || ''
+        : selectedClassId,
     isPracticeMode,
     enabled: firestoreReadsEnabled,
   });
@@ -154,7 +169,7 @@ export default function App() {
   });
   const shopClassId = view === 'teacher'
     ? selectedClassId
-    : selectedOpenClassRoom?.classId || '';
+    : studentProfile?.classId || selectedOpenClassRoom?.classId || '';
   const { shopItems } = useShopItems({
     user: scopedUser,
     view,
@@ -185,6 +200,71 @@ export default function App() {
     enabled: firestoreReadsEnabled && view === 'teacher',
   });
 
+  useEffect(() => {
+    if (!authReady) return undefined;
+    if (!user) {
+      setStudentProfile(null);
+      setStudentSessionExpiresAt(0);
+      setStudentSessionChecked(true);
+      return undefined;
+    }
+    if (!user.isAnonymous) {
+      setStudentProfile(null);
+      setStudentSessionExpiresAt(0);
+      setStudentSessionChecked(true);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setStudentSessionChecked(false);
+    getStudentSession()
+      .then((result) => {
+        if (cancelled) return;
+        if (result?.profile && Number(result.sessionExpiresAt) > Date.now()) {
+          setStudentProfile(normalizeClassStudent(result.profile));
+          setStudentSessionExpiresAt(Number(result.sessionExpiresAt));
+          setNickname(result.profile.name || '');
+          setView((currentView) => currentView === 'entry' ? 'login' : currentView);
+        } else {
+          setStudentProfile(null);
+          setStudentSessionExpiresAt(0);
+        }
+      })
+      .catch((error) => {
+        console.error(error);
+        if (!cancelled) {
+          setStudentProfile(null);
+          setStudentSessionExpiresAt(0);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setStudentSessionChecked(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authReady, user?.isAnonymous, user?.uid]);
+
+  useEffect(() => {
+    if (!studentProfile || !studentSessionExpiresAt) return undefined;
+    const remaining = studentSessionExpiresAt - Date.now();
+    if (remaining <= 0) {
+      setStudentProfile(null);
+      setStudentSessionExpiresAt(0);
+      setView('entry');
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      setStudentProfile(null);
+      setStudentSessionExpiresAt(0);
+      setView('entry');
+      alert('학생 로그인 시간이 만료되었습니다. 다시 로그인해 주세요.');
+    }, remaining);
+    return () => window.clearTimeout(timer);
+  }, [studentProfile, studentSessionExpiresAt]);
+
   const announcements = useMemo(() => [...localAnnouncements, ...subscribedAnnouncements], [localAnnouncements, subscribedAnnouncements]);
   const quizzes = useMemo(() => [...localQuizzes, ...subscribedQuizzes], [localQuizzes, subscribedQuizzes]);
   const rooms = useMemo(() => [...localRooms, ...subscribedRooms], [localRooms, subscribedRooms]);
@@ -194,6 +274,12 @@ export default function App() {
       .filter((scoreItem) => scoreItem.studentId)
       .map((scoreItem) => scoreItem.studentId),
     [selectedOpenClassRoomScores],
+  );
+  const studentOpenClassRooms = useMemo(
+    () => studentProfile?.classId
+      ? openClassRooms.filter((room) => room.classId === studentProfile.classId)
+      : [],
+    [openClassRooms, studentProfile?.classId],
   );
   const hallOfFame = useMemo(
     () => savedHallOfFame || calculateHallOfFame(monthlyScores),
@@ -416,8 +502,9 @@ export default function App() {
     }
   }, [nickname, pickRandomWord, quizzes, resetPlayingState, roomCodeInput, user]);
 
-  const handleJoinClassStudent = useCallback(async (student) => {
-    if (!selectedOpenClassRoom?.id || !student?.id) {
+  const handleJoinClassStudent = useCallback(async (student, roomOverride = null) => {
+    const targetRoom = roomOverride || selectedOpenClassRoom;
+    if (!targetRoom?.id || !student?.id) {
       alert('입장할 학급과 이름을 선택해주세요.');
       return;
     }
@@ -428,7 +515,7 @@ export default function App() {
     }
 
     try {
-      const roomData = selectedOpenClassRoom;
+      const roomData = targetRoom;
       const remainingSeconds = getRemainingSeconds(roomData);
 
       if (roomData.status === 'playing' && remainingSeconds <= 0) {
@@ -438,6 +525,9 @@ export default function App() {
 
       const duration = Number(roomData.duration || 300);
       const joined = await joinClassGame(roomData.id, student.id);
+      if (Number(joined.sessionExpiresAt) > Date.now()) {
+        setStudentSessionExpiresAt(Number(joined.sessionExpiresAt));
+      }
       const normalizedStudent = normalizeClassStudent({ ...student, ...joined.profile });
       const scoreData = joined.score;
       const scoreDocId = scoreData.id;
@@ -501,6 +591,10 @@ export default function App() {
       ) {
         const { reward } = await finalizeStudentReward(currentScoreDocId);
         setLastReward(reward);
+        const refreshedSession = await getStudentSession();
+        if (refreshedSession?.profile) {
+          setStudentProfile(normalizeClassStudent(refreshedSession.profile));
+        }
         setLocalScores((prevScores) => prevScores.map((scoreItem) => (
           scoreItem.id === currentScoreDocId
             ? {
@@ -1291,6 +1385,39 @@ export default function App() {
     return verifyStudentPin(selectedOpenClassRoom.id, studentId, pin);
   };
 
+  const completeStudentLogin = (result) => {
+    if (!result?.profile || Number(result.sessionExpiresAt) <= Date.now()) return false;
+    const profile = normalizeClassStudent(result.profile);
+    setStudentProfile(profile);
+    setStudentSessionExpiresAt(Number(result.sessionExpiresAt));
+    setNickname(profile.name || '');
+    setStudentLoginClassId(profile.classId || '');
+    setIsPracticeMode(false);
+    setView('login');
+    return true;
+  };
+
+  const handleStudentLoginPin = async (studentId, pin) => {
+    const result = await verifyStudentLoginPin(studentId, pin);
+    completeStudentLogin(result);
+    return result;
+  };
+
+  const handleStudentInitialLoginPin = async (studentId, pin) => {
+    const result = await setInitialStudentLoginPin(studentId, pin);
+    completeStudentLogin(result);
+    return result;
+  };
+
+  const handleStudentLogout = async () => {
+    await logoutStudentSession().catch((error) => console.error(error));
+    setStudentProfile(null);
+    setStudentSessionExpiresAt(0);
+    setStudentLoginClassId('');
+    setNickname('');
+    setView('entry');
+  };
+
   const handleSyncPublicRoster = async () => {
     if (!requireTeacherAccess()) return;
     try {
@@ -1316,7 +1443,11 @@ export default function App() {
     }
 
     try {
-      return await buyStudentShopItem(normalizedStudent.id, shopItem.id);
+      const result = await buyStudentShopItem(normalizedStudent.id, shopItem.id);
+      if (result?.profile && studentProfile?.id === normalizedStudent.id) {
+        setStudentProfile(normalizeClassStudent(result.profile));
+      }
+      return result;
     } catch (error) {
       console.error(error);
       const messages = {
@@ -1393,6 +1524,9 @@ export default function App() {
 
     try {
       const result = await buyStudentShopItem(normalizedStudent.id, item.id);
+      if (result?.profile && studentProfile?.id === normalizedStudent.id) {
+        setStudentProfile(normalizeClassStudent(result.profile));
+      }
       alert(`${item.name} 구매가 완료되었습니다.`);
       return result;
     } catch (error) {
@@ -1418,7 +1552,11 @@ export default function App() {
     }
 
     try {
-      return await equipStudentCosmetic(normalizedStudent.id, cosmetic.id);
+      const result = await equipStudentCosmetic(normalizedStudent.id, cosmetic.id);
+      if (result?.profile && studentProfile?.id === normalizedStudent.id) {
+        setStudentProfile(normalizeClassStudent(result.profile));
+      }
+      return result;
     } catch (error) {
       console.error(error);
       alert(error.code === 'api/permission-denied'
@@ -1576,7 +1714,7 @@ export default function App() {
   };
 
   const handleBackToLogin = () => {
-    setView('login');
+    setView(studentProfile ? 'login' : 'entry');
     setPwdError('');
     setIsPracticeMode(false);
     setSelectedOpenClassRoomId('');
@@ -1594,7 +1732,7 @@ export default function App() {
     handleBackToLogin();
   };
 
-  if (!authReady) {
+  if (!authReady || !studentSessionChecked) {
     return (
       <div className="min-h-screen spring-bg flex items-center justify-center p-4">
         <div className="glass-box rounded-3xl p-10 text-center max-w-md w-full z-10 relative shadow-xl">
@@ -1614,6 +1752,20 @@ export default function App() {
         currentUser={user}
         onBack={handleTeacherLoginBack}
         onGoogleSignIn={handleTeacherSubmit}
+      />
+    );
+  }
+
+  if (view === 'studentLogin') {
+    return (
+      <StudentLoginView
+        classes={classes}
+        classStudents={classStudents}
+        selectedClassId={studentLoginClassId}
+        setSelectedClassId={setStudentLoginClassId}
+        onVerifyPin={handleStudentLoginPin}
+        onSetInitialPin={handleStudentInitialLoginPin}
+        onBack={() => setView('entry')}
       />
     );
   }
@@ -1640,6 +1792,19 @@ export default function App() {
         onBack={() => setView('login')}
         onJoinRoom={handleJoinRoom}
         onPracticeStart={startPractice}
+        initialTab="guest"
+        guestOnly
+      />
+    );
+  }
+
+  if (view === 'studentRoomEntry') {
+    return (
+      <StudentRoomEntryView
+        student={studentProfile}
+        rooms={studentOpenClassRooms}
+        onJoin={handleJoinClassStudent}
+        onBack={() => setView('login')}
       />
     );
   }
@@ -1649,7 +1814,7 @@ export default function App() {
       <WaitingView
         nickname={nickname}
         myRoomData={myRoomData}
-        onLeave={() => setView('studentLobby')}
+        onLeave={() => setView(studentProfile && myRoomData?.entryType === 'class' ? 'studentRoomEntry' : 'studentLobby')}
       />
     );
   }
@@ -1790,6 +1955,32 @@ export default function App() {
     );
   }
 
+  if (view === 'entry' || !studentProfile) {
+    return (
+      <EntryView
+        onStudentLogin={() => {
+          setStudentLoginClassId('');
+          setView('studentLogin');
+        }}
+        onGuestEntry={() => {
+          setNickname('');
+          setIsPracticeMode(false);
+          setView('studentLobby');
+        }}
+        onPractice={() => {
+          setNickname('');
+          setIsPracticeMode(false);
+          setView('studentLobby');
+        }}
+        onTeacherClick={() => {
+          setIsPracticeMode(false);
+          setPwdError('');
+          setView(teacherAuthorized ? 'teacher' : 'teacherLogin');
+        }}
+      />
+    );
+  }
+
   return (
     <LoginView
       announcements={announcements}
@@ -1797,13 +1988,21 @@ export default function App() {
       setShowAnnouncementModal={setShowAnnouncementModal}
       onStudentClick={() => {
         setIsPracticeMode(false);
-        setView('studentLobby');
+        setView('studentRoomEntry');
       }}
+      onPracticeClick={startPractice}
+      onGuestClick={() => setView('studentLobby')}
+      onStudentLogout={handleStudentLogout}
       onTeacherClick={() => {
         setIsPracticeMode(false);
         setPwdError('');
         setView(teacherAuthorized ? 'teacher' : 'teacherLogin');
       }}
+      studentProfile={studentProfile}
+      shopItems={shopItems}
+      onBuyCosmetic={handleBuyCosmetic}
+      onBuyStockItem={handleBuyStockItem}
+      onEquipCosmetic={handleEquipCosmetic}
     />
   );
 }

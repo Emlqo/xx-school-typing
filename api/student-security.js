@@ -4,7 +4,7 @@ import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore';
 
 const APP_ID = 'xx-school-typing-app';
 const TEACHER_UID = String(process.env.TEACHER_UID || 'hnjJNGDuydcd4SfQ2Xq5cE6IujD3').trim();
-const SESSION_HOURS = 12;
+const SESSION_MINUTES = 30;
 
 const PATHS = {
   rooms: 'typing_rooms',
@@ -135,7 +135,7 @@ async function requireOpenClassRoom(roomId, classId) {
 }
 
 async function createSession(uid, studentId, student) {
-  const expiresAt = Timestamp.fromMillis(Date.now() + SESSION_HOURS * 60 * 60 * 1000);
+  const expiresAt = Timestamp.fromMillis(Date.now() + SESSION_MINUTES * 60 * 1000);
   await publicCollection(PATHS.studentSessions).doc(uid).set({
     userId: uid,
     studentId,
@@ -144,6 +144,81 @@ async function createSession(uid, studentId, student) {
     expiresAt,
   });
   return expiresAt.toMillis();
+}
+
+async function getStudentSession(uid) {
+  const sessionRef = publicCollection(PATHS.studentSessions).doc(uid);
+  const sessionSnapshot = await sessionRef.get();
+  if (!sessionSnapshot.exists) return { profile: null, sessionExpiresAt: 0 };
+
+  const session = sessionSnapshot.data();
+  const sessionExpiresAt = toMillis(session.expiresAt);
+  if (!session.studentId || sessionExpiresAt <= Date.now()) {
+    await sessionRef.delete().catch(() => {});
+    return { profile: null, sessionExpiresAt: 0 };
+  }
+
+  const { data: student } = await getActiveStudent(session.studentId);
+  if (student.classId !== session.classId) {
+    await sessionRef.delete().catch(() => {});
+    return { profile: null, sessionExpiresAt: 0 };
+  }
+
+  return {
+    profile: safeProfile(session.studentId, student),
+    sessionExpiresAt,
+  };
+}
+
+async function logoutStudentSession(uid) {
+  await publicCollection(PATHS.studentSessions).doc(uid).delete();
+  return { success: true };
+}
+
+async function verifyStudentLoginPin(uid, body) {
+  const studentId = requireString(body.studentId, 'studentId');
+  const pin = requirePin(body.pin);
+  const { data } = await getActiveStudent(studentId);
+  if (!data.studentPin || String(data.studentPin) !== pin) {
+    throw new ApiError(403, 'api/permission-denied', '개인 PIN이 일치하지 않습니다.');
+  }
+  const sessionExpiresAt = await createSession(uid, studentId, data);
+  return { profile: safeProfile(studentId, data), sessionExpiresAt };
+}
+
+async function setInitialStudentLoginPin(uid, body) {
+  const studentId = requireString(body.studentId, 'studentId');
+  const pin = requirePin(body.pin);
+  const { data: initialStudent } = await getActiveStudent(studentId);
+  const studentRef = publicCollection(PATHS.classStudents).doc(studentId);
+  const rosterRef = publicCollection(PATHS.classRoster).doc(studentId);
+  let student;
+
+  await database().runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(studentRef);
+    if (!snapshot.exists || snapshot.data().active === false) {
+      throw new ApiError(404, 'api/not-found', '학생 정보를 찾을 수 없습니다.');
+    }
+    student = snapshot.data();
+    if (student.classId !== initialStudent.classId) {
+      throw new ApiError(409, 'api/failed-precondition', '학급 정보가 변경되었습니다.');
+    }
+    if (student.studentPin) {
+      throw new ApiError(409, 'api/already-exists', '이미 PIN이 설정된 학생입니다.');
+    }
+    student = { ...student, studentPin: pin };
+    transaction.update(studentRef, { studentPin: pin, updatedAt: FieldValue.serverTimestamp() });
+    transaction.set(rosterRef, {
+      classId: student.classId,
+      name: student.name || '',
+      active: student.active !== false,
+      hasPin: true,
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+  });
+
+  const sessionExpiresAt = await createSession(uid, studentId, student);
+  return { profile: safeProfile(studentId, student), sessionExpiresAt };
 }
 
 async function requireSession(uid, studentId) {
@@ -206,6 +281,7 @@ async function joinClassGame(uid, body) {
   const { data: student } = await getActiveStudent(studentId);
   const room = await requireOpenClassRoom(roomId, student.classId);
   if (session.classId !== student.classId) throw new ApiError(403, 'api/permission-denied', '학급 정보가 일치하지 않습니다.');
+  const sessionExpiresAt = await createSession(uid, studentId, student);
 
   const existing = await publicCollection(PATHS.scores)
     .where('roomId', '==', roomId)
@@ -249,7 +325,7 @@ async function joinClassGame(uid, body) {
     nickname: student.name || '',
     joinedAt: FieldValue.serverTimestamp(),
   }, { merge: true });
-  return { score: safeScore(scoreRef.id, score), profile: safeProfile(studentId, student) };
+  return { score: safeScore(scoreRef.id, score), profile: safeProfile(studentId, student), sessionExpiresAt };
 }
 
 async function joinGuestGame(uid, body) {
@@ -453,6 +529,10 @@ async function syncPublicClassRoster(uid) {
 }
 
 const actions = {
+  getStudentSession,
+  logoutStudentSession,
+  verifyStudentLoginPin,
+  setInitialStudentLoginPin,
   verifyStudentPin,
   setInitialStudentPin,
   joinClassGame,
