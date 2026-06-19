@@ -9,6 +9,7 @@ const SESSION_MINUTES = 30;
 const PATHS = {
   rooms: 'typing_rooms',
   scores: 'typing_scores',
+  classes: 'typing_classes',
   classStudents: 'typing_class_students',
   classRoster: 'typing_class_roster',
   studentSessions: 'typing_student_sessions',
@@ -83,6 +84,7 @@ function safeProfile(studentId, data = {}) {
   return {
     id: studentId,
     classId: data.classId || '',
+    className: data.className || '',
     name: data.name || '',
     active: data.active !== false,
     totalPoints: Math.max(0, Number(data.totalPoints || 0)),
@@ -91,6 +93,15 @@ function safeProfile(studentId, data = {}) {
     equippedCosmetic: data.equippedCosmetic || null,
     hasPin: Boolean(data.studentPin),
   };
+}
+
+async function safeLoginProfile(studentId, data = {}) {
+  let className = data.className || '';
+  if (!className && data.classId) {
+    const classSnapshot = await publicCollection(PATHS.classes).doc(data.classId).get();
+    className = classSnapshot.exists ? classSnapshot.data().name || '' : '';
+  }
+  return safeProfile(studentId, { ...data, className });
 }
 
 function safeScore(scoreId, data = {}) {
@@ -165,7 +176,7 @@ async function getStudentSession(uid) {
   }
 
   return {
-    profile: safeProfile(session.studentId, student),
+    profile: await safeLoginProfile(session.studentId, student),
     sessionExpiresAt,
   };
 }
@@ -183,7 +194,7 @@ async function verifyStudentLoginPin(uid, body) {
     throw new ApiError(403, 'api/permission-denied', '개인 PIN이 일치하지 않습니다.');
   }
   const sessionExpiresAt = await createSession(uid, studentId, data);
-  return { profile: safeProfile(studentId, data), sessionExpiresAt };
+  return { profile: await safeLoginProfile(studentId, data), sessionExpiresAt };
 }
 
 async function setInitialStudentLoginPin(uid, body) {
@@ -218,7 +229,7 @@ async function setInitialStudentLoginPin(uid, body) {
   });
 
   const sessionExpiresAt = await createSession(uid, studentId, student);
-  return { profile: safeProfile(studentId, student), sessionExpiresAt };
+  return { profile: await safeLoginProfile(studentId, student), sessionExpiresAt };
 }
 
 async function requireSession(uid, studentId) {

@@ -64,8 +64,14 @@ import TeacherDashboardView from './components/views/TeacherDashboardView.jsx';
 import TeacherLoginView from './components/views/TeacherLoginView.jsx';
 import WaitingView from './components/views/WaitingView.jsx';
 
+const TEACHER_PATH = '/teacher';
+
+function getInitialView() {
+  return window.location.pathname.replace(/\/$/, '') === TEACHER_PATH ? 'teacherLogin' : 'entry';
+}
+
 export default function App() {
-  const [view, setView] = useState('entry');
+  const [view, setView] = useState(getInitialView);
   const [pwdError, setPwdError] = useState('');
   const [teacherLoginLoading, setTeacherLoginLoading] = useState(false);
   const [teacherGatePassword, setTeacherGatePassword] = useState('');
@@ -269,6 +275,21 @@ export default function App() {
     }, remaining);
     return () => window.clearTimeout(timer);
   }, [studentProfile, studentSessionExpiresAt]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const isTeacherPath = window.location.pathname.replace(/\/$/, '') === TEACHER_PATH;
+      if (isTeacherPath) {
+        setPwdError('');
+        setView('teacherLogin');
+        return;
+      }
+      setView(studentProfile ? 'login' : 'entry');
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [studentProfile]);
 
   const announcements = useMemo(() => [...localAnnouncements, ...subscribedAnnouncements], [localAnnouncements, subscribedAnnouncements]);
   const quizzes = useMemo(() => [...localQuizzes, ...subscribedQuizzes], [localQuizzes, subscribedQuizzes]);
@@ -810,6 +831,7 @@ export default function App() {
         window.sessionStorage.removeItem('pw_typing_teacher_gate');
         setTeacherGatePassed(false);
         setTeacherGatePassword('');
+        window.history.replaceState({}, '', '/');
         setView('login');
         setPwdError('관리자 세션이 만료되었습니다. 다시 로그인해주세요.');
       }, TEACHER_IDLE_TIMEOUT_MS);
@@ -829,6 +851,7 @@ export default function App() {
     if (teacherAuthorized && teacherGatePassed) return true;
     window.alert('관리자가 아닌데 누구인가요? 관리자 계정으로 다시 로그인해 주세요.');
     setPwdError('관리자 세션이 없거나 만료되었습니다. Google 계정으로 다시 로그인해주세요.');
+    window.history.replaceState({}, '', TEACHER_PATH);
     setView('teacherLogin');
     return false;
   }, [teacherAuthorized, teacherGatePassed]);
@@ -841,7 +864,11 @@ export default function App() {
     try {
       const verified = await verifyTeacherPassword(teacherGatePassword, TEACHER_PASSWORD_HASH);
       if (!verified) {
-        setPwdError('1차 관리자 비밀번호가 일치하지 않습니다.');
+        const warningMessage = studentProfile
+          ? `${studentProfile.className || '학급 로그인'} ${studentProfile.name}야, 뭐 하니??`
+          : '관리자가 아닌데 누구인가요??';
+        window.alert(warningMessage);
+        setPwdError(warningMessage);
         return;
       }
       window.sessionStorage.setItem('pw_typing_teacher_gate', 'passed');
@@ -861,6 +888,7 @@ export default function App() {
       return;
     }
     if (teacherAuthorized) {
+      window.history.replaceState({}, '', TEACHER_PATH);
       setView('teacher');
       setPwdError('');
       return;
@@ -878,6 +906,7 @@ export default function App() {
       }
 
       if (isTeacherUser(googleUser)) {
+        window.history.replaceState({}, '', TEACHER_PATH);
         setView('teacher');
         setPwdError('');
         setIsPracticeMode(false);
@@ -1479,7 +1508,7 @@ export default function App() {
     try {
       const result = await buyStudentShopItem(normalizedStudent.id, shopItem.id);
       if (result?.profile && studentProfile?.id === normalizedStudent.id) {
-        setStudentProfile(normalizeClassStudent(result.profile));
+        setStudentProfile((previous) => normalizeClassStudent({ ...previous, ...result.profile }));
       }
       return result;
     } catch (error) {
@@ -1559,7 +1588,7 @@ export default function App() {
     try {
       const result = await buyStudentShopItem(normalizedStudent.id, item.id);
       if (result?.profile && studentProfile?.id === normalizedStudent.id) {
-        setStudentProfile(normalizeClassStudent(result.profile));
+        setStudentProfile((previous) => normalizeClassStudent({ ...previous, ...result.profile }));
       }
       alert(`${item.name} 구매가 완료되었습니다.`);
       return result;
@@ -1588,7 +1617,7 @@ export default function App() {
     try {
       const result = await equipStudentCosmetic(normalizedStudent.id, cosmetic.id);
       if (result?.profile && studentProfile?.id === normalizedStudent.id) {
-        setStudentProfile(normalizeClassStudent(result.profile));
+        setStudentProfile((previous) => normalizeClassStudent({ ...previous, ...result.profile }));
       }
       return result;
     } catch (error) {
@@ -1748,6 +1777,7 @@ export default function App() {
   };
 
   const handleBackToLogin = () => {
+    window.history.replaceState({}, '', '/');
     setView(studentProfile ? 'login' : 'entry');
     setPwdError('');
     setIsPracticeMode(false);
@@ -1770,6 +1800,15 @@ export default function App() {
     setTeacherGatePassed(false);
     setTeacherGatePassword('');
     handleBackToLogin();
+  };
+
+  const openTeacherLogin = () => {
+    if (window.location.pathname.replace(/\/$/, '') !== TEACHER_PATH) {
+      window.history.pushState({}, '', TEACHER_PATH);
+    }
+    setIsPracticeMode(false);
+    setPwdError('');
+    setView('teacherLogin');
   };
 
   if (!authReady || !studentSessionChecked) {
@@ -2016,11 +2055,7 @@ export default function App() {
           setIsPracticeMode(false);
           setView('studentLobby');
         }}
-        onTeacherClick={() => {
-          setIsPracticeMode(false);
-          setPwdError('');
-          setView('teacherLogin');
-        }}
+        onTeacherClick={openTeacherLogin}
       />
     );
   }
@@ -2037,11 +2072,7 @@ export default function App() {
       onPracticeClick={startPractice}
       onGuestClick={() => setView('studentLobby')}
       onStudentLogout={handleStudentLogout}
-      onTeacherClick={() => {
-        setIsPracticeMode(false);
-        setPwdError('');
-        setView('teacherLogin');
-      }}
+      onTeacherClick={openTeacherLogin}
       studentProfile={studentProfile}
       shopItems={shopItems}
       onBuyCosmetic={handleBuyCosmetic}
