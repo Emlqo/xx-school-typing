@@ -13,7 +13,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { APP_ID, GAME_RULES } from './constants/gameRules.js';
-import { isTeacherUser, TEACHER_IDLE_TIMEOUT_MS, TEACHER_UID } from './constants/admin.js';
+import { isTeacherUser, TEACHER_IDLE_TIMEOUT_MS, TEACHER_PASSWORD_HASH, TEACHER_UID } from './constants/admin.js';
 import { KOREAN_WORDS, ENGLISH_WORDS } from './constants/words.js';
 import { getCosmeticById } from './constants/cosmetics.js';
 import { FIRESTORE_PATHS } from './constants/firestorePaths.js';
@@ -37,6 +37,7 @@ import { calculateHallOfFame, getMonthKey } from './utils/hallOfFame.js';
 import { calculateCpm, calculateQuizScore, calculateTypingScore, getQuizWrongPenalty } from './utils/scoring.js';
 import { formatTime } from './utils/format.js';
 import { normalizeClassStudent } from './utils/classStudents.js';
+import { verifyTeacherPassword } from './utils/teacherAuth.js';
 import { calculateRankRewards, getDefaultRewardState } from './utils/rewards.js';
 import useAnnouncements from './hooks/useAnnouncements.js';
 import useClasses from './hooks/useClasses.js';
@@ -67,6 +68,10 @@ export default function App() {
   const [view, setView] = useState('entry');
   const [pwdError, setPwdError] = useState('');
   const [teacherLoginLoading, setTeacherLoginLoading] = useState(false);
+  const [teacherGatePassword, setTeacherGatePassword] = useState('');
+  const [teacherGatePassed, setTeacherGatePassed] = useState(
+    () => window.sessionStorage.getItem('pw_typing_teacher_gate') === 'passed',
+  );
   const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
   const [nickname, setNickname] = useState('');
   const [roomCodeInput, setRoomCodeInput] = useState('');
@@ -802,6 +807,9 @@ export default function App() {
       window.clearTimeout(logoutTimer);
       logoutTimer = window.setTimeout(async () => {
         await signOutFirebaseUser().catch((error) => console.error(error));
+        window.sessionStorage.removeItem('pw_typing_teacher_gate');
+        setTeacherGatePassed(false);
+        setTeacherGatePassword('');
         setView('login');
         setPwdError('관리자 세션이 만료되었습니다. 다시 로그인해주세요.');
       }, TEACHER_IDLE_TIMEOUT_MS);
@@ -818,14 +826,40 @@ export default function App() {
   }, [teacherAuthorized, view]);
 
   const requireTeacherAccess = useCallback(() => {
-    if (teacherAuthorized) return true;
+    if (teacherAuthorized && teacherGatePassed) return true;
     window.alert('관리자가 아닌데 누구인가요? 관리자 계정으로 다시 로그인해 주세요.');
     setPwdError('관리자 세션이 없거나 만료되었습니다. Google 계정으로 다시 로그인해주세요.');
     setView('teacherLogin');
     return false;
-  }, [teacherAuthorized]);
+  }, [teacherAuthorized, teacherGatePassed]);
+
+  const handleTeacherGateSubmit = async (event) => {
+    event.preventDefault();
+    setTeacherLoginLoading(true);
+    setPwdError('');
+
+    try {
+      const verified = await verifyTeacherPassword(teacherGatePassword, TEACHER_PASSWORD_HASH);
+      if (!verified) {
+        setPwdError('1차 관리자 비밀번호가 일치하지 않습니다.');
+        return;
+      }
+      window.sessionStorage.setItem('pw_typing_teacher_gate', 'passed');
+      setTeacherGatePassed(true);
+      setTeacherGatePassword('');
+    } catch (error) {
+      console.error(error);
+      setPwdError('1차 인증 중 오류가 발생했습니다.');
+    } finally {
+      setTeacherLoginLoading(false);
+    }
+  };
 
   const handleTeacherSubmit = async () => {
+    if (!teacherGatePassed) {
+      setPwdError('1차 관리자 인증을 먼저 완료해 주세요.');
+      return;
+    }
     if (teacherAuthorized) {
       setView('teacher');
       setPwdError('');
@@ -1722,6 +1756,9 @@ export default function App() {
 
   const handleTeacherLogout = async () => {
     await signOutFirebaseUser().catch((error) => console.error(error));
+    window.sessionStorage.removeItem('pw_typing_teacher_gate');
+    setTeacherGatePassed(false);
+    setTeacherGatePassword('');
     handleBackToLogin();
   };
 
@@ -1729,6 +1766,9 @@ export default function App() {
     if (user && !user.isAnonymous) {
       await signOutFirebaseUser().catch((error) => console.error(error));
     }
+    window.sessionStorage.removeItem('pw_typing_teacher_gate');
+    setTeacherGatePassed(false);
+    setTeacherGatePassword('');
     handleBackToLogin();
   };
 
@@ -1743,14 +1783,18 @@ export default function App() {
     );
   }
 
-  if (view === 'teacherLogin' || (view === 'teacher' && !teacherAuthorized)) {
+  if (view === 'teacherLogin' || (view === 'teacher' && (!teacherAuthorized || !teacherGatePassed))) {
     return (
       <TeacherLoginView
         error={pwdError}
         isLoading={teacherLoginLoading}
         teacherUidConfigured={Boolean(TEACHER_UID)}
         currentUser={user}
+        gatePassed={teacherGatePassed}
+        gatePassword={teacherGatePassword}
+        setGatePassword={setTeacherGatePassword}
         onBack={handleTeacherLoginBack}
+        onGateSubmit={handleTeacherGateSubmit}
         onGoogleSignIn={handleTeacherSubmit}
       />
     );
@@ -1975,7 +2019,7 @@ export default function App() {
         onTeacherClick={() => {
           setIsPracticeMode(false);
           setPwdError('');
-          setView(teacherAuthorized ? 'teacher' : 'teacherLogin');
+          setView('teacherLogin');
         }}
       />
     );
@@ -1996,7 +2040,7 @@ export default function App() {
       onTeacherClick={() => {
         setIsPracticeMode(false);
         setPwdError('');
-        setView(teacherAuthorized ? 'teacher' : 'teacherLogin');
+        setView('teacherLogin');
       }}
       studentProfile={studentProfile}
       shopItems={shopItems}
