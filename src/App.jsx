@@ -2077,7 +2077,6 @@ export default function App() {
           setIsPracticeMode(false);
           setView('studentLobby');
         }}
-        onTeacherClick={openTeacherLogin}
       />
     );
   }

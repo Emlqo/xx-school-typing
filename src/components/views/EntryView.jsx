@@ -4,7 +4,6 @@ export default function EntryView({
   onStudentLogin = () => {},
   onGuestEntry = () => {},
   onPractice = () => {},
-  onTeacherClick = () => {},
 }) {
   return (
     <div className="min-h-screen spring-bg flex items-center justify-center p-4">
@@ -32,9 +31,6 @@ export default function EntryView({
               게스트 입장
             </button>
           </div>
-          <button type="button" onClick={onTeacherClick} className="w-full py-3 text-slate-500 hover:text-slate-700 font-bold text-sm transition-colors">
-            교무실(관리자) 접속
-          </button>
         </div>
 
         <div className="mt-7 rounded-2xl bg-white/70 border border-cyan-100 p-4 text-left">
