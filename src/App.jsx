@@ -26,6 +26,7 @@ import {
   joinClassGame,
   joinGuestGame,
   logoutStudentSession,
+  recordPracticeCompletion,
   setInitialStudentLoginPin,
   setInitialStudentPin,
   syncPublicClassRoster,
@@ -144,6 +145,7 @@ export default function App() {
   const lastProcessedSyncRef = useRef(0);
   const lastSyncedScoreRef = useRef(0);
   const isEndingRef = useRef(false);
+  const practiceRunIdRef = useRef('');
   const autoAnnouncementShownRef = useRef(false);
 
   const { user, authReady } = useFirebaseAuth();
@@ -468,12 +470,15 @@ export default function App() {
     setSelectedRoomId('');
     setCurrentScoreDocId(null);
     setMyRoomData(null);
+    practiceRunIdRef.current = studentProfile?.id
+      ? (window.crypto?.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2)}`)
+      : '';
     resetPlayingState({ practiceMode: true, duration: 300, mode: 'mixed' });
     pendingQuizzesRef.current = [...quizzes].sort(() => Math.random() - 0.5);
     wordCountRef.current = 0;
     pickRandomWord('mixed', { practiceMode: true });
     setView('playing');
-  }, [nickname, pickRandomWord, quizzes, resetPlayingState]);
+  }, [nickname, pickRandomWord, quizzes, resetPlayingState, studentProfile?.id]);
 
   const handleJoinRoom = useCallback(async () => {
     const studentName = nickname.trim();
@@ -592,7 +597,24 @@ export default function App() {
     setBoosterActive(false);
     setView('result');
 
-    if (isPracticeMode || !currentScoreDocId || !db) return;
+    if (isPracticeMode) {
+      const practiceRunId = practiceRunIdRef.current;
+      practiceRunIdRef.current = '';
+      if (studentProfile?.id && practiceRunId) {
+        try {
+          await recordPracticeCompletion(
+            studentProfile.id,
+            practiceRunId,
+            gameInfoRef.current.elapsed || gameDuration,
+          );
+        } catch (error) {
+          console.error('자유 연습 참여 기록을 저장하지 못했습니다.', error);
+        }
+      }
+      return;
+    }
+
+    if (!currentScoreDocId || !db) return;
 
     try {
       const elapsedSeconds = gameInfoRef.current.elapsed || gameDuration || 1;
@@ -639,7 +661,7 @@ export default function App() {
     } catch (error) {
       console.error(error);
     }
-  }, [currentScoreDocId, gameDuration, isPracticeMode, scores]);
+  }, [currentScoreDocId, gameDuration, isPracticeMode, scores, studentProfile?.id]);
 
   const handleKeyDown = useCallback((event) => {
     if (event.key === 'Backspace') {

@@ -117,6 +117,12 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    // Logged-in practice completion records are created only by the trusted API.
+    match /artifacts/{appId}/public/data/typing_practice_records/{recordId} {
+      allow read: if isSupportedApp(appId) && isTeacher();
+      allow create, update, delete: if false;
+    }
+
     match /artifacts/{appId}/users/{userId}/{document=**} {
       allow read, write: if isSignedIn() && request.auth.uid == userId;
     }

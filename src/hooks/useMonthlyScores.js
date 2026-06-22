@@ -103,7 +103,9 @@ export default function useMonthlyScores({
         const savedData = snapshot.data();
         setMonthlyScores([]);
         setSavedHallOfFame(savedData.hallOfFame || null);
-        setSavedScoreCount(Number(savedData.sourceScoreCount || 0));
+        setSavedScoreCount(
+          Number(savedData.sourceScoreCount || 0) + Number(savedData.sourcePracticeCount || 0),
+        );
         setLastSavedAt(savedData.updatedAt || null);
       } catch (loadError) {
         if (cancelled) return;
@@ -131,25 +133,38 @@ export default function useMonthlyScores({
 
     try {
       const scoresRef = getPublicCollection(db, APP_ID, FIRESTORE_PATHS.scores);
+      const practiceRecordsRef = getPublicCollection(db, APP_ID, FIRESTORE_PATHS.practiceRecords);
       const monthlyScoresQuery = query(
         scoresRef,
         where('createdAt', '>=', monthStart),
         where('createdAt', '<', nextMonthStart),
       );
-      const snapshot = await getDocs(monthlyScoresQuery);
-      const nextScores = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      const nextHallOfFame = compactHallOfFame(calculateHallOfFame(nextScores));
+      const monthlyPracticeQuery = query(
+        practiceRecordsRef,
+        where('createdAt', '>=', monthStart),
+        where('createdAt', '<', nextMonthStart),
+      );
+      const [scoreSnapshot, practiceSnapshot] = await Promise.all([
+        getDocs(monthlyScoresQuery),
+        getDocs(monthlyPracticeQuery),
+      ]);
+      const nextScores = scoreSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      const nextPracticeRecords = practiceSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      const nextHallOfFame = compactHallOfFame(
+        calculateHallOfFame(nextScores, nextPracticeRecords),
+      );
       const savedRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.hallOfFame, monthKey);
 
       setMonthlyScores(nextScores);
       setSavedHallOfFame(nextHallOfFame);
-      setSavedScoreCount(nextScores.length);
+      setSavedScoreCount(nextScores.length + nextPracticeRecords.length);
       setLastSavedAt(Date.now());
 
       await setDoc(savedRef, {
         monthKey,
         hallOfFame: nextHallOfFame,
         sourceScoreCount: nextScores.length,
+        sourcePracticeCount: nextPracticeRecords.length,
         updatedBy: user.uid,
         updatedAt: serverTimestamp(),
       }, { merge: true });

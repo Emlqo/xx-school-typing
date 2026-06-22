@@ -12,4 +12,5 @@ export const FIRESTORE_PATHS = {
   hallOfFame: 'typing_hall_of_fame',
   shopItems: 'typing_shop_items',
   shopPurchases: 'typing_shop_purchases',
+  practiceRecords: 'typing_practice_records',
 };

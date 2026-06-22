@@ -241,7 +241,7 @@ export default function HallOfFamePanel({
           />
           <RankingList
             title="꾸준왕 TOP 10"
-            description="월간 참여 횟수 기준"
+            description="로그인 후 완료한 월간 자유 연습 횟수 기준"
             items={data.participationKing}
             valueLabel="회"
           />

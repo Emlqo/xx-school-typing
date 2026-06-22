@@ -234,6 +234,33 @@ describe('shop boundary', () => {
   });
 });
 
+describe('practice records', () => {
+  test('students cannot read or forge practice completion records', async () => {
+    await seed('typing_practice_records', 'student-1_run-1', {
+      entryType: 'practice',
+      studentId: 'student-1',
+      classId: 'class-1',
+    });
+    const db = testEnv.authenticatedContext(STUDENT_UID).firestore();
+    await assertFails(getDoc(publicDoc(db, 'typing_practice_records', 'student-1_run-1')));
+    await assertFails(setDoc(publicDoc(db, 'typing_practice_records', 'forged'), {
+      entryType: 'practice',
+      studentId: 'student-1',
+      classId: 'class-1',
+    }));
+  });
+
+  test('teacher can read practice completion records', async () => {
+    await seed('typing_practice_records', 'student-1_run-1', {
+      entryType: 'practice',
+      studentId: 'student-1',
+      classId: 'class-1',
+    });
+    const db = testEnv.authenticatedContext(TEACHER_UID).firestore();
+    await assertSucceeds(getDoc(publicDoc(db, 'typing_practice_records', 'student-1_run-1')));
+  });
+});
+
 test('unknown paths are denied', async () => {
   const db = testEnv.authenticatedContext(TEACHER_UID).firestore();
   await assertFails(setDoc(publicDoc(db, 'unknown_collection', 'doc-1'), { value: true }));

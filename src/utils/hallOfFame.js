@@ -43,6 +43,18 @@ function getClassScores(monthlyScores = []) {
     .filter(Boolean);
 }
 
+function normalizePracticeRecord(record = {}) {
+  if (record.entryType !== 'practice' || !record.classId || !record.studentId) return null;
+
+  return {
+    ...record,
+    classId: String(record.classId),
+    className: record.className || '',
+    studentId: String(record.studentId),
+    nickname: record.nickname || '',
+  };
+}
+
 function getStudentKey(score) {
   return `${score.classId}:${score.studentId}`;
 }
@@ -160,9 +172,20 @@ export function calculateSpeedKing(monthlyScores = []) {
     }));
 }
 
-export function calculateParticipationKing(monthlyScores = []) {
+export function calculateParticipationKing(monthlyPracticeRecords = []) {
+  const summaries = new Map();
+  monthlyPracticeRecords
+    .map((record) => normalizePracticeRecord(record))
+    .filter(Boolean)
+    .forEach((record) => {
+      const key = getStudentKey(record);
+      const summary = summaries.get(key) || createStudentSummary(record);
+      summary.gamesPlayed += 1;
+      summaries.set(key, summary);
+    });
+
   return sortRankings(
-    summarizeByStudent(monthlyScores),
+    [...summaries.values()],
     (summary) => summary.gamesPlayed,
   )
     .slice(0, TOP_LIMIT)
@@ -195,12 +218,12 @@ export function calculateGrowthKing(monthlyScores = []) {
   return sortRankings(growthRankings, (summary) => summary.growth).slice(0, TOP_LIMIT);
 }
 
-export function calculateHallOfFame(monthlyScores = []) {
+export function calculateHallOfFame(monthlyScores = [], monthlyPracticeRecords = []) {
   return {
     classMvp: calculateClassMvp(monthlyScores),
     quizKing: calculateQuizKing(monthlyScores),
     speedKing: calculateSpeedKing(monthlyScores),
-    participationKing: calculateParticipationKing(monthlyScores),
+    participationKing: calculateParticipationKing(monthlyPracticeRecords),
     growthKing: calculateGrowthKing(monthlyScores),
   };
 }

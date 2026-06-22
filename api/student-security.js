@@ -16,6 +16,7 @@ const PATHS = {
   roomPresence: 'typing_room_presence',
   shopItems: 'typing_shop_items',
   shopPurchases: 'typing_shop_purchases',
+  practiceRecords: 'typing_practice_records',
 };
 
 const REWARD_RULES = {
@@ -71,6 +72,14 @@ function requirePin(value) {
     throw new ApiError(400, 'api/invalid-argument', 'PIN은 숫자 4자리여야 합니다.');
   }
   return pin;
+}
+
+function requirePracticeRunId(value) {
+  const runId = String(value || '').trim();
+  if (!/^[A-Za-z0-9_-]{8,80}$/.test(runId)) {
+    throw new ApiError(400, 'api/invalid-argument', '연습 기록 식별자가 올바르지 않습니다.');
+  }
+  return runId;
 }
 
 function toMillis(value) {
@@ -512,6 +521,44 @@ async function finalizeStudentReward(uid, body) {
   return { reward };
 }
 
+async function recordPracticeCompletion(uid, body) {
+  const studentId = requireString(body.studentId, 'studentId');
+  const practiceRunId = requirePracticeRunId(body.practiceRunId);
+  const requestedDuration = Number(body.durationSec || 0);
+  const durationSec = Number.isFinite(requestedDuration)
+    ? Math.max(0, Math.floor(requestedDuration))
+    : 0;
+  const session = await requireSession(uid, studentId);
+  const { data: student } = await getActiveStudent(studentId);
+  if (session.classId !== student.classId) {
+    throw new ApiError(403, 'api/permission-denied', '학급 정보가 일치하지 않습니다.');
+  }
+  const profile = await safeLoginProfile(studentId, student);
+
+  const recordRef = publicCollection(PATHS.practiceRecords).doc(`${studentId}_${practiceRunId}`);
+  let created = false;
+  await database().runTransaction(async (transaction) => {
+    const existing = await transaction.get(recordRef);
+    if (existing.exists) return;
+
+    transaction.create(recordRef, {
+      entryType: 'practice',
+      classId: student.classId,
+      className: profile.className,
+      studentId,
+      nickname: profile.name,
+      userId: uid,
+      practiceRunId,
+      durationSec,
+      createdAt: FieldValue.serverTimestamp(),
+      completedAt: FieldValue.serverTimestamp(),
+    });
+    created = true;
+  });
+
+  return { recorded: created };
+}
+
 async function syncPublicClassRoster(uid) {
   if (uid !== TEACHER_UID) throw new ApiError(403, 'api/permission-denied', '관리자 권한이 없습니다.');
   const students = await publicCollection(PATHS.classStudents).get();
@@ -551,6 +598,7 @@ const actions = {
   buyStudentShopItem,
   equipStudentCosmetic,
   finalizeStudentReward,
+  recordPracticeCompletion,
   syncPublicClassRoster,
 };
 
