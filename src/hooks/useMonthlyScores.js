@@ -57,6 +57,17 @@ function compactHallOfFame(hallOfFame = {}) {
   };
 }
 
+function sanitizeSavedHallOfFame(hallOfFame = {}, sourcePracticeCount = 0) {
+  const nextHallOfFame = compactHallOfFame(hallOfFame);
+
+  // Participation rankings are valid only when they came from logged-in practice records.
+  if (Number(sourcePracticeCount || 0) <= 0) {
+    nextHallOfFame.participationKing = [];
+  }
+
+  return nextHallOfFame;
+}
+
 export default function useMonthlyScores({
   user,
   view,
@@ -101,11 +112,11 @@ export default function useMonthlyScores({
         }
 
         const savedData = snapshot.data();
+        const sourceScoreCount = Number(savedData.sourceScoreCount || 0);
+        const sourcePracticeCount = Number(savedData.sourcePracticeCount || 0);
         setMonthlyScores([]);
-        setSavedHallOfFame(savedData.hallOfFame || null);
-        setSavedScoreCount(
-          Number(savedData.sourceScoreCount || 0) + Number(savedData.sourcePracticeCount || 0),
-        );
+        setSavedHallOfFame(sanitizeSavedHallOfFame(savedData.hallOfFame || null, sourcePracticeCount));
+        setSavedScoreCount(sourceScoreCount + sourcePracticeCount);
         setLastSavedAt(savedData.updatedAt || null);
       } catch (loadError) {
         if (cancelled) return;
