@@ -12,3 +12,8 @@ export const REWARD_RULES = {
     completion: 1,
   },
 };
+
+export const PRACTICE_RECORD_RULES = {
+  minDurationSec: 300,
+  minCpm: 30,
+};

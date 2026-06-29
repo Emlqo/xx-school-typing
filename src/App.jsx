@@ -39,6 +39,7 @@ import { calculateCpm, calculateQuizScore, calculateTypingScore, getQuizWrongPen
 import { formatTime } from './utils/format.js';
 import { normalizeClassStudent } from './utils/classStudents.js';
 import { verifyTeacherPassword } from './utils/teacherAuth.js';
+import { PRACTICE_RECORD_RULES } from './constants/rewards.js';
 import { calculateRankRewards, getDefaultRewardState } from './utils/rewards.js';
 import useAnnouncements from './hooks/useAnnouncements.js';
 import useClasses from './hooks/useClasses.js';
@@ -601,12 +602,22 @@ export default function App() {
       const practiceRunId = practiceRunIdRef.current;
       practiceRunIdRef.current = '';
       if (studentProfile?.id && practiceRunId) {
+        const elapsedSeconds = gameInfoRef.current.elapsed || gameDuration || 0;
+        const finalCpm = calculateCpm({ chars: latestCharsRef.current, seconds: elapsedSeconds });
+        const qualifiesForPracticeRecord = elapsedSeconds >= PRACTICE_RECORD_RULES.minDurationSec
+          && finalCpm >= PRACTICE_RECORD_RULES.minCpm
+          && latestCharsRef.current > 0;
+
         try {
-          await recordPracticeCompletion(
-            studentProfile.id,
-            practiceRunId,
-            gameInfoRef.current.elapsed || gameDuration,
-          );
+          if (qualifiesForPracticeRecord) {
+            await recordPracticeCompletion(
+              studentProfile.id,
+              practiceRunId,
+              elapsedSeconds,
+              latestCharsRef.current,
+              finalCpm,
+            );
+          }
         } catch (error) {
           console.error('자유 연습 참여 기록을 저장하지 못했습니다.', error);
         }

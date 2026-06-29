@@ -33,8 +33,8 @@ export const joinGuestGame = (roomCode, nickname) => call('joinGuestGame', { roo
 export const buyStudentShopItem = (studentId, itemId) => call('buyStudentShopItem', { studentId, itemId });
 export const equipStudentCosmetic = (studentId, cosmeticId) => call('equipStudentCosmetic', { studentId, cosmeticId });
 export const finalizeStudentReward = (scoreId) => call('finalizeStudentReward', { scoreId });
-export const recordPracticeCompletion = (studentId, practiceRunId, durationSec) => call(
+export const recordPracticeCompletion = (studentId, practiceRunId, durationSec, correctChars, cpm) => call(
   'recordPracticeCompletion',
-  { studentId, practiceRunId, durationSec },
+  { studentId, practiceRunId, durationSec, correctChars, cpm },
 );
 export const syncPublicClassRoster = () => call('syncPublicClassRoster');

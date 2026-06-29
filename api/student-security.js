@@ -26,6 +26,11 @@ const REWARD_RULES = {
   growthRateThreshold: 0.1,
 };
 
+const PRACTICE_RECORD_RULES = {
+  minDurationSec: 300,
+  minCpm: 30,
+};
+
 class ApiError extends Error {
   constructor(status, code, message) {
     super(message);
@@ -528,6 +533,28 @@ async function recordPracticeCompletion(uid, body) {
   const durationSec = Number.isFinite(requestedDuration)
     ? Math.max(0, Math.floor(requestedDuration))
     : 0;
+  const requestedCorrectChars = Number(body.correctChars || 0);
+  const correctChars = Number.isFinite(requestedCorrectChars)
+    ? Math.max(0, Math.floor(requestedCorrectChars))
+    : 0;
+  const requestedCpm = Number(body.cpm || 0);
+  const cpm = Number.isFinite(requestedCpm)
+    ? Math.max(0, Math.floor(requestedCpm))
+    : 0;
+
+  if (
+    durationSec < PRACTICE_RECORD_RULES.minDurationSec
+    || cpm < PRACTICE_RECORD_RULES.minCpm
+    || correctChars <= 0
+  ) {
+    return {
+      recorded: false,
+      reason: 'practice-threshold-not-met',
+      minDurationSec: PRACTICE_RECORD_RULES.minDurationSec,
+      minCpm: PRACTICE_RECORD_RULES.minCpm,
+    };
+  }
+
   const session = await requireSession(uid, studentId);
   const { data: student } = await getActiveStudent(studentId);
   if (session.classId !== student.classId) {
@@ -550,6 +577,8 @@ async function recordPracticeCompletion(uid, body) {
       userId: uid,
       practiceRunId,
       durationSec,
+      correctChars,
+      cpm,
       createdAt: FieldValue.serverTimestamp(),
       completedAt: FieldValue.serverTimestamp(),
     });
