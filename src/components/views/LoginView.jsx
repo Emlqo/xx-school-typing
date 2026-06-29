@@ -1,5 +1,6 @@
 import AnnouncementModal from '../common/AnnouncementModal.jsx';
 import CherryBlossomBackground from '../common/CherryBlossomBackground.jsx';
+import LinkifiedText from '../common/LinkifiedText.jsx';
 import { REWARD_RULES } from '../../constants/rewards.js';
 import StudentHomeShopPanel from '../common/StudentHomeShopPanel.jsx';
 
@@ -67,7 +68,7 @@ function AnnouncementBoard({ announcements = [], onOpenModal = () => {} }) {
                   <span className="text-[10px] px-2 py-1 rounded-full bg-red-500 text-white font-black shrink-0">중요</span>
                 )}
               </div>
-              <p className="text-sm text-gray-600 whitespace-pre-wrap leading-relaxed font-medium">{announcement.content}</p>
+              <LinkifiedText text={announcement.content} className="text-sm text-gray-600 whitespace-pre-wrap leading-relaxed font-medium" />
               <div className="text-xs text-gray-400 font-bold text-right mt-3">
                 {formatAnnouncementDate(announcement)}
               </div>

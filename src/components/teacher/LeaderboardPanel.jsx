@@ -3,6 +3,7 @@ import { getCosmeticById } from '../../constants/cosmetics.js';
 
 export default function LeaderboardPanel({
   leaderboardScores = [],
+  students = [],
   rooms = [],
   viewingRoomId = '',
   participantCount = 0,
@@ -20,6 +21,15 @@ export default function LeaderboardPanel({
     ? selectedRoom.expiresAt.toMillis()
     : Number(selectedRoom?.expiresAt || 0);
   const gameEnded = selectedRoom?.status === 'playing' && expiresAt > 0 && expiresAt <= currentTime;
+  const isClassRoom = selectedRoom?.entryType === 'class';
+  const enteredStudentIds = new Set(
+    leaderboardScores
+      .filter((score) => score.studentId)
+      .map((score) => score.studentId),
+  );
+  const missingStudents = isClassRoom
+    ? students.filter((student) => student.active !== false && !enteredStudentIds.has(student.id))
+    : [];
   const title = viewingRoomId === 'all'
     ? '풍양중 전체 명예의 전당'
     : viewingRoomId === ''
@@ -47,7 +57,7 @@ export default function LeaderboardPanel({
                   <button onClick={() => requestScoreSync(viewingRoomId)} className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-bold shadow-lg transition-all">
                     📡 실시간 가져오기
                   </button>
-                  {selectedRoom.entryType === 'class' && (
+                  {isClassRoom && (
                     <button
                       onClick={() => finalizeRankRewards(viewingRoomId)}
                       disabled={!gameEnded || selectedRoom.rewardFinalized === true || participantCount === 0}
@@ -75,6 +85,38 @@ export default function LeaderboardPanel({
               </div>
             </div>
             <div className="text-6xl animate-bounce drop-shadow-lg">🔥</div>
+          </div>
+        )}
+
+        {viewingRoomId !== '' && viewingRoomId !== 'all' && isClassRoom && students.length > 0 && (
+          <div className="bg-white/90 border border-amber-100 rounded-2xl p-4 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <div>
+                <div className="text-xs font-black text-amber-600 tracking-widest">미입장 학생</div>
+                <div className="text-sm font-bold text-gray-500">
+                  아직 점수 문서가 없는 학생입니다. 튕긴 학생은 이름을 눌러 재입장하면 입장 처리됩니다.
+                </div>
+              </div>
+              <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-sm font-black">
+                {missingStudents.length}명 / {students.filter((student) => student.active !== false).length}명
+              </span>
+            </div>
+            {missingStudents.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {missingStudents.map((student) => (
+                  <span
+                    key={student.id}
+                    className="px-3 py-1.5 rounded-full bg-amber-50 border border-amber-100 text-amber-700 text-sm font-black"
+                  >
+                    {student.name}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3 text-emerald-700 text-sm font-black">
+                모든 학생이 입장했습니다.
+              </div>
+            )}
           </div>
         )}
       </div>

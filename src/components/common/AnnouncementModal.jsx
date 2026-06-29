@@ -1,3 +1,5 @@
+import LinkifiedText from './LinkifiedText.jsx';
+
 export default function AnnouncementModal({ announcements = [], onClose = () => {} }) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
@@ -12,7 +14,7 @@ export default function AnnouncementModal({ announcements = [], onClose = () => 
                   {ann.isAlert && <span className="text-red-500 mr-1 animate-pulse">🚨</span>}
                   {ann.title}
                 </h3>
-                <p className="text-gray-600 whitespace-pre-wrap text-sm leading-relaxed">{ann.content}</p>
+                <LinkifiedText text={ann.content} className="text-gray-600 whitespace-pre-wrap text-sm leading-relaxed" />
                 <div className="text-xs text-gray-400 mt-3 text-right">
                   {ann.createdAt?.toDate ? ann.createdAt.toDate().toLocaleDateString() : ''}
                 </div>

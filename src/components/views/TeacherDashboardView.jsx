@@ -170,6 +170,7 @@ export default function TeacherDashboardView({
             />
             <LeaderboardPanel
               leaderboardScores={leaderboardScores}
+              students={selectedClassRoom ? students : []}
               rooms={rooms}
               viewingRoomId={viewingRoomId}
               participantCount={participantCount}
