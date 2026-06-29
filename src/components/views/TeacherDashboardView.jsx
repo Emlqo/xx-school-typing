@@ -89,6 +89,7 @@ export default function TeacherDashboardView({
   handleRemoveStudentCosmetic = () => {},
   handleResetStudentCosmetics = () => {},
   shopItems = [],
+  shopPurchases = [],
   handleSaveShopItem = () => {},
   handleDeleteShopItem = () => {},
   classEntryCount = 0,
@@ -262,6 +263,7 @@ export default function TeacherDashboardView({
             selectedClassId={selectedClassId}
             setSelectedClassId={setSelectedClassId}
             students={students}
+            shopPurchases={shopPurchases}
             handleSetStudentPoints={handleSetStudentPoints}
             handleAdjustStudentPoints={handleAdjustStudentPoints}
             handleGrantStudentCosmetic={handleGrantStudentCosmetic}

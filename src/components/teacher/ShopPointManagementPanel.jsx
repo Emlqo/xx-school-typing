@@ -13,6 +13,7 @@ export default function ShopPointManagementPanel({
   handleRemoveStudentCosmetic = () => {},
   handleResetStudentCosmetics = () => {},
   shopItems = [],
+  shopPurchases = [],
   handleSaveShopItem = async () => false,
   handleDeleteShopItem = () => {},
 }) {
@@ -75,6 +76,28 @@ export default function ShopPointManagementPanel({
   const stockShopItems = shopItems.filter((item) => item.itemType !== 'cosmetic');
   const managedShopItems = [...cosmeticShopItems, ...stockShopItems];
   const isEditing = Boolean(editingItemId || editingCosmeticId);
+  const purchasesByStudentId = shopPurchases.reduce((map, purchase) => {
+    if (!purchase.studentId) return map;
+    const nextPurchases = map.get(purchase.studentId) || [];
+    nextPurchases.push(purchase);
+    map.set(purchase.studentId, nextPurchases);
+    return map;
+  }, new Map());
+  const recentPurchases = shopPurchases.slice(0, 20);
+
+  const formatPurchaseDate = (value) => {
+    if (!value) return '';
+    const date = typeof value.toDate === 'function'
+      ? value.toDate()
+      : new Date(typeof value.seconds === 'number' ? value.seconds * 1000 : value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleString('ko-KR', {
+      month: 'numeric',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
 
   return (
     <div className="glass-box p-6 rounded-3xl border border-teal-100">
@@ -211,10 +234,48 @@ export default function ShopPointManagementPanel({
       </div>
 
       <h3 className="text-lg font-black text-teal-800 mb-4">학생 포인트 및 장식 관리</h3>
+      <div className="bg-white rounded-2xl border border-cyan-100 p-5 mb-8">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div>
+            <div className="text-xs font-black text-cyan-600 tracking-widest">구매 내역</div>
+            <h3 className="text-lg font-black text-gray-800">선택 학급 최근 구매 기록</h3>
+          </div>
+          <span className="text-xs font-black px-3 py-1 rounded-full bg-cyan-50 border border-cyan-100 text-cyan-700">
+            총 {safeToLocaleNumber(shopPurchases.length)}건
+          </span>
+        </div>
+        {recentPurchases.length > 0 ? (
+          <div className="space-y-2 max-h-72 overflow-y-auto custom-scrollbar pr-1">
+            {recentPurchases.map((purchase) => (
+              <div key={purchase.id} className="rounded-xl border border-cyan-100 bg-cyan-50/40 p-3 flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="font-black text-gray-800 truncate">
+                    {purchase.studentName || '이름 없음'} · {purchase.itemName || '상품명 없음'}
+                  </div>
+                  <div className="text-xs font-bold text-gray-400 mt-1">
+                    {formatPurchaseDate(purchase.createdAt)} · {purchase.itemType === 'cosmetic' ? '장식' : '상품'} · {purchase.status || 'completed'}
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="text-lg font-black text-rose-500">-{safeToLocaleNumber(purchase.pointsSpent || 0)}P</div>
+                  <div className="text-xs font-bold text-gray-400">수량 {safeToLocaleNumber(purchase.quantity || 1)}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center text-gray-400 py-8 bg-cyan-50/60 rounded-2xl border border-cyan-100 font-bold">
+            선택한 학급의 구매 내역이 없습니다.
+          </div>
+        )}
+      </div>
+
+      <h3 className="text-lg font-black text-teal-800 mb-4">학생별 포인트 관리</h3>
       <div className="space-y-4">
         {students.map((student) => {
           const ownedCosmetics = Array.isArray(student.ownedCosmetics) ? student.ownedCosmetics : [];
           const totalPoints = Number(student.totalPoints || 0);
+          const studentPurchases = purchasesByStudentId.get(student.id) || [];
 
           return (
             <div key={student.id} className="bg-white rounded-2xl border border-cyan-100 p-4 shadow-sm">
@@ -226,6 +287,9 @@ export default function ShopPointManagementPanel({
                   </div>
                   <div className="text-2xl font-black text-emerald-600 mt-2">
                     {safeToLocaleNumber(totalPoints)}P
+                  </div>
+                  <div className="text-xs text-cyan-600 font-black mt-1">
+                    구매 {safeToLocaleNumber(studentPurchases.length)}건
                   </div>
                 </div>
 
@@ -306,6 +370,26 @@ export default function ShopPointManagementPanel({
                   </div>
                 </div>
               </div>
+              {studentPurchases.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-cyan-100">
+                  <div className="text-xs text-gray-400 font-black mb-2">학생 구매 내역</div>
+                  <div className="flex flex-wrap gap-2">
+                    {studentPurchases.slice(0, 8).map((purchase) => (
+                      <span
+                        key={purchase.id}
+                        className="px-3 py-1.5 rounded-full bg-cyan-50 border border-cyan-100 text-cyan-700 text-xs font-black"
+                      >
+                        {purchase.itemName || '상품'} · -{safeToLocaleNumber(purchase.pointsSpent || 0)}P
+                      </span>
+                    ))}
+                    {studentPurchases.length > 8 && (
+                      <span className="px-3 py-1.5 rounded-full bg-gray-50 border border-gray-100 text-gray-400 text-xs font-black">
+                        외 {safeToLocaleNumber(studentPurchases.length - 8)}건
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}

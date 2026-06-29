@@ -51,6 +51,7 @@ import useQuizzes from './hooks/useQuizzes.js';
 import useRoomScores from './hooks/useRoomScores.js';
 import useScores from './hooks/useScores.js';
 import useShopItems from './hooks/useShopItems.js';
+import useShopPurchases from './hooks/useShopPurchases.js';
 import useScoreSyncRequest from './hooks/useScoreSyncRequest.js';
 import useStudentRoomWatcher from './hooks/useStudentRoomWatcher.js';
 import useTeacherRooms from './hooks/useTeacherRooms.js';
@@ -190,6 +191,13 @@ export default function App() {
     classId: shopClassId,
     isPracticeMode,
     enabled: firestoreReadsEnabled,
+  });
+  const { shopPurchases } = useShopPurchases({
+    user: scopedUser,
+    view,
+    classId: selectedClassId,
+    isPracticeMode,
+    enabled: firestoreReadsEnabled && view === 'teacher',
   });
   const { scores: subscribedScores } = useScores({
     user: scopedUser,
@@ -2055,6 +2063,7 @@ export default function App() {
         handleRemoveStudentCosmetic={handleRemoveStudentCosmetic}
         handleResetStudentCosmetics={handleResetStudentCosmetics}
         shopItems={shopItems}
+        shopPurchases={shopPurchases}
         handleSaveShopItem={handleSaveShopItem}
         handleDeleteShopItem={handleDeleteShopItem}
         classEntryCount={0}
