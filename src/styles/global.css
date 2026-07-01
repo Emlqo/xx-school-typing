@@ -207,6 +207,38 @@ body {
   box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.18), 0 0 30px rgba(14, 165, 233, 0.5);
 }
 
+.cosmetic-preview-title-mvp {
+  background:
+    radial-gradient(circle at 20% 12%, rgba(255, 255, 255, 0.98), transparent 28%),
+    conic-gradient(from 215deg at 24% 45%, #92400e, #facc15, #fff7ad, #f59e0b, #92400e);
+  border-color: #facc15;
+  box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.45), 0 0 34px rgba(245, 158, 11, 0.78), inset 0 0 24px rgba(255, 255, 255, 0.52);
+}
+
+.cosmetic-preview-title-quiz {
+  background:
+    radial-gradient(circle at 18% 12%, rgba(233, 213, 255, 0.98), transparent 30%),
+    linear-gradient(135deg, #312e81 0%, #7c3aed 46%, #38bdf8 100%);
+  border-color: #a78bfa;
+  box-shadow: 0 0 0 2px rgba(167, 139, 250, 0.45), 0 0 34px rgba(124, 58, 237, 0.72), inset 0 0 22px rgba(255, 255, 255, 0.3);
+}
+
+.cosmetic-preview-title-practice {
+  background:
+    radial-gradient(circle at 18% 14%, rgba(220, 252, 231, 0.98), transparent 31%),
+    linear-gradient(135deg, #064e3b 0%, #10b981 48%, #bef264 100%);
+  border-color: #34d399;
+  box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.42), 0 0 34px rgba(16, 185, 129, 0.68), inset 0 0 22px rgba(255, 255, 255, 0.34);
+}
+
+.cosmetic-preview-title-speed {
+  background:
+    radial-gradient(circle at 18% 14%, rgba(207, 250, 254, 0.98), transparent 31%),
+    linear-gradient(125deg, #0f172a 0%, #0284c7 42%, #67e8f9 68%, #f8fafc 100%);
+  border-color: #22d3ee;
+  box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.42), 0 0 36px rgba(14, 165, 233, 0.76), inset 0 0 24px rgba(255, 255, 255, 0.36);
+}
+
 .cosmetic-row {
   position: relative;
   background-size: 240% 240% !important;
@@ -267,6 +299,50 @@ body {
   border-left-color: #0ea5e9;
 }
 
+.cosmetic-row-title-mvp {
+  background:
+    radial-gradient(circle at 10% 48%, rgba(250, 204, 21, 0.82), transparent 26%),
+    linear-gradient(105deg, rgba(146, 64, 14, 0.32), rgba(255, 251, 235, 0.98), rgba(250, 204, 21, 0.72), rgba(255, 255, 255, 0.96)) !important;
+  box-shadow: inset 0 0 0 1px rgba(250, 204, 21, 0.8), 0 0 34px rgba(245, 158, 11, 0.72), 0 12px 30px rgba(146, 64, 14, 0.22);
+}
+
+.cosmetic-row-title-mvp td:first-child {
+  border-left-color: #facc15;
+}
+
+.cosmetic-row-title-quiz {
+  background:
+    radial-gradient(circle at 10% 48%, rgba(168, 85, 247, 0.7), transparent 26%),
+    linear-gradient(105deg, rgba(49, 46, 129, 0.34), rgba(255, 255, 255, 0.96), rgba(192, 132, 252, 0.64), rgba(219, 234, 254, 0.96)) !important;
+  box-shadow: inset 0 0 0 1px rgba(167, 139, 250, 0.72), 0 0 34px rgba(124, 58, 237, 0.62), 0 12px 30px rgba(49, 46, 129, 0.18);
+}
+
+.cosmetic-row-title-quiz td:first-child {
+  border-left-color: #8b5cf6;
+}
+
+.cosmetic-row-title-practice {
+  background:
+    radial-gradient(circle at 10% 48%, rgba(52, 211, 153, 0.68), transparent 26%),
+    linear-gradient(105deg, rgba(6, 78, 59, 0.3), rgba(255, 255, 255, 0.96), rgba(134, 239, 172, 0.62), rgba(240, 253, 244, 0.96)) !important;
+  box-shadow: inset 0 0 0 1px rgba(52, 211, 153, 0.72), 0 0 32px rgba(16, 185, 129, 0.6), 0 12px 30px rgba(6, 95, 70, 0.17);
+}
+
+.cosmetic-row-title-practice td:first-child {
+  border-left-color: #10b981;
+}
+
+.cosmetic-row-title-speed {
+  background:
+    radial-gradient(circle at 10% 48%, rgba(34, 211, 238, 0.74), transparent 26%),
+    linear-gradient(105deg, rgba(15, 23, 42, 0.32), rgba(255, 255, 255, 0.96), rgba(103, 232, 249, 0.7), rgba(240, 249, 255, 0.96)) !important;
+  box-shadow: inset 0 0 0 1px rgba(34, 211, 238, 0.72), 0 0 34px rgba(14, 165, 233, 0.68), 0 12px 30px rgba(3, 105, 161, 0.18);
+}
+
+.cosmetic-row-title-speed td:first-child {
+  border-left-color: #22d3ee;
+}
+
 .cosmetic-badge {
   position: relative;
   overflow: hidden;
@@ -298,6 +374,24 @@ body {
 
 .cosmetic-badge-wave {
   background: linear-gradient(135deg, #0284c7, #22d3ee);
+}
+
+.cosmetic-badge-title-mvp {
+  background: linear-gradient(135deg, #78350f, #f59e0b, #fef08a);
+  color: #451a03 !important;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.cosmetic-badge-title-quiz {
+  background: linear-gradient(135deg, #312e81, #7c3aed, #38bdf8);
+}
+
+.cosmetic-badge-title-practice {
+  background: linear-gradient(135deg, #064e3b, #10b981, #bef264);
+}
+
+.cosmetic-badge-title-speed {
+  background: linear-gradient(135deg, #0f172a, #0284c7, #67e8f9);
 }
 
 .cosmetic-name-content {
@@ -425,6 +519,111 @@ body {
   animation: wave-sparkle 1.9s ease-in-out infinite;
 }
 
+.cosmetic-effect-title-mvp {
+  background:
+    radial-gradient(circle at 20% 50%, rgba(254, 240, 138, 0.95) 0 10%, rgba(245, 158, 11, 0.52) 18%, transparent 36%),
+    linear-gradient(90deg, rgba(146, 64, 14, 0.16), rgba(250, 204, 21, 0.34), transparent);
+  animation: title-mvp-pulse 1.75s ease-in-out infinite;
+}
+
+.cosmetic-effect-title-mvp::before {
+  content: '♛';
+  left: 4%;
+  top: 50%;
+  color: #facc15;
+  font-size: 2.5rem;
+  line-height: 1;
+  text-shadow: 0 0 8px #fff7ad, 0 0 18px rgba(245, 158, 11, 0.9);
+  transform: translateY(-50%);
+  animation: title-crown-float 1.55s ease-in-out infinite;
+}
+
+.cosmetic-effect-title-mvp::after {
+  inset: -20% -10%;
+  background:
+    radial-gradient(circle at 16% 28%, rgba(255, 255, 255, 0.95) 0 3px, transparent 4px),
+    radial-gradient(circle at 28% 70%, rgba(254, 240, 138, 0.95) 0 3px, transparent 4px),
+    linear-gradient(105deg, transparent 20%, rgba(255, 255, 255, 0.9) 42%, transparent 56%);
+  animation: title-gold-sweep 2.15s ease-in-out infinite;
+}
+
+.cosmetic-effect-title-quiz {
+  background:
+    radial-gradient(circle at 18% 50%, rgba(196, 181, 253, 0.74), transparent 24%),
+    linear-gradient(90deg, rgba(49, 46, 129, 0.14), rgba(96, 165, 250, 0.28), transparent);
+  animation: title-quiz-glow 1.25s steps(2, end) infinite;
+}
+
+.cosmetic-effect-title-quiz::before {
+  inset: 11% 65% 9% 5%;
+  clip-path: polygon(45% 0, 96% 0, 60% 42%, 96% 42%, 26% 100%, 43% 55%, 8% 55%);
+  background: linear-gradient(180deg, #fef3c7, #a78bfa 48%, #38bdf8);
+  filter: drop-shadow(0 0 8px rgba(124, 58, 237, 0.9));
+  animation: title-bolt-jump 1.1s ease-in-out infinite;
+}
+
+.cosmetic-effect-title-quiz::after {
+  inset: 0;
+  background:
+    radial-gradient(circle at 32% 34%, rgba(255, 255, 255, 0.85) 0 2px, transparent 3px),
+    radial-gradient(circle at 45% 66%, rgba(216, 180, 254, 0.9) 0 2px, transparent 3px),
+    repeating-linear-gradient(115deg, transparent 0 14px, rgba(167, 139, 250, 0.32) 14px 16px, transparent 16px 32px);
+  animation: title-quiz-scan 1.75s linear infinite;
+}
+
+.cosmetic-effect-title-practice {
+  background:
+    radial-gradient(circle at 20% 50%, rgba(187, 247, 208, 0.78), transparent 26%),
+    linear-gradient(90deg, rgba(6, 78, 59, 0.14), rgba(134, 239, 172, 0.28), transparent);
+  animation: title-practice-breathe 2.2s ease-in-out infinite;
+}
+
+.cosmetic-effect-title-practice::before {
+  inset: 18% 70% 18% 4%;
+  border: 3px solid rgba(52, 211, 153, 0.9);
+  border-radius: 999px;
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.82), inset 0 0 12px rgba(220, 252, 231, 0.7);
+  animation: title-practice-ring 1.8s ease-out infinite;
+}
+
+.cosmetic-effect-title-practice::after {
+  inset: -10% -5%;
+  background:
+    radial-gradient(ellipse at 16% 62%, rgba(34, 197, 94, 0.78) 0 4%, transparent 5%),
+    radial-gradient(ellipse at 28% 36%, rgba(190, 242, 100, 0.8) 0 4%, transparent 5%),
+    linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.65), transparent);
+  animation: title-practice-grow 2.8s linear infinite;
+}
+
+.cosmetic-effect-title-speed {
+  background:
+    radial-gradient(circle at 14% 50%, rgba(103, 232, 249, 0.78), transparent 20%),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.16), rgba(34, 211, 238, 0.3), transparent);
+}
+
+.cosmetic-effect-title-speed::before {
+  inset: 18% -20% 18% -8%;
+  background:
+    linear-gradient(100deg, transparent 0 12%, rgba(255, 255, 255, 0.95) 16%, transparent 23% 32%, rgba(34, 211, 238, 0.8) 38%, transparent 48%),
+    linear-gradient(100deg, transparent 0 48%, rgba(14, 165, 233, 0.72) 55%, transparent 66%);
+  filter: drop-shadow(0 0 8px rgba(34, 211, 238, 0.9));
+  animation: title-speed-streak 0.85s linear infinite;
+}
+
+.cosmetic-effect-title-speed::after {
+  left: 4%;
+  top: 50%;
+  width: 2.3rem;
+  height: 2.3rem;
+  border-radius: 999px;
+  border: 3px solid rgba(103, 232, 249, 0.94);
+  border-right-color: transparent;
+  border-bottom-color: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 16px rgba(34, 211, 238, 0.92);
+  transform: translateY(-50%);
+  animation: title-speed-spin 0.72s linear infinite;
+}
+
 @keyframes cosmetic-flow {
   0%, 100% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
@@ -493,6 +692,63 @@ body {
 @keyframes wave-sparkle {
   0%, 100% { transform: translateX(-18%); opacity: 0.54; }
   50% { transform: translateX(18%); opacity: 1; }
+}
+
+@keyframes title-mvp-pulse {
+  0%, 100% { opacity: 0.82; transform: scaleX(0.98); filter: saturate(1.08); }
+  50% { opacity: 1; transform: scaleX(1.04); filter: saturate(1.35); }
+}
+
+@keyframes title-crown-float {
+  0%, 100% { transform: translateY(-50%) rotate(-7deg) scale(0.95); }
+  50% { transform: translateY(-62%) rotate(7deg) scale(1.12); }
+}
+
+@keyframes title-gold-sweep {
+  0%, 34% { transform: translateX(-55%) skewX(-15deg); opacity: 0; }
+  46% { opacity: 1; }
+  100% { transform: translateX(70%) skewX(-15deg); opacity: 0; }
+}
+
+@keyframes title-quiz-glow {
+  0%, 100% { opacity: 0.78; filter: hue-rotate(0deg); }
+  50% { opacity: 1; filter: hue-rotate(24deg); }
+}
+
+@keyframes title-bolt-jump {
+  0%, 100% { transform: translate(0, 0) scale(0.95); opacity: 0.75; }
+  45% { transform: translate(8px, -2px) scale(1.08); opacity: 1; }
+}
+
+@keyframes title-quiz-scan {
+  0% { transform: translateX(-18%); }
+  100% { transform: translateX(18%); }
+}
+
+@keyframes title-practice-breathe {
+  0%, 100% { opacity: 0.75; transform: scaleX(0.98); }
+  50% { opacity: 1; transform: scaleX(1.04); }
+}
+
+@keyframes title-practice-ring {
+  0% { transform: scale(0.7); opacity: 1; }
+  78%, 100% { transform: scale(1.8); opacity: 0; }
+}
+
+@keyframes title-practice-grow {
+  0% { transform: translateX(-18%) translateY(6%); }
+  100% { transform: translateX(62%) translateY(-6%); }
+}
+
+@keyframes title-speed-streak {
+  0% { transform: translateX(-25%); opacity: 0.62; }
+  72% { opacity: 1; }
+  100% { transform: translateX(25%); opacity: 0.62; }
+}
+
+@keyframes title-speed-spin {
+  0% { transform: translateY(-50%) rotate(0deg) scale(0.95); }
+  100% { transform: translateY(-50%) rotate(360deg) scale(1.05); }
 }
 
 .hall-mvp-champion {

@@ -356,6 +356,7 @@ export default function ShopPointManagementPanel({
                           }`}
                           title={owned ? '클릭하면 회수합니다.' : '클릭하면 지급합니다.'}
                         >
+                          {item.category === 'title' ? '칭호 · ' : ''}
                           {item.name}{equipped ? ' · 장착 중' : owned ? ' · 보유' : ''}
                         </button>
                       );
