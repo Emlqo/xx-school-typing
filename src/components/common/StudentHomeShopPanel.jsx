@@ -7,6 +7,7 @@ export default function StudentHomeShopPanel({
   onBuyCosmetic = async () => null,
   onBuyStockItem = async () => null,
   onEquipCosmetic = async () => null,
+  onRefreshStudentProfile = async () => null,
 }) {
   if (!student) return null;
   const owned = Array.isArray(student.ownedCosmetics) ? student.ownedCosmetics : [];
@@ -19,6 +20,13 @@ export default function StudentHomeShopPanel({
           <div className="text-xs font-black text-teal-600 tracking-widest">MY SHOP</div>
           <h2 className="text-2xl font-black text-gray-800">{student.name}의 포인트 상점</h2>
           <p className="text-xs text-gray-500 font-bold mt-1">최고 기록 {safeToLocaleNumber(student.bestScore)}점</p>
+          <button
+            type="button"
+            onClick={onRefreshStudentProfile}
+            className="mt-3 px-3 py-2 rounded-xl bg-white/85 hover:bg-white border border-cyan-100 text-cyan-700 text-xs font-black transition-colors"
+          >
+            내 포인트/칭호 새로고침
+          </button>
         </div>
         <div className="rounded-2xl bg-emerald-50 border border-emerald-200 px-5 py-3 text-right">
           <div className="text-xs font-black text-emerald-600">보유 포인트</div>

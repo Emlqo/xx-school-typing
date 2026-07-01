@@ -1522,6 +1522,25 @@ export default function App() {
     setView('entry');
   };
 
+  const refreshStudentProfile = useCallback(async () => {
+    if (!studentProfile?.id) return null;
+
+    try {
+      const result = await getStudentSession();
+      if (result?.profile && Number(result.sessionExpiresAt) > Date.now()) {
+        const nextProfile = normalizeClassStudent(result.profile);
+        setStudentProfile(nextProfile);
+        setStudentSessionExpiresAt(Number(result.sessionExpiresAt));
+        return nextProfile;
+      }
+    } catch (error) {
+      console.error(error);
+      alert('학생 정보를 새로고침하지 못했습니다. 다시 로그인해 주세요.');
+    }
+
+    return null;
+  }, [studentProfile?.id]);
+
   const handleSyncPublicRoster = async () => {
     if (!requireTeacherAccess()) return;
     try {
@@ -1650,10 +1669,6 @@ export default function App() {
     const cosmetic = getCosmeticById(cosmeticId);
 
     if (!normalizedStudent.id || !cosmetic) return;
-    if (!normalizedStudent.ownedCosmetics.includes(cosmetic.id)) {
-      alert('보유한 아이템만 장착할 수 있습니다.');
-      return;
-    }
 
     try {
       const result = await equipStudentCosmetic(normalizedStudent.id, cosmetic.id);
@@ -2119,6 +2134,7 @@ export default function App() {
       onBuyCosmetic={handleBuyCosmetic}
       onBuyStockItem={handleBuyStockItem}
       onEquipCosmetic={handleEquipCosmetic}
+      onRefreshStudentProfile={refreshStudentProfile}
     />
   );
 }

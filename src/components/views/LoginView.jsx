@@ -133,6 +133,7 @@ export default function LoginView({
   onBuyCosmetic = async () => null,
   onBuyStockItem = async () => null,
   onEquipCosmetic = async () => null,
+  onRefreshStudentProfile = async () => null,
 }) {
   const vacationDday = calculateVacationDday();
 
@@ -209,6 +210,7 @@ export default function LoginView({
         onBuyCosmetic={onBuyCosmetic}
         onBuyStockItem={onBuyStockItem}
         onEquipCosmetic={onEquipCosmetic}
+        onRefreshStudentProfile={onRefreshStudentProfile}
       />
       </div>
     </div>
