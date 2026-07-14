@@ -53,7 +53,7 @@ export const COSMETIC_ITEMS = [
   {
     id: 'title_quiz_king',
     name: '퀴즈왕',
-    description: '퀴즈를 가장 많이 맞힌 학생에게 주는 번뜩이는 지식의 칭호입니다.',
+    description: '한 게임에서 퀴즈를 가장 많이 맞힌 학생에게 주는 번뜩이는 지식의 칭호입니다.',
     price: 9999,
     category: 'title',
     previewClass: 'cosmetic-preview cosmetic-preview-title-quiz',

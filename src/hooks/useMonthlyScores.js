@@ -6,6 +6,8 @@ import { db } from '../services/firebaseClient.js';
 import { calculateHallOfFame } from '../utils/hallOfFame.js';
 import { getPublicCollection, getPublicDoc } from '../utils/firestoreRefs.js';
 
+const HALL_OF_FAME_CALCULATION_VERSION = 2;
+
 function getMonthRange(monthKey) {
   const [yearText, monthText] = String(monthKey || '').split('-');
   const year = Number(yearText);
@@ -34,6 +36,7 @@ function compactRankingItem(item = {}) {
     value: Number(item.value || 0),
     totalScore: Number(item.totalScore || 0),
     totalQuizCorrectCount: Number(item.totalQuizCorrectCount || 0),
+    bestQuizCorrectCount: Number(item.bestQuizCorrectCount || 0),
     maxCpm: Number(item.maxCpm || 0),
     gamesPlayed: Number(item.gamesPlayed || 0),
     bestScore: Number(item.bestScore || 0),
@@ -57,8 +60,17 @@ function compactHallOfFame(hallOfFame = {}) {
   };
 }
 
-function sanitizeSavedHallOfFame(hallOfFame = {}, sourcePracticeCount = 0) {
+function sanitizeSavedHallOfFame(
+  hallOfFame = {},
+  sourcePracticeCount = 0,
+  calculationVersion = 0,
+) {
   const nextHallOfFame = compactHallOfFame(hallOfFame);
+
+  // Quiz King changed from monthly cumulative answers to a single-game best record.
+  if (Number(calculationVersion || 0) < HALL_OF_FAME_CALCULATION_VERSION) {
+    nextHallOfFame.quizKing = [];
+  }
 
   // Participation rankings are valid only when they came from logged-in practice records.
   if (Number(sourcePracticeCount || 0) <= 0) {
@@ -82,9 +94,10 @@ export default function useMonthlyScores({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const { monthStart, nextMonthStart } = useMemo(() => getMonthRange(monthKey), [monthKey]);
+  const canReadSavedResult = view === 'teacher' || view === 'hallOfFame';
 
   useEffect(() => {
-    if (!enabled || !user || !db || view !== 'teacher' || isPracticeMode || !monthKey) {
+    if (!enabled || !user || !db || !canReadSavedResult || isPracticeMode || !monthKey) {
       setMonthlyScores([]);
       setSavedHallOfFame(null);
       setSavedScoreCount(0);
@@ -114,8 +127,13 @@ export default function useMonthlyScores({
         const savedData = snapshot.data();
         const sourceScoreCount = Number(savedData.sourceScoreCount || 0);
         const sourcePracticeCount = Number(savedData.sourcePracticeCount || 0);
+        const calculationVersion = Number(savedData.calculationVersion || 0);
         setMonthlyScores([]);
-        setSavedHallOfFame(sanitizeSavedHallOfFame(savedData.hallOfFame || null, sourcePracticeCount));
+        setSavedHallOfFame(sanitizeSavedHallOfFame(
+          savedData.hallOfFame || null,
+          sourcePracticeCount,
+          calculationVersion,
+        ));
         setSavedScoreCount(sourceScoreCount + sourcePracticeCount);
         setLastSavedAt(savedData.updatedAt || null);
       } catch (loadError) {
@@ -131,7 +149,7 @@ export default function useMonthlyScores({
     return () => {
       cancelled = true;
     };
-  }, [enabled, isPracticeMode, monthKey, user, view]);
+  }, [canReadSavedResult, enabled, isPracticeMode, monthKey, user]);
 
   const refreshMonthlyScores = useCallback(async () => {
     if (!enabled || !user || !db || view !== 'teacher' || isPracticeMode) {
@@ -174,6 +192,7 @@ export default function useMonthlyScores({
       await setDoc(savedRef, {
         monthKey,
         hallOfFame: nextHallOfFame,
+        calculationVersion: HALL_OF_FAME_CALCULATION_VERSION,
         sourceScoreCount: nextScores.length,
         sourcePracticeCount: nextPracticeRecords.length,
         updatedBy: user.uid,

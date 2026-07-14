@@ -183,6 +183,7 @@ export default function HallOfFamePanel({
   onRefresh = () => {},
   isLoading = false,
   error = null,
+  readOnly = false,
 }) {
   const data = { ...defaultHallOfFame, ...hallOfFame };
   const loadedScoreCount = scoreCount || monthlyScores.length;
@@ -193,7 +194,11 @@ export default function HallOfFamePanel({
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
         <div>
           <h2 className="text-2xl font-black text-yellow-700 flex items-center gap-2">🏆 명예의 전당</h2>
-          <p className="text-sm text-gray-500 font-bold mt-1">저장된 월간 결과를 먼저 표시하고, 버튼을 누를 때만 전체 기록을 다시 계산합니다.</p>
+          <p className="text-sm text-gray-500 font-bold mt-1">
+            {readOnly
+              ? '선생님이 확정해 저장한 월간 명예의 전당 기록입니다.'
+              : '저장된 월간 결과를 먼저 표시하고, 버튼을 누를 때만 전체 기록을 다시 계산합니다.'}
+          </p>
         </div>
         <div className="bg-white rounded-2xl border border-yellow-100 p-3 min-w-[260px]">
           <label className="text-xs font-black text-gray-400 block mb-1">집계 월</label>
@@ -203,15 +208,19 @@ export default function HallOfFamePanel({
             onChange={(event) => setMonthKey(event.target.value)}
             className="w-full px-3 py-2 border border-yellow-200 rounded-xl outline-none focus:ring-2 focus:ring-yellow-400 font-black text-gray-700"
           />
-          <button
-            type="button"
-            onClick={onRefresh}
-            disabled={isLoading}
-            className="w-full mt-3 py-2 bg-yellow-400 hover:bg-yellow-500 disabled:bg-gray-300 disabled:cursor-not-allowed text-yellow-950 rounded-xl font-black transition-colors"
-          >
-            {isLoading ? '기록 처리 중...' : '선택한 월 기록 갱신하고 저장'}
-          </button>
-          <div className="text-xs text-gray-400 font-bold mt-2">계산에 사용한 기록 {loadedScoreCount}개</div>
+          {!readOnly && (
+            <>
+              <button
+                type="button"
+                onClick={onRefresh}
+                disabled={isLoading}
+                className="w-full mt-3 py-2 bg-yellow-400 hover:bg-yellow-500 disabled:bg-gray-300 disabled:cursor-not-allowed text-yellow-950 rounded-xl font-black transition-colors"
+              >
+                {isLoading ? '기록 처리 중...' : '선택한 월 기록 갱신하고 저장'}
+              </button>
+              <div className="text-xs text-gray-400 font-bold mt-2">계산에 사용한 기록 {loadedScoreCount}개</div>
+            </>
+          )}
           {savedAtLabel && (
             <div className="text-xs text-emerald-600 font-bold mt-1">마지막 저장 {savedAtLabel}</div>
           )}
@@ -229,7 +238,7 @@ export default function HallOfFamePanel({
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
           <RankingList
             title="퀴즈왕 TOP 10"
-            description="월간 퀴즈 정답 수 합계 기준"
+            description="단일 게임 퀴즈 정답 수 최고 기록 기준"
             items={data.quizKing}
             valueLabel="개"
           />

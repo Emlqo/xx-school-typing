@@ -62,6 +62,7 @@ import PlayingView from './components/views/PlayingView.jsx';
 import ResultView from './components/views/ResultView.jsx';
 import StudentLobbyView from './components/views/StudentLobbyView.jsx';
 import StudentLoginView from './components/views/StudentLoginView.jsx';
+import StudentHallOfFameView from './components/views/StudentHallOfFameView.jsx';
 import StudentRoomEntryView from './components/views/StudentRoomEntryView.jsx';
 import TeacherDashboardView from './components/views/TeacherDashboardView.jsx';
 import TeacherLoginView from './components/views/TeacherLoginView.jsx';
@@ -219,7 +220,7 @@ export default function App() {
     view,
     monthKey: hallOfFameMonthKey,
     isPracticeMode,
-    enabled: firestoreReadsEnabled && view === 'teacher',
+    enabled: firestoreReadsEnabled && (view === 'teacher' || view === 'hallOfFame'),
   });
 
   useEffect(() => {
@@ -1998,6 +1999,20 @@ export default function App() {
     );
   }
 
+  if (view === 'hallOfFame' && studentProfile) {
+    return (
+      <StudentHallOfFameView
+        monthKey={hallOfFameMonthKey}
+        setMonthKey={setHallOfFameMonthKey}
+        hallOfFame={hallOfFame}
+        savedAt={hallOfFameSavedAt}
+        isLoading={isHallOfFameLoading}
+        error={hallOfFameError}
+        onBack={() => setView('login')}
+      />
+    );
+  }
+
   if (view === 'teacher') {
     return (
       <TeacherDashboardView
@@ -2127,6 +2142,7 @@ export default function App() {
       }}
       onPracticeClick={startPractice}
       onGuestClick={() => setView('studentLobby')}
+      onHallOfFameClick={() => setView('hallOfFame')}
       onStudentLogout={handleStudentLogout}
       onTeacherClick={openTeacherLogin}
       studentProfile={studentProfile}

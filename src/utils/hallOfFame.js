@@ -149,15 +149,50 @@ export function calculateClassMvp(monthlyScores = []) {
 }
 
 export function calculateQuizKing(monthlyScores = []) {
+  const summariesByStudent = new Map(
+    summarizeByStudent(monthlyScores).map((summary) => [getStudentKey(summary), summary]),
+  );
+  const bestQuizScoreByStudent = new Map();
+
+  getClassScores(monthlyScores).forEach((score) => {
+    if (score.quizCorrectCount <= 0) return;
+
+    const previous = bestQuizScoreByStudent.get(getStudentKey(score));
+    if (!previous || score.quizCorrectCount > previous.quizCorrectCount) {
+      bestQuizScoreByStudent.set(getStudentKey(score), score);
+      return;
+    }
+
+    if (score.quizCorrectCount === previous.quizCorrectCount && score.score > previous.score) {
+      bestQuizScoreByStudent.set(getStudentKey(score), score);
+      return;
+    }
+
+    if (
+      score.quizCorrectCount === previous.quizCorrectCount
+      && score.score === previous.score
+      && score.cpm > previous.cpm
+    ) {
+      bestQuizScoreByStudent.set(getStudentKey(score), score);
+    }
+  });
+
   return sortRankings(
-    summarizeByStudent(monthlyScores),
-    (summary) => summary.totalQuizCorrectCount,
+    [...bestQuizScoreByStudent.values()].map((score) => {
+      const summary = summariesByStudent.get(getStudentKey(score)) || createStudentSummary(score);
+
+      return {
+        ...summary,
+        bestQuizCorrectCount: score.quizCorrectCount,
+        bestScore: score.score,
+        bestCpm: score.cpm,
+        achievedAt: score.createdMillis,
+        value: score.quizCorrectCount,
+      };
+    }),
+    (summary) => summary.bestQuizCorrectCount || summary.value || 0,
   )
-    .slice(0, TOP_LIMIT)
-    .map((summary) => ({
-      ...summary,
-      value: summary.totalQuizCorrectCount,
-    }));
+    .slice(0, TOP_LIMIT);
 }
 
 export function calculateSpeedKing(monthlyScores = []) {
