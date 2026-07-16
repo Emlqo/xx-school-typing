@@ -6,6 +6,7 @@ import GameStatusBar from '../game/GameStatusBar.jsx';
 import QuizCard from '../game/QuizCard.jsx';
 import TypingInput from '../game/TypingInput.jsx';
 import WordDisplay from '../game/WordDisplay.jsx';
+import DuelScoreboard from '../duel/DuelScoreboard.jsx';
 
 export default function PlayingView({
   nickname = '',
@@ -28,6 +29,7 @@ export default function PlayingView({
   boosterTimeLeft = 0,
   activateBooster = () => {},
   inputRef = null,
+  duelInfo = null,
 }) {
   const [languageMismatch, setLanguageMismatch] = useState(null);
   const progress = currentWord.length > 0
@@ -81,7 +83,16 @@ export default function PlayingView({
         languageMismatch={languageMismatch}
       />
 
-      <div className="flex-1 flex flex-col items-center justify-center max-w-4xl w-full mx-auto -mt-10 md:-mt-20 z-10">
+      {duelInfo && (
+        <DuelScoreboard
+          myName={duelInfo.myName}
+          myScore={score}
+          opponentName={duelInfo.opponentName}
+          opponentScore={duelInfo.opponentScore}
+        />
+      )}
+
+      <div className={`flex-1 flex flex-col items-center justify-center max-w-4xl w-full mx-auto z-10 ${duelInfo ? '-mt-4 md:-mt-10' : '-mt-10 md:-mt-20'}`}>
         {currentQuiz ? (
           <QuizCard
             currentQuiz={currentQuiz}

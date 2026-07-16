@@ -17,6 +17,18 @@ const PATHS = {
   shopItems: 'typing_shop_items',
   shopPurchases: 'typing_shop_purchases',
   practiceRecords: 'typing_practice_records',
+  duelChallenges: 'typing_duel_challenges',
+  duels: 'typing_duels',
+  duelScores: 'typing_duel_scores',
+};
+
+const DUEL_RULES = {
+  challengeDurationMs: 60 * 1000,
+  countdownMs: 5 * 1000,
+  durationMs: 5 * 60 * 1000,
+  stakePoints: 5,
+  dailyWinPointLimit: 15,
+  finalizeGraceMs: 3 * 1000,
 };
 
 const REWARD_RULES = {
@@ -94,7 +106,28 @@ function toMillis(value) {
   return 0;
 }
 
+function getKoreanDateKey(now = Date.now()) {
+  const koreanTime = new Date(Number(now) + (9 * 60 * 60 * 1000));
+  return koreanTime.toISOString().slice(0, 10);
+}
+
+function getDuelDailyWinPoints(data = {}, dateKey = getKoreanDateKey()) {
+  if (String(data.duelDailyWinDate || '') !== dateKey) return 0;
+  return Math.max(0, Number(data.duelDailyWinPoints || 0));
+}
+
+function assertDuelDailyLimit(student = {}) {
+  if (getDuelDailyWinPoints(student) >= DUEL_RULES.dailyWinPointLimit) {
+    throw new ApiError(
+      409,
+      'api/duel-daily-limit',
+      `오늘 결투로 획득할 수 있는 ${DUEL_RULES.dailyWinPointLimit}P를 모두 획득했습니다. 자정 이후 다시 도전하세요.`,
+    );
+  }
+}
+
 function safeProfile(studentId, data = {}) {
+  const duelDailyWinDate = getKoreanDateKey();
   return {
     id: studentId,
     classId: data.classId || '',
@@ -106,6 +139,8 @@ function safeProfile(studentId, data = {}) {
     ownedCosmetics: Array.isArray(data.ownedCosmetics) ? data.ownedCosmetics.filter(Boolean) : [],
     equippedCosmetic: data.equippedCosmetic || null,
     hasPin: Boolean(data.studentPin),
+    duelDailyWinDate,
+    duelDailyWinPoints: getDuelDailyWinPoints(data, duelDailyWinDate),
   };
 }
 
@@ -125,6 +160,53 @@ function safeScore(scoreId, data = {}) {
     createdAt: toMillis(data.createdAt),
     updatedAt: toMillis(data.updatedAt),
   };
+}
+
+function safeDuel(duelId, data = {}) {
+  return {
+    id: duelId,
+    ...data,
+    startsAt: toMillis(data.startsAt),
+    endsAt: toMillis(data.endsAt),
+    createdAt: toMillis(data.createdAt),
+    completedAt: toMillis(data.completedAt),
+  };
+}
+
+function sanitizeQuizSequence(value) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 50).map((quiz, index) => {
+    const question = String(quiz?.question || '').trim().slice(0, 300);
+    const options = Array.isArray(quiz?.options)
+      ? quiz.options.slice(0, 4).map((option) => String(option || '').trim().slice(0, 200))
+      : [];
+    const answer = Math.max(0, Math.min(3, Number(quiz?.answer || 0)));
+    if (!question || options.length !== 4 || options.some((option) => !option)) return null;
+    return { id: String(quiz?.id || `duel-quiz-${index}`), question, options, answer };
+  }).filter(Boolean);
+}
+
+function activeChallengeFields(challengeId, role, expiresAt) {
+  return {
+    activeChallengeId: challengeId,
+    activeChallengeRole: role,
+    activeChallengeExpiresAt: expiresAt,
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+}
+
+function clearChallengeFields() {
+  return {
+    activeChallengeId: FieldValue.delete(),
+    activeChallengeRole: FieldValue.delete(),
+    activeChallengeExpiresAt: FieldValue.delete(),
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+}
+
+function hasActiveStudentActivity(student = {}) {
+  return Boolean(student.activeDuelId)
+    || (Boolean(student.activeChallengeId) && toMillis(student.activeChallengeExpiresAt) > Date.now());
 }
 
 async function authenticate(request) {
@@ -588,6 +670,422 @@ async function recordPracticeCompletion(uid, body) {
   return { recorded: created };
 }
 
+async function findActiveStudentSession(studentId) {
+  const sessions = await publicCollection(PATHS.studentSessions)
+    .where('studentId', '==', studentId)
+    .get();
+  const activeSessions = sessions.docs
+    .map((snapshot) => ({ uid: snapshot.id, data: snapshot.data() }))
+    .filter((session) => toMillis(session.data.expiresAt) > Date.now())
+    .sort((a, b) => toMillis(b.data.expiresAt) - toMillis(a.data.expiresAt));
+  return activeSessions[0] || null;
+}
+
+async function createDuelChallenge(uid, body) {
+  const targetStudentId = requireString(body.targetStudentId, 'targetStudentId');
+  const callerSession = await publicCollection(PATHS.studentSessions).doc(uid).get();
+  if (!callerSession.exists || toMillis(callerSession.data().expiresAt) <= Date.now()) {
+    throw new ApiError(403, 'api/permission-denied', '학생 인증이 만료되었습니다.');
+  }
+  const challengerStudentId = callerSession.data().studentId;
+  if (!challengerStudentId || challengerStudentId === targetStudentId) {
+    throw new ApiError(400, 'api/invalid-argument', '본인에게는 결투를 신청할 수 없습니다.');
+  }
+  const [{ data: initialChallenger }, { data: initialTarget }] = await Promise.all([
+    getActiveStudent(challengerStudentId),
+    getActiveStudent(targetStudentId),
+  ]);
+  if (callerSession.data().classId !== initialChallenger.classId) {
+    throw new ApiError(403, 'api/permission-denied', '신청 학생의 학급 정보가 일치하지 않습니다.');
+  }
+  const [challengerProfile, targetProfile] = await Promise.all([
+    safeLoginProfile(challengerStudentId, initialChallenger),
+    safeLoginProfile(targetStudentId, initialTarget),
+  ]);
+
+  const targetSession = await findActiveStudentSession(targetStudentId);
+  if (!targetSession) {
+    throw new ApiError(409, 'api/failed-precondition', '상대 학생이 현재 로그인 상태가 아닙니다.');
+  }
+
+  const challengeRef = publicCollection(PATHS.duelChallenges).doc(targetSession.uid);
+  const challengerRef = publicCollection(PATHS.classStudents).doc(challengerStudentId);
+  const targetRef = publicCollection(PATHS.classStudents).doc(targetStudentId);
+  const now = Date.now();
+  const expiresAt = Timestamp.fromMillis(now + DUEL_RULES.challengeDurationMs);
+  let challenge;
+
+  await database().runTransaction(async (transaction) => {
+    const [challengerSnapshot, targetSnapshot, existingChallenge] = await Promise.all([
+      transaction.get(challengerRef),
+      transaction.get(targetRef),
+      transaction.get(challengeRef),
+    ]);
+    if (!challengerSnapshot.exists || challengerSnapshot.data().active === false) {
+      throw new ApiError(404, 'api/not-found', '신청 학생 정보를 찾을 수 없습니다.');
+    }
+    if (!targetSnapshot.exists || targetSnapshot.data().active === false) {
+      throw new ApiError(404, 'api/not-found', '상대 학생 정보를 찾을 수 없습니다.');
+    }
+    const challenger = challengerSnapshot.data();
+    const target = targetSnapshot.data();
+    if (hasActiveStudentActivity(challenger) || hasActiveStudentActivity(target)) {
+      throw new ApiError(409, 'api/failed-precondition', '이미 진행 중인 결투 신청 또는 결투가 있습니다.');
+    }
+    if (Number(challenger.totalPoints || 0) < DUEL_RULES.stakePoints) {
+      throw new ApiError(409, 'api/failed-precondition', '결투 신청에는 5P 이상이 필요합니다.');
+    }
+    if (Number(target.totalPoints || 0) < DUEL_RULES.stakePoints) {
+      throw new ApiError(409, 'api/failed-precondition', '상대 학생의 포인트가 5P보다 적습니다.');
+    }
+    assertDuelDailyLimit(challenger);
+    assertDuelDailyLimit(target);
+    if (
+      existingChallenge.exists
+      && existingChallenge.data().status === 'pending'
+      && toMillis(existingChallenge.data().expiresAt) > now
+    ) {
+      throw new ApiError(409, 'api/already-exists', '상대 학생에게 이미 도착한 결투 신청이 있습니다.');
+    }
+
+    challenge = {
+      status: 'pending',
+      challengerStudentId,
+      challengerName: challenger.name || challengerProfile.name || '',
+      challengerClassId: challenger.classId || '',
+      challengerClassName: challengerProfile.className || challenger.className || '',
+      challengerUserId: uid,
+      targetStudentId,
+      targetName: target.name || targetProfile.name || '',
+      targetClassId: target.classId || '',
+      targetClassName: targetProfile.className || target.className || '',
+      targetUserId: targetSession.uid,
+      participantUids: [uid, targetSession.uid],
+      stakePoints: DUEL_RULES.stakePoints,
+      expiresAt,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    transaction.set(challengeRef, challenge);
+    transaction.update(challengerRef, activeChallengeFields(targetSession.uid, 'challenger', expiresAt));
+    transaction.update(targetRef, activeChallengeFields(targetSession.uid, 'target', expiresAt));
+  });
+
+  return {
+    challenge: {
+      ...challenge,
+      id: targetSession.uid,
+      createdAt: now,
+      updatedAt: now,
+      expiresAt: expiresAt.toMillis(),
+    },
+  };
+}
+
+async function rejectDuelChallenge(uid, body) {
+  const targetStudentId = requireString(body.targetStudentId, 'targetStudentId');
+  await requireSession(uid, targetStudentId);
+  const challengeRef = publicCollection(PATHS.duelChallenges).doc(uid);
+
+  await database().runTransaction(async (transaction) => {
+    const challengeSnapshot = await transaction.get(challengeRef);
+    if (!challengeSnapshot.exists) return;
+    const challenge = challengeSnapshot.data();
+    if (challenge.targetUserId !== uid || challenge.targetStudentId !== targetStudentId) {
+      throw new ApiError(403, 'api/permission-denied', '결투 신청을 거절할 권한이 없습니다.');
+    }
+    if (challenge.status !== 'pending') return;
+    const challengerRef = publicCollection(PATHS.classStudents).doc(challenge.challengerStudentId);
+    const targetRef = publicCollection(PATHS.classStudents).doc(targetStudentId);
+    const [challengerSnapshot, targetSnapshot] = await Promise.all([
+      transaction.get(challengerRef),
+      transaction.get(targetRef),
+    ]);
+    transaction.update(challengeRef, {
+      status: 'rejected',
+      respondedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    if (challengerSnapshot.exists) transaction.update(challengerRef, clearChallengeFields());
+    if (targetSnapshot.exists) transaction.update(targetRef, clearChallengeFields());
+  });
+  return { success: true };
+}
+
+async function acceptDuelChallenge(uid, body) {
+  const targetStudentId = requireString(body.targetStudentId, 'targetStudentId');
+  await requireSession(uid, targetStudentId);
+  const quizSequence = sanitizeQuizSequence(body.quizSequence);
+  const challengeRef = publicCollection(PATHS.duelChallenges).doc(uid);
+  const duelRef = publicCollection(PATHS.duels).doc();
+  let responseDuel;
+
+  await database().runTransaction(async (transaction) => {
+    const challengeSnapshot = await transaction.get(challengeRef);
+    if (!challengeSnapshot.exists) throw new ApiError(404, 'api/not-found', '결투 신청을 찾을 수 없습니다.');
+    const challenge = challengeSnapshot.data();
+    if (challenge.targetUserId !== uid || challenge.targetStudentId !== targetStudentId) {
+      throw new ApiError(403, 'api/permission-denied', '결투 신청을 수락할 권한이 없습니다.');
+    }
+    if (challenge.status !== 'pending' || toMillis(challenge.expiresAt) <= Date.now()) {
+      throw new ApiError(409, 'api/failed-precondition', '결투 신청 시간이 만료되었습니다.');
+    }
+
+    const challengerRef = publicCollection(PATHS.classStudents).doc(challenge.challengerStudentId);
+    const targetRef = publicCollection(PATHS.classStudents).doc(targetStudentId);
+    const [challengerSnapshot, targetSnapshot] = await Promise.all([
+      transaction.get(challengerRef),
+      transaction.get(targetRef),
+    ]);
+    if (!challengerSnapshot.exists || !targetSnapshot.exists) {
+      throw new ApiError(404, 'api/not-found', '결투 참가 학생 정보를 찾을 수 없습니다.');
+    }
+    const challenger = challengerSnapshot.data();
+    const target = targetSnapshot.data();
+    const challengerPoints = Math.max(0, Number(challenger.totalPoints || 0));
+    const targetPoints = Math.max(0, Number(target.totalPoints || 0));
+    if (challengerPoints < DUEL_RULES.stakePoints || targetPoints < DUEL_RULES.stakePoints) {
+      throw new ApiError(409, 'api/failed-precondition', '두 학생 모두 5P 이상 보유해야 합니다.');
+    }
+    assertDuelDailyLimit(challenger);
+    assertDuelDailyLimit(target);
+
+    const startsAt = Timestamp.fromMillis(Date.now() + DUEL_RULES.countdownMs);
+    const endsAt = Timestamp.fromMillis(startsAt.toMillis() + DUEL_RULES.durationMs);
+    const challengerScoreRef = publicCollection(PATHS.duelScores).doc(`${duelRef.id}_${challenge.challengerStudentId}`);
+    const targetScoreRef = publicCollection(PATHS.duelScores).doc(`${duelRef.id}_${targetStudentId}`);
+    const participantUids = [challenge.challengerUserId, uid];
+    const randomSeed = Math.floor(Math.random() * 2147483646) + 1;
+    const baseDuelScore = {
+      duelId: duelRef.id,
+      entryType: 'duel',
+      participantUids,
+      score: 0,
+      cpm: 0,
+      correctChars: 0,
+      quizCorrectCount: 0,
+      wordIndex: 0,
+      quizIndex: 0,
+      wordCountSinceQuiz: 0,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    const duel = {
+      status: 'playing',
+      duration: DUEL_RULES.durationMs / 1000,
+      mode: 'mixed',
+      stakePoints: DUEL_RULES.stakePoints,
+      randomSeed,
+      quizSequence,
+      participantUids,
+      participantStudentIds: [challenge.challengerStudentId, targetStudentId],
+      challengerStudentId: challenge.challengerStudentId,
+      challengerName: challenge.challengerName || challenger.name || '',
+      challengerClassId: challenger.classId || challenge.challengerClassId || '',
+      challengerClassName: challenge.challengerClassName || challenger.className || '',
+      challengerUserId: challenge.challengerUserId,
+      challengerScoreId: challengerScoreRef.id,
+      targetStudentId,
+      targetName: challenge.targetName || target.name || '',
+      targetClassId: target.classId || challenge.targetClassId || '',
+      targetClassName: challenge.targetClassName || target.className || '',
+      targetUserId: uid,
+      targetScoreId: targetScoreRef.id,
+      startsAt,
+      endsAt,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+
+    transaction.create(duelRef, duel);
+    transaction.create(challengerScoreRef, {
+      ...baseDuelScore,
+      studentId: challenge.challengerStudentId,
+      classId: challenger.classId || '',
+      className: challenge.challengerClassName || challenger.className || '',
+      nickname: challenge.challengerName || challenger.name || '',
+      userId: challenge.challengerUserId,
+    });
+    transaction.create(targetScoreRef, {
+      ...baseDuelScore,
+      studentId: targetStudentId,
+      classId: target.classId || '',
+      className: challenge.targetClassName || target.className || '',
+      nickname: challenge.targetName || target.name || '',
+      userId: uid,
+    });
+    transaction.update(challengerRef, {
+      ...clearChallengeFields(),
+      totalPoints: challengerPoints - DUEL_RULES.stakePoints,
+      activeDuelId: duelRef.id,
+    });
+    transaction.update(targetRef, {
+      ...clearChallengeFields(),
+      totalPoints: targetPoints - DUEL_RULES.stakePoints,
+      activeDuelId: duelRef.id,
+    });
+    transaction.update(challengeRef, {
+      status: 'accepted',
+      duelId: duelRef.id,
+      respondedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    responseDuel = safeDuel(duelRef.id, duel);
+  });
+
+  return { duel: responseDuel };
+}
+
+async function getActiveDuel(uid, body) {
+  const studentId = requireString(body.studentId, 'studentId');
+  await requireSession(uid, studentId);
+  const { data: student } = await getActiveStudent(studentId);
+  if (!student.activeDuelId) {
+    return {
+      duel: null,
+      outgoingChallengeTargetId: student.activeChallengeRole === 'challenger'
+        && toMillis(student.activeChallengeExpiresAt) > Date.now()
+        ? student.activeChallengeId || ''
+        : '',
+    };
+  }
+  const duelSnapshot = await publicCollection(PATHS.duels).doc(student.activeDuelId).get();
+  if (!duelSnapshot.exists) {
+    await publicCollection(PATHS.classStudents).doc(studentId).update({
+      activeDuelId: FieldValue.delete(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    return { duel: null, outgoingChallengeTargetId: '' };
+  }
+  const duel = duelSnapshot.data();
+  if (!Array.isArray(duel.participantUids) || !duel.participantUids.includes(uid)) {
+    throw new ApiError(403, 'api/permission-denied', '결투 참가 정보가 일치하지 않습니다.');
+  }
+  return { duel: safeDuel(duelSnapshot.id, duel), outgoingChallengeTargetId: '' };
+}
+
+async function finalizeDuel(uid, body) {
+  const duelId = requireString(body.duelId, 'duelId');
+  const studentId = requireString(body.studentId, 'studentId');
+  await requireSession(uid, studentId);
+  const duelRef = publicCollection(PATHS.duels).doc(duelId);
+  let finalizedDuel;
+
+  await database().runTransaction(async (transaction) => {
+    const duelSnapshot = await transaction.get(duelRef);
+    if (!duelSnapshot.exists) throw new ApiError(404, 'api/not-found', '결투 기록을 찾을 수 없습니다.');
+    const duel = duelSnapshot.data();
+    if (!duel.participantStudentIds?.includes(studentId) || !duel.participantUids?.includes(uid)) {
+      throw new ApiError(403, 'api/permission-denied', '결투 결과를 확정할 권한이 없습니다.');
+    }
+    if (duel.status === 'completed') {
+      finalizedDuel = safeDuel(duelSnapshot.id, duel);
+      return;
+    }
+
+    const challengerScoreRef = publicCollection(PATHS.duelScores).doc(duel.challengerScoreId);
+    const targetScoreRef = publicCollection(PATHS.duelScores).doc(duel.targetScoreId);
+    const [challengerScoreSnapshot, targetScoreSnapshot] = await Promise.all([
+      transaction.get(challengerScoreRef),
+      transaction.get(targetScoreRef),
+    ]);
+    if (!challengerScoreSnapshot.exists || !targetScoreSnapshot.exists) {
+      throw new ApiError(404, 'api/not-found', '결투 점수 기록을 찾을 수 없습니다.');
+    }
+    const challengerScore = challengerScoreSnapshot.data();
+    const targetScore = targetScoreSnapshot.data();
+    const bothFinished = Boolean(challengerScore.finishedAt) && Boolean(targetScore.finishedAt);
+    if (Date.now() < toMillis(duel.endsAt) + DUEL_RULES.finalizeGraceMs && !bothFinished) {
+      throw new ApiError(409, 'api/failed-precondition', '아직 결투가 종료되지 않았습니다.');
+    }
+
+    const challengerRef = publicCollection(PATHS.classStudents).doc(duel.challengerStudentId);
+    const targetRef = publicCollection(PATHS.classStudents).doc(duel.targetStudentId);
+    const [challengerSnapshot, targetSnapshot] = await Promise.all([
+      transaction.get(challengerRef),
+      transaction.get(targetRef),
+    ]);
+    if (!challengerSnapshot.exists || !targetSnapshot.exists) {
+      throw new ApiError(404, 'api/not-found', '결투 참가 학생 정보를 찾을 수 없습니다.');
+    }
+    const challengerPoints = Math.max(0, Number(challengerSnapshot.data().totalPoints || 0));
+    const targetPoints = Math.max(0, Number(targetSnapshot.data().totalPoints || 0));
+    const challengerFinalScore = Number(challengerScore.score || 0);
+    const targetFinalScore = Number(targetScore.score || 0);
+    const isDraw = challengerFinalScore === targetFinalScore;
+    const winnerStudentId = isDraw
+      ? null
+      : challengerFinalScore > targetFinalScore
+        ? duel.challengerStudentId
+        : duel.targetStudentId;
+    const loserStudentId = isDraw
+      ? null
+      : winnerStudentId === duel.challengerStudentId
+        ? duel.targetStudentId
+        : duel.challengerStudentId;
+    const stake = Number(duel.stakePoints || DUEL_RULES.stakePoints);
+    const challengerRefund = isDraw ? stake : winnerStudentId === duel.challengerStudentId ? stake * 2 : 0;
+    const targetRefund = isDraw ? stake : winnerStudentId === duel.targetStudentId ? stake * 2 : 0;
+    const completedAt = Timestamp.now();
+    const completedDateKey = getKoreanDateKey(completedAt.toMillis());
+    const challengerDailyWinPoints = getDuelDailyWinPoints(challengerSnapshot.data(), completedDateKey);
+    const targetDailyWinPoints = getDuelDailyWinPoints(targetSnapshot.data(), completedDateKey);
+    const updates = {
+      status: 'completed',
+      result: isDraw ? 'draw' : 'win',
+      winnerStudentId,
+      loserStudentId,
+      pointTransfer: isDraw ? 0 : stake,
+      rewardDateKey: completedDateKey,
+      finalScores: {
+        challenger: {
+          studentId: duel.challengerStudentId,
+          nickname: duel.challengerName || '',
+          score: challengerFinalScore,
+          cpm: Number(challengerScore.cpm || 0),
+          correctChars: Number(challengerScore.correctChars || 0),
+          quizCorrectCount: Number(challengerScore.quizCorrectCount || 0),
+        },
+        target: {
+          studentId: duel.targetStudentId,
+          nickname: duel.targetName || '',
+          score: targetFinalScore,
+          cpm: Number(targetScore.cpm || 0),
+          correctChars: Number(targetScore.correctChars || 0),
+          quizCorrectCount: Number(targetScore.quizCorrectCount || 0),
+        },
+      },
+      completedAt,
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    transaction.update(challengerRef, {
+      totalPoints: challengerPoints + challengerRefund,
+      ...(winnerStudentId === duel.challengerStudentId ? {
+        duelDailyWinDate: completedDateKey,
+        duelDailyWinPoints: challengerDailyWinPoints + stake,
+      } : {}),
+      activeDuelId: FieldValue.delete(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    transaction.update(targetRef, {
+      totalPoints: targetPoints + targetRefund,
+      ...(winnerStudentId === duel.targetStudentId ? {
+        duelDailyWinDate: completedDateKey,
+        duelDailyWinPoints: targetDailyWinPoints + stake,
+      } : {}),
+      activeDuelId: FieldValue.delete(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    transaction.update(challengerScoreRef, { finalizedAt: completedAt, updatedAt: FieldValue.serverTimestamp() });
+    transaction.update(targetScoreRef, { finalizedAt: completedAt, updatedAt: FieldValue.serverTimestamp() });
+    transaction.update(duelRef, updates);
+    finalizedDuel = safeDuel(duelSnapshot.id, { ...duel, ...updates });
+  });
+
+  const { data: student } = await getActiveStudent(studentId);
+  return { duel: finalizedDuel, profile: await safeLoginProfile(studentId, student) };
+}
+
 async function syncPublicClassRoster(uid) {
   if (uid !== TEACHER_UID) throw new ApiError(403, 'api/permission-denied', '관리자 권한이 없습니다.');
   const students = await publicCollection(PATHS.classStudents).get();
@@ -629,6 +1127,11 @@ const actions = {
   finalizeStudentReward,
   recordPracticeCompletion,
   syncPublicClassRoster,
+  createDuelChallenge,
+  rejectDuelChallenge,
+  acceptDuelChallenge,
+  getActiveDuel,
+  finalizeDuel,
 };
 
 export default async function handler(request, response) {

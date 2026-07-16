@@ -13,4 +13,7 @@ export const FIRESTORE_PATHS = {
   shopItems: 'typing_shop_items',
   shopPurchases: 'typing_shop_purchases',
   practiceRecords: 'typing_practice_records',
+  duelChallenges: 'typing_duel_challenges',
+  duels: 'typing_duels',
+  duelScores: 'typing_duel_scores',
 };

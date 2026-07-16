@@ -38,3 +38,11 @@ export const recordPracticeCompletion = (studentId, practiceRunId, durationSec, 
   { studentId, practiceRunId, durationSec, correctChars, cpm },
 );
 export const syncPublicClassRoster = () => call('syncPublicClassRoster');
+export const createDuelChallenge = (targetStudentId) => call('createDuelChallenge', { targetStudentId });
+export const rejectDuelChallenge = (targetStudentId) => call('rejectDuelChallenge', { targetStudentId });
+export const acceptDuelChallenge = (targetStudentId, quizSequence) => call(
+  'acceptDuelChallenge',
+  { targetStudentId, quizSequence },
+);
+export const getActiveDuel = (studentId) => call('getActiveDuel', { studentId });
+export const finalizeDuel = (duelId, studentId) => call('finalizeDuel', { duelId, studentId });

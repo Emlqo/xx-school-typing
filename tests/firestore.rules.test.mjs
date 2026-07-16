@@ -261,6 +261,65 @@ describe('practice records', () => {
   });
 });
 
+describe('duel security boundary', () => {
+  test('student can watch their own duel inbox but cannot forge a challenge', async () => {
+    const db = testEnv.authenticatedContext(STUDENT_UID).firestore();
+    await assertSucceeds(getDoc(publicDoc(db, 'typing_duel_challenges', STUDENT_UID)));
+    await assertFails(setDoc(publicDoc(db, 'typing_duel_challenges', STUDENT_UID), {
+      status: 'pending',
+      participantUids: [STUDENT_UID, OTHER_UID],
+    }));
+  });
+
+  test('only duel participants and teacher can read duel records', async () => {
+    await seed('typing_duels', 'duel-1', {
+      status: 'playing',
+      participantUids: [STUDENT_UID, OTHER_UID],
+    });
+    const studentDb = testEnv.authenticatedContext(STUDENT_UID).firestore();
+    const outsiderDb = testEnv.authenticatedContext('outsider-uid').firestore();
+    const teacherDb = testEnv.authenticatedContext(TEACHER_UID).firestore();
+    await assertSucceeds(getDoc(publicDoc(studentDb, 'typing_duels', 'duel-1')));
+    await assertSucceeds(getDoc(publicDoc(teacherDb, 'typing_duels', 'duel-1')));
+    await assertFails(getDoc(publicDoc(outsiderDb, 'typing_duels', 'duel-1')));
+    await assertFails(updateDoc(publicDoc(studentDb, 'typing_duels', 'duel-1'), { status: 'completed' }));
+  });
+
+  test('student can update only their own allowed duel score fields', async () => {
+    const scoreData = {
+      duelId: 'duel-1',
+      studentId: 'student-1',
+      userId: STUDENT_UID,
+      participantUids: [STUDENT_UID, OTHER_UID],
+      score: 0,
+      cpm: 0,
+      correctChars: 0,
+      quizCorrectCount: 0,
+      wordIndex: 0,
+      quizIndex: 0,
+      wordCountSinceQuiz: 0,
+    };
+    await seed('typing_duel_scores', 'duel-1_student-1', scoreData);
+    const studentDb = testEnv.authenticatedContext(STUDENT_UID).firestore();
+    const otherDb = testEnv.authenticatedContext(OTHER_UID).firestore();
+    const scoreRef = publicDoc(studentDb, 'typing_duel_scores', 'duel-1_student-1');
+    await assertSucceeds(getDoc(scoreRef));
+    await assertSucceeds(updateDoc(scoreRef, {
+      score: 120,
+      cpm: 80,
+      correctChars: 12,
+      quizCorrectCount: 1,
+      wordIndex: 4,
+      quizIndex: 1,
+      wordCountSinceQuiz: 0,
+      updatedAt: new Date(),
+    }));
+    await assertFails(updateDoc(publicDoc(otherDb, 'typing_duel_scores', 'duel-1_student-1'), { score: 9999 }));
+    await assertFails(updateDoc(scoreRef, { studentId: 'student-2' }));
+    await assertFails(setDoc(publicDoc(studentDb, 'typing_duel_scores', 'forged'), scoreData));
+  });
+});
+
 test('unknown paths are denied', async () => {
   const db = testEnv.authenticatedContext(TEACHER_UID).firestore();
   await assertFails(setDoc(publicDoc(db, 'unknown_collection', 'doc-1'), { value: true }));

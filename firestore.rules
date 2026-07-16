@@ -38,6 +38,33 @@ service cloud.firestore {
       ]);
     }
 
+    function isDuelParticipant(data) {
+      return isSignedIn()
+        && data.participantUids is list
+        && request.auth.uid in data.participantUids;
+    }
+
+    function duelScoreIdentityIsUnchanged() {
+      return request.resource.data.userId == resource.data.userId
+        && request.resource.data.duelId == resource.data.duelId
+        && request.resource.data.studentId == resource.data.studentId
+        && request.resource.data.participantUids == resource.data.participantUids;
+    }
+
+    function duelScoreUpdateOnly() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'score',
+        'cpm',
+        'correctChars',
+        'quizCorrectCount',
+        'wordIndex',
+        'quizIndex',
+        'wordCountSinceQuiz',
+        'finishedAt',
+        'updatedAt'
+      ]);
+    }
+
     match /artifacts/{appId}/public/data/typing_announcements/{announcementId} {
       allow read: if isSupportedApp(appId) && isSignedIn();
       allow create, update, delete: if isSupportedApp(appId) && isTeacher();
@@ -121,6 +148,29 @@ service cloud.firestore {
     match /artifacts/{appId}/public/data/typing_practice_records/{recordId} {
       allow read: if isSupportedApp(appId) && isTeacher();
       allow create, update, delete: if false;
+    }
+
+    match /artifacts/{appId}/public/data/typing_duel_challenges/{inboxUserId} {
+      allow read: if isSupportedApp(appId)
+        && (isTeacher() || request.auth.uid == inboxUserId || isDuelParticipant(resource.data));
+      allow create, update, delete: if false;
+    }
+
+    match /artifacts/{appId}/public/data/typing_duels/{duelId} {
+      allow read: if isSupportedApp(appId)
+        && (isTeacher() || isDuelParticipant(resource.data));
+      allow create, update, delete: if false;
+    }
+
+    match /artifacts/{appId}/public/data/typing_duel_scores/{scoreId} {
+      allow read: if isSupportedApp(appId)
+        && (isTeacher() || isDuelParticipant(resource.data));
+      allow update: if isSupportedApp(appId)
+        && isDuelParticipant(resource.data)
+        && resource.data.userId == request.auth.uid
+        && duelScoreIdentityIsUnchanged()
+        && duelScoreUpdateOnly();
+      allow create, delete: if false;
     }
 
     match /artifacts/{appId}/users/{userId}/{document=**} {

@@ -20,13 +20,18 @@ import { FIRESTORE_PATHS } from './constants/firestorePaths.js';
 import { db, signInTeacherWithGoogle, signOutFirebaseUser } from './services/firebaseClient.js';
 import {
   buyStudentShopItem,
+  acceptDuelChallenge,
+  createDuelChallenge,
   equipStudentCosmetic,
+  finalizeDuel,
   finalizeStudentReward,
+  getActiveDuel,
   getStudentSession,
   joinClassGame,
   joinGuestGame,
   logoutStudentSession,
   recordPracticeCompletion,
+  rejectDuelChallenge,
   setInitialStudentLoginPin,
   setInitialStudentPin,
   syncPublicClassRoster,
@@ -37,14 +42,19 @@ import { getPublicCollection, getPublicDoc } from './utils/firestoreRefs.js';
 import { calculateHallOfFame, getMonthKey } from './utils/hallOfFame.js';
 import { calculateCpm, calculateQuizScore, calculateTypingScore, getQuizWrongPenalty } from './utils/scoring.js';
 import { formatTime } from './utils/format.js';
-import { normalizeClassStudent } from './utils/classStudents.js';
+import { getCurrentDuelDailyWinPoints, normalizeClassStudent } from './utils/classStudents.js';
+import { DUEL_RULES } from './constants/duelRules.js';
 import { verifyTeacherPassword } from './utils/teacherAuth.js';
 import { PRACTICE_RECORD_RULES } from './constants/rewards.js';
 import { calculateRankRewards, getDefaultRewardState } from './utils/rewards.js';
+import { createDuelQuizSequence, getDuelRemainingSeconds, getDuelWord, toDuelMillis } from './utils/duel.js';
 import useAnnouncements from './hooks/useAnnouncements.js';
 import useClasses from './hooks/useClasses.js';
 import useClassStudents from './hooks/useClassStudents.js';
 import useFirebaseAuth from './hooks/useFirebaseAuth.js';
+import useDuel from './hooks/useDuel.js';
+import useDuelChallenge from './hooks/useDuelChallenge.js';
+import useDuelScores from './hooks/useDuelScores.js';
 import useMonthlyScores from './hooks/useMonthlyScores.js';
 import useOpenClassRooms from './hooks/useOpenClassRooms.js';
 import useQuizzes from './hooks/useQuizzes.js';
@@ -58,6 +68,9 @@ import useTeacherRooms from './hooks/useTeacherRooms.js';
 import useWords from './hooks/useWords.js';
 import LoginView from './components/views/LoginView.jsx';
 import EntryView from './components/views/EntryView.jsx';
+import DuelChallengeView from './components/views/DuelChallengeView.jsx';
+import DuelCountdownView from './components/views/DuelCountdownView.jsx';
+import DuelResultView from './components/views/DuelResultView.jsx';
 import PlayingView from './components/views/PlayingView.jsx';
 import ResultView from './components/views/ResultView.jsx';
 import StudentLobbyView from './components/views/StudentLobbyView.jsx';
@@ -67,6 +80,8 @@ import StudentRoomEntryView from './components/views/StudentRoomEntryView.jsx';
 import TeacherDashboardView from './components/views/TeacherDashboardView.jsx';
 import TeacherLoginView from './components/views/TeacherLoginView.jsx';
 import WaitingView from './components/views/WaitingView.jsx';
+import DuelChallengeModal from './components/duel/DuelChallengeModal.jsx';
+import DuelOutgoingModal from './components/duel/DuelOutgoingModal.jsx';
 
 const TEACHER_PATH = '/teacher';
 
@@ -132,6 +147,12 @@ export default function App() {
   const [studentSessionChecked, setStudentSessionChecked] = useState(false);
   const [hallOfFameMonthKey, setHallOfFameMonthKey] = useState(() => getMonthKey(new Date()));
   const [lastReward, setLastReward] = useState(() => getDefaultRewardState());
+  const [duelClassId, setDuelClassId] = useState('');
+  const [outgoingDuelTargetId, setOutgoingDuelTargetId] = useState('');
+  const [activeDuelId, setActiveDuelId] = useState('');
+  const [duelResultData, setDuelResultData] = useState(null);
+  const [isDuelMode, setIsDuelMode] = useState(false);
+  const [duelProcessing, setDuelProcessing] = useState(false);
   const [localRooms] = useState([]);
   const [localScores, setLocalScores] = useState([]);
   const [localAnnouncements] = useState([]);
@@ -150,6 +171,11 @@ export default function App() {
   const isEndingRef = useRef(false);
   const practiceRunIdRef = useRef('');
   const autoAnnouncementShownRef = useRef(false);
+  const duelWordIndexRef = useRef(0);
+  const duelQuizIndexRef = useRef(0);
+  const duelSyncDirtyRef = useRef(false);
+  const duelSyncPromiseRef = useRef(null);
+  const duelRecoveryStudentRef = useRef('');
 
   const { user, authReady } = useFirebaseAuth();
   const teacherAuthorized = useMemo(() => isTeacherUser(user), [user]);
@@ -158,7 +184,8 @@ export default function App() {
   const { announcements: subscribedAnnouncements } = useAnnouncements({ user: scopedUser, enabled: firestoreReadsEnabled });
   const { quizzes: subscribedQuizzes } = useQuizzes({ user: scopedUser, enabled: firestoreReadsEnabled });
   const { rooms: subscribedRooms } = useTeacherRooms({ user: scopedUser, view, enabled: firestoreReadsEnabled });
-  const { words } = useWords({ user: scopedUser, view, isPracticeMode, enabled: firestoreReadsEnabled });
+  const wordsView = isDuelMode && view === 'playing' ? 'duelPlaying' : view;
+  const { words } = useWords({ user: scopedUser, view: wordsView, isPracticeMode, enabled: firestoreReadsEnabled });
   const { classes } = useClasses({ user: scopedUser, view, isPracticeMode, enabled: firestoreReadsEnabled });
   const { openClassRooms } = useOpenClassRooms({ user: scopedUser, view, isPracticeMode, enabled: firestoreReadsEnabled });
   const selectedOpenClassRoom = useMemo(
@@ -170,6 +197,8 @@ export default function App() {
     view,
     classId: view === 'studentLogin'
       ? studentLoginClassId
+      : view === 'duelChallenge'
+        ? duelClassId
       : view === 'studentLobby'
         ? selectedOpenClassRoom?.classId || ''
         : selectedClassId,
@@ -222,6 +251,32 @@ export default function App() {
     isPracticeMode,
     enabled: firestoreReadsEnabled && (view === 'teacher' || view === 'hallOfFame'),
   });
+  const { incomingChallenge, outgoingChallenge } = useDuelChallenge({
+    user: scopedUser,
+    studentId: user?.uid || '',
+    outgoingTargetStudentId: outgoingDuelTargetId,
+    enabled: Boolean(studentProfile)
+      && !isPracticeMode
+      && (view === 'login' || view === 'duelChallenge'),
+  });
+  const { duel: activeDuel } = useDuel({
+    user: scopedUser,
+    duelId: activeDuelId,
+    enabled: Boolean(studentProfile) && !isPracticeMode,
+  });
+  const { duelScores } = useDuelScores({
+    user: scopedUser,
+    duel: activeDuel,
+    enabled: Boolean(studentProfile) && !isPracticeMode,
+  });
+  const myDuelScore = useMemo(
+    () => duelScores.find((item) => item.studentId === studentProfile?.id) || null,
+    [duelScores, studentProfile?.id],
+  );
+  const opponentDuelScore = useMemo(
+    () => duelScores.find((item) => item.studentId !== studentProfile?.id) || null,
+    [duelScores, studentProfile?.id],
+  );
 
   useEffect(() => {
     if (!authReady) return undefined;
@@ -268,6 +323,55 @@ export default function App() {
       cancelled = true;
     };
   }, [authReady, user?.isAnonymous, user?.uid]);
+
+  useEffect(() => {
+    const studentId = studentProfile?.id || '';
+    if (!studentId || duelRecoveryStudentRef.current === studentId) return;
+    duelRecoveryStudentRef.current = studentId;
+
+    getActiveDuel(studentId)
+      .then((result) => {
+        if (result?.duel?.id) {
+          setActiveDuelId(result.duel.id);
+          setIsDuelMode(result.duel.status !== 'completed');
+          setView(result.duel.status === 'completed' ? 'duelResult' : 'duelCountdown');
+          return;
+        }
+        if (result?.outgoingChallengeTargetId) {
+          setOutgoingDuelTargetId(result.outgoingChallengeTargetId);
+        }
+      })
+      .catch((error) => console.error('결투 상태를 복구하지 못했습니다.', error));
+  }, [studentProfile?.id]);
+
+  useEffect(() => {
+    const relevantIncoming = incomingChallenge?.targetStudentId === studentProfile?.id
+      ? incomingChallenge
+      : null;
+    const relevantOutgoing = outgoingChallenge?.challengerStudentId === studentProfile?.id
+      ? outgoingChallenge
+      : null;
+    const acceptedChallenge = [relevantIncoming, relevantOutgoing]
+      .find((challenge) => challenge?.status === 'accepted' && challenge.duelId);
+    if (!acceptedChallenge?.duelId) return;
+    setActiveDuelId(acceptedChallenge.duelId);
+    setIsDuelMode(true);
+    setView((currentView) => (
+      currentView === 'duelResult' ? currentView : 'duelCountdown'
+    ));
+  }, [incomingChallenge, outgoingChallenge, studentProfile?.id]);
+
+  useEffect(() => {
+    if (!activeDuel || activeDuel.status !== 'completed') return;
+    setDuelResultData(activeDuel);
+    setIsDuelMode(false);
+    setView('duelResult');
+    getStudentSession()
+      .then((result) => {
+        if (result?.profile) setStudentProfile(normalizeClassStudent(result.profile));
+      })
+      .catch((error) => console.error(error));
+  }, [activeDuel]);
 
   useEffect(() => {
     if (!studentProfile || !studentSessionExpiresAt) return undefined;
@@ -427,6 +531,32 @@ export default function App() {
     setInputValue('');
   }, [customWordPools, gameMode, isPracticeMode]);
 
+  const pickDuelContent = useCallback(() => {
+    if (!activeDuel) return;
+    const quizSequence = Array.isArray(activeDuel.quizSequence) ? activeDuel.quizSequence : [];
+
+    if (
+      wordCountRef.current >= GAME_RULES.quizIntervalWords
+      && duelQuizIndexRef.current < quizSequence.length
+    ) {
+      const nextQuiz = quizSequence[duelQuizIndexRef.current];
+      duelQuizIndexRef.current += 1;
+      wordCountRef.current = 0;
+      setCurrentQuiz(nextQuiz);
+      setCurrentWord('');
+      setInputValue('');
+      duelSyncDirtyRef.current = true;
+      return;
+    }
+
+    const nextWord = getDuelWord(activeDuel.randomSeed, duelWordIndexRef.current);
+    duelWordIndexRef.current += 1;
+    setCurrentQuiz(null);
+    setCurrentWord(nextWord);
+    setInputValue('');
+    duelSyncDirtyRef.current = true;
+  }, [activeDuel]);
+
   const resetPlayingState = useCallback(({ practiceMode, duration = 300, mode = 'mixed' }) => {
     setScore(0);
     setCorrectChars(0);
@@ -455,6 +585,7 @@ export default function App() {
     lastProcessedSyncRef.current = 0;
     lastSyncedScoreRef.current = 0;
     isEndingRef.current = false;
+    setIsDuelMode(false);
   }, []);
 
   const restoreScoreState = (scoreData = {}) => {
@@ -470,6 +601,29 @@ export default function App() {
     latestQuizCorrectCountRef.current = restoredQuizCorrectCount;
     lastSyncedScoreRef.current = restoredScore;
   };
+
+  const startDuelGame = useCallback(() => {
+    if (!activeDuel || !myDuelScore || !studentProfile?.id) return;
+    const remainingSeconds = getDuelRemainingSeconds(activeDuel);
+    resetPlayingState({ practiceMode: false, duration: 300, mode: 'mixed' });
+    setIsDuelMode(true);
+    setSelectedRoomId('');
+    setCurrentScoreDocId(null);
+    setMyRoomData(null);
+    restoreScoreState(myDuelScore);
+    duelWordIndexRef.current = Math.max(0, Number(myDuelScore.wordIndex || 0));
+    duelQuizIndexRef.current = Math.max(0, Number(myDuelScore.quizIndex || 0));
+    wordCountRef.current = Math.max(0, Number(myDuelScore.wordCountSinceQuiz || 0));
+    setTimeLeft(remainingSeconds);
+    gameInfoRef.current.elapsed = Math.max(0, 300 - remainingSeconds);
+    isEndingRef.current = false;
+    if (remainingSeconds <= 0) {
+      setView('duelFinishing');
+      return;
+    }
+    pickDuelContent();
+    setView('playing');
+  }, [activeDuel, myDuelScore, pickDuelContent, resetPlayingState, studentProfile?.id]);
 
   const startPractice = useCallback(() => {
     if (!nickname.trim()) {
@@ -601,10 +755,76 @@ export default function App() {
     }
   }, [pickRandomWord, quizzes, resetPlayingState, selectedOpenClassRoom, user]);
 
+  const syncDuelScore = useCallback(async ({ finished = false } = {}) => {
+    if (!isDuelMode || !myDuelScore?.id || !db) return;
+    if (duelSyncPromiseRef.current) await duelSyncPromiseRef.current;
+    if (!finished && !duelSyncDirtyRef.current) return;
+    const elapsedSeconds = Math.max(1, gameInfoRef.current.elapsed || 1);
+    const captured = {
+      score: latestScoreRef.current,
+      correctChars: latestCharsRef.current,
+      quizCorrectCount: latestQuizCorrectCountRef.current,
+      wordIndex: duelWordIndexRef.current,
+      quizIndex: duelQuizIndexRef.current,
+      wordCountSinceQuiz: wordCountRef.current,
+    };
+    const finalCpm = calculateCpm({ chars: captured.correctChars, seconds: elapsedSeconds });
+    const scoreRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.duelScores, myDuelScore.id);
+    const updates = {
+      score: captured.score,
+      cpm: finalCpm,
+      correctChars: captured.correctChars,
+      quizCorrectCount: captured.quizCorrectCount,
+      wordIndex: captured.wordIndex,
+      quizIndex: captured.quizIndex,
+      wordCountSinceQuiz: captured.wordCountSinceQuiz,
+      updatedAt: serverTimestamp(),
+    };
+    if (finished) updates.finishedAt = serverTimestamp();
+    const syncPromise = updateDoc(scoreRef, updates);
+    duelSyncPromiseRef.current = syncPromise;
+    try {
+      await syncPromise;
+      duelSyncDirtyRef.current = latestScoreRef.current !== captured.score
+        || latestCharsRef.current !== captured.correctChars
+        || latestQuizCorrectCountRef.current !== captured.quizCorrectCount
+        || duelWordIndexRef.current !== captured.wordIndex
+        || duelQuizIndexRef.current !== captured.quizIndex
+        || wordCountRef.current !== captured.wordCountSinceQuiz;
+    } finally {
+      duelSyncPromiseRef.current = null;
+    }
+  }, [isDuelMode, myDuelScore?.id]);
+
   const endGame = useCallback(async () => {
     if (isEndingRef.current) return;
     isEndingRef.current = true;
     setBoosterActive(false);
+
+    if (isDuelMode && activeDuel?.id && studentProfile?.id) {
+      setView('duelFinishing');
+      try {
+        await syncDuelScore({ finished: true });
+        let finalized = null;
+        for (let attempt = 0; attempt < 6 && !finalized; attempt += 1) {
+          try {
+            finalized = await finalizeDuel(activeDuel.id, studentProfile.id);
+          } catch (error) {
+            if (error.code !== 'api/failed-precondition' || attempt === 5) throw error;
+            await new Promise((resolve) => window.setTimeout(resolve, 700));
+          }
+        }
+        if (finalized?.profile) setStudentProfile(normalizeClassStudent(finalized.profile));
+        if (finalized?.duel) setDuelResultData(finalized.duel);
+        setView('duelResult');
+      } catch (error) {
+        console.error(error);
+        isEndingRef.current = false;
+        alert('결투 결과를 확정하는 중 오류가 발생했습니다. 잠시 후 다시 시도합니다.');
+      }
+      return;
+    }
+
     setView('result');
 
     if (isPracticeMode) {
@@ -681,7 +901,7 @@ export default function App() {
     } catch (error) {
       console.error(error);
     }
-  }, [currentScoreDocId, gameDuration, isPracticeMode, scores, studentProfile?.id]);
+  }, [activeDuel?.id, currentScoreDocId, gameDuration, isDuelMode, isPracticeMode, scores, studentProfile?.id, syncDuelScore]);
 
   const handleKeyDown = useCallback((event) => {
     if (event.key === 'Backspace') {
@@ -695,7 +915,7 @@ export default function App() {
     event.preventDefault();
 
     if (inputValue.trim() === currentWord) {
-      const myInfo = scores.find((item) => item.id === currentScoreDocId) || {};
+      const myInfo = isDuelMode ? myDuelScore || {} : scores.find((item) => item.id === currentScoreDocId) || {};
       const nextCombo = combo + 1;
       const earned = calculateTypingScore({
         word: currentWord,
@@ -714,18 +934,20 @@ export default function App() {
       playComboSound();
       window.setTimeout(() => setShowSuccess(false), 700);
       wordCountRef.current += 1;
-      pickRandomWord(gameMode);
+      duelSyncDirtyRef.current = isDuelMode || duelSyncDirtyRef.current;
+      if (isDuelMode) pickDuelContent();
+      else pickRandomWord(gameMode);
       return;
     }
 
     setCombo(0);
     setIsError(true);
-  }, [boosterActive, combo, currentQuiz, currentScoreDocId, currentWord, gameMode, inputValue, pickRandomWord, playComboSound, scores]);
+  }, [boosterActive, combo, currentQuiz, currentScoreDocId, currentWord, gameMode, inputValue, isDuelMode, myDuelScore, pickDuelContent, pickRandomWord, playComboSound, scores]);
 
   const handleQuizAnswer = useCallback((answerIndex) => {
     if (!currentQuiz) return;
 
-    const myInfo = scores.find((item) => item.id === currentScoreDocId) || {};
+    const myInfo = isDuelMode ? myDuelScore || {} : scores.find((item) => item.id === currentScoreDocId) || {};
 
     if (answerIndex === currentQuiz.answer) {
       const earned = calculateQuizScore({
@@ -751,13 +973,15 @@ export default function App() {
     }
 
     setCurrentQuiz(null);
-    pickRandomWord(gameMode);
-  }, [boosterActive, currentQuiz, currentScoreDocId, gameMode, pickRandomWord, scores]);
+    duelSyncDirtyRef.current = isDuelMode || duelSyncDirtyRef.current;
+    if (isDuelMode) pickDuelContent();
+    else pickRandomWord(gameMode);
+  }, [boosterActive, currentQuiz, currentScoreDocId, gameMode, isDuelMode, myDuelScore, pickDuelContent, pickRandomWord, scores]);
 
   const activateBooster = useCallback(() => {
     if (!boosterAvailable || boosterActive) return;
 
-    const myInfo = scores.find((item) => item.id === currentScoreDocId) || {};
+    const myInfo = isDuelMode ? myDuelScore || {} : scores.find((item) => item.id === currentScoreDocId) || {};
     if (myInfo.boosterEnabled === false) {
       alert('선생님이 부스터 사용을 비활성화했습니다.');
       return;
@@ -766,7 +990,7 @@ export default function App() {
     setBoosterActive(true);
     setBoosterAvailable(false);
     setBoosterTimeLeft(GAME_RULES.boosterDuration);
-  }, [boosterActive, boosterAvailable, currentScoreDocId, scores]);
+  }, [boosterActive, boosterAvailable, currentScoreDocId, isDuelMode, myDuelScore, scores]);
 
   useStudentRoomWatcher({
     user,
@@ -818,27 +1042,44 @@ export default function App() {
     latestScoreRef.current = score;
     latestCharsRef.current = correctChars;
     latestQuizCorrectCountRef.current = quizCorrectCount;
-  }, [correctChars, quizCorrectCount, score]);
+    if (isDuelMode && view === 'playing') duelSyncDirtyRef.current = true;
+  }, [correctChars, isDuelMode, quizCorrectCount, score, view]);
+
+  useEffect(() => {
+    if (!isDuelMode || view !== 'playing' || !myDuelScore?.id) return undefined;
+    const timer = window.setInterval(() => {
+      if (!duelSyncDirtyRef.current) return;
+      syncDuelScore().catch((error) => console.error('결투 점수 동기화 오류', error));
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [isDuelMode, myDuelScore?.id, syncDuelScore, view]);
 
   useEffect(() => {
     if (view !== 'playing') return undefined;
 
     const timer = window.setInterval(() => {
       setTimeLeft((prevTimeLeft) => {
-        const nextTimeLeft = Math.max(prevTimeLeft - 1, 0);
+        const nextTimeLeft = isDuelMode
+          ? getDuelRemainingSeconds(activeDuel)
+          : Math.max(prevTimeLeft - 1, 0);
         gameInfoRef.current.elapsed = gameDuration - nextTimeLeft;
         return nextTimeLeft;
       });
     }, 1000);
 
     return () => window.clearInterval(timer);
-  }, [gameDuration, view]);
+  }, [activeDuel, gameDuration, isDuelMode, view]);
 
   useEffect(() => {
     if (view === 'playing' && timeLeft <= 0) {
       endGame();
     }
   }, [endGame, timeLeft, view]);
+
+  useEffect(() => {
+    if (view !== 'duelFinishing' || !isDuelMode || isEndingRef.current) return;
+    endGame();
+  }, [endGame, isDuelMode, view]);
 
   useEffect(() => {
     if (!boosterActive) return undefined;
@@ -1497,6 +1738,7 @@ export default function App() {
     setStudentSessionExpiresAt(Number(result.sessionExpiresAt));
     setNickname(profile.name || '');
     setStudentLoginClassId(profile.classId || '');
+    duelRecoveryStudentRef.current = '';
     setIsPracticeMode(false);
     setView('login');
     return true;
@@ -1520,6 +1762,10 @@ export default function App() {
     setStudentSessionExpiresAt(0);
     setStudentLoginClassId('');
     setNickname('');
+    setOutgoingDuelTargetId('');
+    setActiveDuelId('');
+    setIsDuelMode(false);
+    duelRecoveryStudentRef.current = '';
     setView('entry');
   };
 
@@ -1541,6 +1787,76 @@ export default function App() {
 
     return null;
   }, [studentProfile?.id]);
+
+  const handleCreateDuelChallenge = async (targetStudent) => {
+    if (!studentProfile?.id || !targetStudent?.id || duelProcessing) return;
+    if (Number(studentProfile.totalPoints || 0) < DUEL_RULES.stakePoints) {
+      alert('결투를 신청하려면 최소 5P가 필요합니다.');
+      return;
+    }
+    if (getCurrentDuelDailyWinPoints(studentProfile) >= DUEL_RULES.dailyWinPointLimit) {
+      alert('오늘 결투 획득 한도 15P를 모두 채웠습니다. 자정 이후 다시 도전하세요.');
+      return;
+    }
+
+    setDuelProcessing(true);
+    try {
+      const result = await createDuelChallenge(targetStudent.id);
+      setOutgoingDuelTargetId(result?.challenge?.id || '');
+      setView('login');
+    } catch (error) {
+      console.error(error);
+      const messages = {
+        'api/failed-precondition': error.message,
+        'api/already-exists': error.message,
+        'api/permission-denied': '학생 로그인 시간이 만료되었습니다. 다시 로그인해주세요.',
+      };
+      alert(messages[error.code] || '결투 신청을 보내지 못했습니다.');
+    } finally {
+      setDuelProcessing(false);
+    }
+  };
+
+  const handleRejectDuelChallenge = async () => {
+    if (!studentProfile?.id || duelProcessing) return;
+    setDuelProcessing(true);
+    try {
+      await rejectDuelChallenge(studentProfile.id);
+    } catch (error) {
+      console.error(error);
+      alert('결투 신청을 거절하는 중 오류가 발생했습니다.');
+    } finally {
+      setDuelProcessing(false);
+    }
+  };
+
+  const handleAcceptDuelChallenge = async () => {
+    if (!studentProfile?.id || duelProcessing) return;
+    if (getCurrentDuelDailyWinPoints(studentProfile) >= DUEL_RULES.dailyWinPointLimit) {
+      alert('오늘 결투 획득 한도 15P를 모두 채웠습니다. 자정 이후 다시 도전하세요.');
+      return;
+    }
+    setDuelProcessing(true);
+    try {
+      const result = await acceptDuelChallenge(
+        studentProfile.id,
+        createDuelQuizSequence(quizzes),
+      );
+      if (!result?.duel?.id) throw new Error('결투 생성 결과가 없습니다.');
+      setActiveDuelId(result.duel.id);
+      setDuelResultData(null);
+      setIsDuelMode(true);
+      setOutgoingDuelTargetId('');
+      const refreshed = await getStudentSession();
+      if (refreshed?.profile) setStudentProfile(normalizeClassStudent(refreshed.profile));
+      setView('duelCountdown');
+    } catch (error) {
+      console.error(error);
+      alert(error.message || '결투를 시작하지 못했습니다.');
+    } finally {
+      setDuelProcessing(false);
+    }
+  };
 
   const handleSyncPublicRoster = async () => {
     if (!requireTeacherAccess()) return;
@@ -1910,6 +2226,21 @@ export default function App() {
     );
   }
 
+  if (view === 'duelChallenge' && studentProfile) {
+    return (
+      <DuelChallengeView
+        student={studentProfile}
+        classes={classes}
+        students={classStudents}
+        selectedClassId={duelClassId}
+        setSelectedClassId={setDuelClassId}
+        isSubmitting={duelProcessing}
+        onChallenge={handleCreateDuelChallenge}
+        onBack={() => setView('login')}
+      />
+    );
+  }
+
   if (view === 'studentLobby') {
     return (
       <StudentLobbyView
@@ -1959,6 +2290,54 @@ export default function App() {
     );
   }
 
+  if (view === 'duelCountdown' && studentProfile) {
+    if (!activeDuel || !myDuelScore) {
+      return (
+        <div className="min-h-screen spring-bg flex items-center justify-center p-4">
+          <div className="glass-box rounded-3xl p-10 text-center font-black text-gray-600 shadow-xl">
+            ⚔️ 결투 경기장을 준비하고 있습니다...
+          </div>
+        </div>
+      );
+    }
+    return (
+      <DuelCountdownView
+        duel={activeDuel}
+        studentId={studentProfile.id}
+        onReady={startDuelGame}
+      />
+    );
+  }
+
+  if (view === 'duelFinishing') {
+    return (
+      <div className="min-h-screen spring-bg flex items-center justify-center p-4">
+        <div className="glass-box rounded-3xl p-10 text-center max-w-md w-full shadow-2xl border border-rose-100">
+          <div className="text-6xl animate-pulse mb-4">⚔️</div>
+          <h1 className="text-2xl font-black text-gray-800">결투 결과 확정 중</h1>
+          <p className="text-sm font-bold text-gray-500 mt-2">두 선수의 마지막 점수와 포인트를 안전하게 처리하고 있습니다.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (view === 'duelResult' && studentProfile) {
+    return (
+      <DuelResultView
+        duel={duelResultData || activeDuel}
+        studentId={studentProfile.id}
+        onHome={() => {
+          setActiveDuelId('');
+          setDuelResultData(null);
+          setOutgoingDuelTargetId('');
+          setIsDuelMode(false);
+          isEndingRef.current = false;
+          setView('login');
+        }}
+      />
+    );
+  }
+
   if (view === 'playing') {
     return (
       <PlayingView
@@ -1982,6 +2361,13 @@ export default function App() {
         boosterTimeLeft={boosterTimeLeft}
         activateBooster={activateBooster}
         inputRef={inputRef}
+        duelInfo={isDuelMode && activeDuel ? {
+          myName: studentProfile?.name || nickname,
+          opponentName: activeDuel.challengerStudentId === studentProfile?.id
+            ? activeDuel.targetName
+            : activeDuel.challengerName,
+          opponentScore: Number(opponentDuelScore?.score || 0),
+        } : null}
       />
     );
   }
@@ -2132,25 +2518,47 @@ export default function App() {
   }
 
   return (
-    <LoginView
-      announcements={announcements}
-      showAnnouncementModal={showAnnouncementModal}
-      setShowAnnouncementModal={setShowAnnouncementModal}
-      onStudentClick={() => {
-        setIsPracticeMode(false);
-        setView('studentRoomEntry');
-      }}
-      onPracticeClick={startPractice}
-      onGuestClick={() => setView('studentLobby')}
-      onHallOfFameClick={() => setView('hallOfFame')}
-      onStudentLogout={handleStudentLogout}
-      onTeacherClick={openTeacherLogin}
-      studentProfile={studentProfile}
-      shopItems={shopItems}
-      onBuyCosmetic={handleBuyCosmetic}
-      onBuyStockItem={handleBuyStockItem}
-      onEquipCosmetic={handleEquipCosmetic}
-      onRefreshStudentProfile={refreshStudentProfile}
-    />
+    <>
+      <LoginView
+        announcements={announcements}
+        showAnnouncementModal={showAnnouncementModal}
+        setShowAnnouncementModal={setShowAnnouncementModal}
+        onStudentClick={() => {
+          setIsPracticeMode(false);
+          setView('studentRoomEntry');
+        }}
+        onPracticeClick={startPractice}
+        onGuestClick={() => setView('studentLobby')}
+        onHallOfFameClick={() => setView('hallOfFame')}
+        onDuelClick={() => {
+          setDuelClassId('');
+          setView('duelChallenge');
+        }}
+        onStudentLogout={handleStudentLogout}
+        onTeacherClick={openTeacherLogin}
+        studentProfile={studentProfile}
+        shopItems={shopItems}
+        onBuyCosmetic={handleBuyCosmetic}
+        onBuyStockItem={handleBuyStockItem}
+        onEquipCosmetic={handleEquipCosmetic}
+        onRefreshStudentProfile={refreshStudentProfile}
+      />
+      {view === 'login' && (
+        <DuelChallengeModal
+          challenge={incomingChallenge?.targetStudentId === studentProfile?.id ? incomingChallenge : null}
+          isProcessing={duelProcessing}
+          canAccept={getCurrentDuelDailyWinPoints(studentProfile) < DUEL_RULES.dailyWinPointLimit}
+          disabledReason="오늘 결투 획득 한도 15P를 모두 채워 수락할 수 없습니다."
+          onAccept={handleAcceptDuelChallenge}
+          onReject={handleRejectDuelChallenge}
+        />
+      )}
+      {view === 'login' && outgoingDuelTargetId && (
+        <DuelOutgoingModal
+          challenge={outgoingChallenge?.challengerStudentId === studentProfile?.id ? outgoingChallenge : null}
+          onClose={() => setOutgoingDuelTargetId('')}
+        />
+      )}
+    </>
   );
 }
