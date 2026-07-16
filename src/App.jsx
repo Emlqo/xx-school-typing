@@ -354,6 +354,7 @@ export default function App() {
     const acceptedChallenge = [relevantIncoming, relevantOutgoing]
       .find((challenge) => challenge?.status === 'accepted' && challenge.duelId);
     if (!acceptedChallenge?.duelId) return;
+    if (toDuelMillis(acceptedChallenge.expiresAt) <= Date.now()) return;
     setActiveDuelId(acceptedChallenge.duelId);
     setIsDuelMode(true);
     setView((currentView) => (
@@ -362,7 +363,7 @@ export default function App() {
   }, [incomingChallenge, outgoingChallenge, studentProfile?.id]);
 
   useEffect(() => {
-    if (!activeDuel || activeDuel.status !== 'completed') return;
+    if (!activeDuelId || !activeDuel || activeDuel.status !== 'completed') return;
     setDuelResultData(activeDuel);
     setIsDuelMode(false);
     setView('duelResult');
@@ -371,7 +372,7 @@ export default function App() {
         if (result?.profile) setStudentProfile(normalizeClassStudent(result.profile));
       })
       .catch((error) => console.error(error));
-  }, [activeDuel]);
+  }, [activeDuel, activeDuelId]);
 
   useEffect(() => {
     if (!studentProfile || !studentSessionExpiresAt) return undefined;
