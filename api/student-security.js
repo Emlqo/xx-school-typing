@@ -173,6 +173,25 @@ function safeDuel(duelId, data = {}) {
   };
 }
 
+function safeDuelHistoryItem(duelId, data = {}) {
+  return {
+    id: duelId,
+    status: data.status || '',
+    result: data.result || '',
+    challengerStudentId: data.challengerStudentId || '',
+    challengerName: data.challengerName || '',
+    challengerClassName: data.challengerClassName || '',
+    targetStudentId: data.targetStudentId || '',
+    targetName: data.targetName || '',
+    targetClassName: data.targetClassName || '',
+    winnerStudentId: data.winnerStudentId || null,
+    loserStudentId: data.loserStudentId || null,
+    pointTransfer: Math.max(0, Number(data.pointTransfer || 0)),
+    finalScores: data.finalScores || null,
+    completedAt: toMillis(data.completedAt),
+  };
+}
+
 function sanitizeQuizSequence(value) {
   if (!Array.isArray(value)) return [];
   return value.slice(0, 50).map((quiz, index) => {
@@ -964,6 +983,33 @@ async function getActiveDuel(uid, body) {
   return { duel: safeDuel(duelSnapshot.id, duel), outgoingChallengeTargetId: '' };
 }
 
+async function getDuelHistory(uid, body) {
+  const studentId = requireString(body.studentId, 'studentId');
+  await requireSession(uid, studentId);
+  const cursorMillis = Math.max(0, Number(body.cursorMillis || 0));
+
+  let historyQuery = publicCollection(PATHS.duels)
+    .where('participantStudentIds', 'array-contains', studentId)
+    .where('status', '==', 'completed')
+    .orderBy('completedAt', 'desc')
+    .limit(10);
+  if (cursorMillis > 0) {
+    historyQuery = historyQuery.startAfter(Timestamp.fromMillis(cursorMillis));
+  }
+
+  const snapshot = await historyQuery.get();
+  const records = snapshot.docs.map((duelSnapshot) => (
+    safeDuelHistoryItem(duelSnapshot.id, duelSnapshot.data())
+  ));
+  const lastRecord = records[records.length - 1] || null;
+
+  return {
+    records,
+    nextCursorMillis: records.length === 10 ? Number(lastRecord?.completedAt || 0) : 0,
+    hasMore: records.length === 10,
+  };
+}
+
 async function finalizeDuel(uid, body) {
   const duelId = requireString(body.duelId, 'duelId');
   const studentId = requireString(body.studentId, 'studentId');
@@ -1131,6 +1177,7 @@ const actions = {
   rejectDuelChallenge,
   acceptDuelChallenge,
   getActiveDuel,
+  getDuelHistory,
   finalizeDuel,
 };
 

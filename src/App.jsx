@@ -26,6 +26,7 @@ import {
   finalizeDuel,
   finalizeStudentReward,
   getActiveDuel,
+  getDuelHistory,
   getStudentSession,
   joinClassGame,
   joinGuestGame,
@@ -71,6 +72,7 @@ import EntryView from './components/views/EntryView.jsx';
 import DuelChallengeView from './components/views/DuelChallengeView.jsx';
 import DuelCountdownView from './components/views/DuelCountdownView.jsx';
 import DuelResultView from './components/views/DuelResultView.jsx';
+import DuelHistoryView from './components/views/DuelHistoryView.jsx';
 import PlayingView from './components/views/PlayingView.jsx';
 import ResultView from './components/views/ResultView.jsx';
 import StudentLobbyView from './components/views/StudentLobbyView.jsx';
@@ -153,6 +155,12 @@ export default function App() {
   const [duelResultData, setDuelResultData] = useState(null);
   const [isDuelMode, setIsDuelMode] = useState(false);
   const [duelProcessing, setDuelProcessing] = useState(false);
+  const [duelHistoryRecords, setDuelHistoryRecords] = useState([]);
+  const [duelHistoryCursor, setDuelHistoryCursor] = useState(0);
+  const [duelHistoryHasMore, setDuelHistoryHasMore] = useState(false);
+  const [duelHistoryLoading, setDuelHistoryLoading] = useState(false);
+  const [duelHistoryError, setDuelHistoryError] = useState('');
+  const [duelHistoryStudentId, setDuelHistoryStudentId] = useState('');
   const [localRooms] = useState([]);
   const [localScores, setLocalScores] = useState([]);
   const [localAnnouncements] = useState([]);
@@ -1735,6 +1743,12 @@ export default function App() {
   const completeStudentLogin = (result) => {
     if (!result?.profile || Number(result.sessionExpiresAt) <= Date.now()) return false;
     const profile = normalizeClassStudent(result.profile);
+    if (duelHistoryStudentId && duelHistoryStudentId !== profile.id) {
+      setDuelHistoryRecords([]);
+      setDuelHistoryCursor(0);
+      setDuelHistoryHasMore(false);
+      setDuelHistoryStudentId('');
+    }
     setStudentProfile(profile);
     setStudentSessionExpiresAt(Number(result.sessionExpiresAt));
     setNickname(profile.name || '');
@@ -1766,6 +1780,11 @@ export default function App() {
     setOutgoingDuelTargetId('');
     setActiveDuelId('');
     setIsDuelMode(false);
+    setDuelHistoryRecords([]);
+    setDuelHistoryCursor(0);
+    setDuelHistoryHasMore(false);
+    setDuelHistoryError('');
+    setDuelHistoryStudentId('');
     duelRecoveryStudentRef.current = '';
     setView('entry');
   };
@@ -1788,6 +1807,35 @@ export default function App() {
 
     return null;
   }, [studentProfile?.id]);
+
+  const loadDuelHistoryPage = async (studentId, cursorMillis = 0, replace = false) => {
+    if (!studentId || duelHistoryLoading) return;
+    setDuelHistoryLoading(true);
+    setDuelHistoryError('');
+    try {
+      const result = await getDuelHistory(studentId, cursorMillis);
+      const nextRecords = Array.isArray(result?.records) ? result.records : [];
+      setDuelHistoryRecords((previous) => replace ? nextRecords : [...previous, ...nextRecords]);
+      setDuelHistoryCursor(Number(result?.nextCursorMillis || 0));
+      setDuelHistoryHasMore(Boolean(result?.hasMore));
+      setDuelHistoryStudentId(studentId);
+    } catch (error) {
+      console.error(error);
+      setDuelHistoryError(error.message || '결투 전적을 불러오지 못했습니다.');
+    } finally {
+      setDuelHistoryLoading(false);
+    }
+  };
+
+  const handleOpenDuelHistory = () => {
+    if (!studentProfile?.id) return;
+    setView('duelHistory');
+    if (duelHistoryStudentId === studentProfile.id) return;
+    setDuelHistoryRecords([]);
+    setDuelHistoryCursor(0);
+    setDuelHistoryHasMore(false);
+    loadDuelHistoryPage(studentProfile.id, 0, true);
+  };
 
   const handleCreateDuelChallenge = async (targetStudent) => {
     if (!studentProfile?.id || !targetStudent?.id || duelProcessing) return;
@@ -2242,6 +2290,20 @@ export default function App() {
     );
   }
 
+  if (view === 'duelHistory' && studentProfile) {
+    return (
+      <DuelHistoryView
+        records={duelHistoryRecords}
+        studentId={studentProfile.id}
+        isLoading={duelHistoryLoading}
+        hasMore={duelHistoryHasMore}
+        error={duelHistoryError}
+        onLoadMore={() => loadDuelHistoryPage(studentProfile.id, duelHistoryCursor, false)}
+        onBack={() => setView('login')}
+      />
+    );
+  }
+
   if (view === 'studentLobby') {
     return (
       <StudentLobbyView
@@ -2356,6 +2418,7 @@ export default function App() {
         setIsError={setIsError}
         currentQuiz={currentQuiz}
         handleKeyDown={handleKeyDown}
+        onInputDelete={() => setCombo(0)}
         handleQuizAnswer={handleQuizAnswer}
         boosterAvailable={boosterAvailable}
         boosterActive={boosterActive}
@@ -2535,6 +2598,7 @@ export default function App() {
           setDuelClassId('');
           setView('duelChallenge');
         }}
+        onDuelHistoryClick={handleOpenDuelHistory}
         onStudentLogout={handleStudentLogout}
         onTeacherClick={openTeacherLogin}
         studentProfile={studentProfile}

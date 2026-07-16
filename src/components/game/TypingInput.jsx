@@ -12,6 +12,7 @@ export default function TypingInput({
   isError = false,
   onLanguageMismatch = () => {},
   onLanguageAccepted = () => {},
+  onDelete = () => {},
 }) {
   return (
     <div className={`w-full max-w-3xl relative rounded-2xl overflow-hidden transition-all duration-200 ${boosterActive ? 'shadow-[0_0_40px_rgba(251,191,36,0.5)] border-4 border-yellow-400 bg-white' : combo > 2 ? 'input-success' : 'glass-box'} ${isError ? 'border-2 border-red-400 animate-shake shadow-lg shadow-red-200' : 'border-2 border-transparent'}`}>
@@ -21,6 +22,7 @@ export default function TypingInput({
         value={inputValue}
         onChange={(e) => {
           const nextValue = e.target.value;
+          if (nextValue.length < inputValue.length) onDelete();
           const mismatch = findLanguageMismatch(nextValue, currentWord);
 
           if (mismatch) {

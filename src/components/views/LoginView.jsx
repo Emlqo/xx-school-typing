@@ -128,6 +128,7 @@ export default function LoginView({
   onGuestClick = () => {},
   onHallOfFameClick = () => {},
   onDuelClick = () => {},
+  onDuelHistoryClick = () => {},
   onStudentLogout = () => {},
   onTeacherClick = () => {},
   studentProfile = null,
@@ -192,6 +193,9 @@ export default function LoginView({
             </button>
             <button onClick={onDuelClick} className="w-full py-4 bg-gradient-to-r from-rose-500 via-red-500 to-orange-500 hover:from-rose-600 hover:via-red-600 hover:to-orange-600 text-white rounded-2xl font-black text-lg shadow-lg shadow-rose-300/50 transition-all flex items-center justify-center gap-2 transform hover:scale-105">
               ⚔️ 1:1 결투 신청
+            </button>
+            <button onClick={onDuelHistoryClick} className="w-full py-3 bg-white/90 hover:bg-white text-rose-600 rounded-2xl font-black border-2 border-rose-100 transition-all flex items-center justify-center gap-2">
+              📜 최근 결투 전적 보기
             </button>
             <div className="grid grid-cols-2 gap-3">
               <button onClick={onPracticeClick} className="py-3 bg-cyan-50 hover:bg-cyan-100 text-teal-700 rounded-2xl font-black border border-cyan-100">자유 연습</button>

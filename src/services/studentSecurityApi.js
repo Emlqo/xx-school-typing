@@ -45,4 +45,8 @@ export const acceptDuelChallenge = (targetStudentId, quizSequence) => call(
   { targetStudentId, quizSequence },
 );
 export const getActiveDuel = (studentId) => call('getActiveDuel', { studentId });
+export const getDuelHistory = (studentId, cursorMillis = 0) => call(
+  'getDuelHistory',
+  { studentId, cursorMillis },
+);
 export const finalizeDuel = (duelId, studentId) => call('finalizeDuel', { duelId, studentId });

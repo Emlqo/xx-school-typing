@@ -23,6 +23,7 @@ export default function PlayingView({
   setIsError = () => {},
   currentQuiz = null,
   handleKeyDown = () => {},
+  onInputDelete = () => {},
   handleQuizAnswer = () => {},
   boosterAvailable = true,
   boosterActive = false,
@@ -117,6 +118,7 @@ export default function PlayingView({
               isError={isError}
               onLanguageMismatch={setLanguageMismatch}
               onLanguageAccepted={() => setLanguageMismatch(null)}
+              onDelete={onInputDelete}
             />
 
             <p className="mt-8 text-gray-500 text-sm font-medium">

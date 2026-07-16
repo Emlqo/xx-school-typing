@@ -31,6 +31,15 @@
         { "fieldPath": "roomId", "order": "ASCENDING" },
         { "fieldPath": "studentId", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "typing_duels",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "participantStudentIds", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "completedAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
