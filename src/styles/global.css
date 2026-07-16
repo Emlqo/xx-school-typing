@@ -139,6 +139,15 @@ body {
   100% { transform: translate(-50%, -60px) scale(0.8); opacity: 0; }
 }
 
+.duel-modal-enter {
+  animation: duel-modal-enter 0.25s ease-out both;
+}
+
+@keyframes duel-modal-enter {
+  from { transform: translateY(12px) scale(0.96); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+
 .custom-scrollbar::-webkit-scrollbar {
   width: 8px;
 }

@@ -26,7 +26,7 @@ export default function DuelChallengeModal({
 
   return (
     <div className="fixed inset-0 bg-slate-950/55 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="glass-box w-full max-w-md rounded-3xl border-2 border-rose-200 p-7 text-center shadow-2xl animate-success-pop">
+      <div className="glass-box duel-modal-enter w-full max-w-md rounded-3xl border-2 border-rose-200 p-7 text-center shadow-2xl">
         <div className="text-6xl mb-3">⚔️</div>
         <div className="text-xs font-black tracking-widest text-rose-500">1:1 결투 신청서</div>
         <h2 className="text-3xl font-black text-gray-800 mt-2">{challenge.challengerName}</h2>
