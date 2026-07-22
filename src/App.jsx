@@ -68,6 +68,7 @@ import useShopPurchases from './hooks/useShopPurchases.js';
 import useScoreSyncRequest from './hooks/useScoreSyncRequest.js';
 import useStudentRoomWatcher from './hooks/useStudentRoomWatcher.js';
 import useTeacherRooms from './hooks/useTeacherRooms.js';
+import useTeacherLiveDuels from './hooks/useTeacherLiveDuels.js';
 import useWords from './hooks/useWords.js';
 import LoginView from './components/views/LoginView.jsx';
 import EntryView from './components/views/EntryView.jsx';
@@ -169,6 +170,8 @@ export default function App() {
   const [teacherDuelHistoryLoading, setTeacherDuelHistoryLoading] = useState(false);
   const [teacherDuelHistoryError, setTeacherDuelHistoryError] = useState('');
   const [teacherDuelHistoryLoaded, setTeacherDuelHistoryLoaded] = useState(false);
+  const [teacherLiveEnabled, setTeacherLiveEnabled] = useState(false);
+  const [selectedTeacherLiveDuelId, setSelectedTeacherLiveDuelId] = useState('');
   const [localRooms] = useState([]);
   const [localScores, setLocalScores] = useState([]);
   const [localAnnouncements] = useState([]);
@@ -289,6 +292,25 @@ export default function App() {
     user: scopedUser,
     duel: activeDuel,
     enabled: Boolean(studentProfile) && !isPracticeMode,
+  });
+  const {
+    duels: teacherLiveDuels,
+    isLoading: teacherLiveLoading,
+    error: teacherLiveError,
+  } = useTeacherLiveDuels({
+    user: scopedUser,
+    view,
+    enabled: teacherAuthorized && teacherLiveEnabled,
+  });
+  const { duel: selectedTeacherLiveDuel, error: selectedTeacherLiveDuelError } = useDuel({
+    user: scopedUser,
+    duelId: selectedTeacherLiveDuelId,
+    enabled: teacherAuthorized && view === 'teacher' && teacherLiveEnabled,
+  });
+  const { duelScores: selectedTeacherLiveScores, error: selectedTeacherLiveScoresError } = useDuelScores({
+    user: scopedUser,
+    duel: selectedTeacherLiveDuel,
+    enabled: teacherAuthorized && view === 'teacher' && teacherLiveEnabled,
   });
   const myDuelScore = useMemo(
     () => duelScores.find((item) => item.studentId === studentProfile?.id) || null,
@@ -428,6 +450,12 @@ export default function App() {
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, [studentProfile]);
+
+  useEffect(() => {
+    if (view === 'teacher') return;
+    setTeacherLiveEnabled(false);
+    setSelectedTeacherLiveDuelId('');
+  }, [view]);
 
   const announcements = useMemo(() => [...localAnnouncements, ...subscribedAnnouncements], [localAnnouncements, subscribedAnnouncements]);
   const quizzes = useMemo(
@@ -2618,6 +2646,18 @@ export default function App() {
         openDuelHistory={handleOpenTeacherDuelHistory}
         loadMoreDuelHistory={() => loadTeacherDuelHistoryPage(teacherDuelHistoryCursor, false)}
         refreshDuelHistory={handleRefreshTeacherDuelHistory}
+        liveDuels={teacherLiveDuels}
+        selectedLiveDuelId={selectedTeacherLiveDuelId}
+        setSelectedLiveDuelId={setSelectedTeacherLiveDuelId}
+        selectedLiveDuel={selectedTeacherLiveDuel}
+        selectedLiveScores={selectedTeacherLiveScores}
+        liveDuelsLoading={teacherLiveLoading}
+        liveDuelsError={teacherLiveError}
+        liveDuelDetailError={selectedTeacherLiveDuelError || selectedTeacherLiveScoresError}
+        onLiveSectionChange={(isEnabled) => {
+          setTeacherLiveEnabled(isEnabled);
+          if (!isEnabled) setSelectedTeacherLiveDuelId('');
+        }}
       />
     );
   }

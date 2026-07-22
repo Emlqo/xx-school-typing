@@ -14,6 +14,7 @@ const {
   doc,
   getDoc,
   getDocs,
+  limit,
   query,
   setDoc,
   updateDoc,
@@ -283,6 +284,28 @@ describe('duel security boundary', () => {
     await assertSucceeds(getDoc(publicDoc(teacherDb, 'typing_duels', 'duel-1')));
     await assertFails(getDoc(publicDoc(outsiderDb, 'typing_duels', 'duel-1')));
     await assertFails(updateDoc(publicDoc(studentDb, 'typing_duels', 'duel-1'), { status: 'completed' }));
+  });
+
+  test('only teacher can run the live playing-duels query', async () => {
+    await seed('typing_duels', 'duel-live-1', {
+      status: 'playing',
+      participantUids: [STUDENT_UID, OTHER_UID],
+    });
+    const teacherDb = testEnv.authenticatedContext(TEACHER_UID).firestore();
+    const studentDb = testEnv.authenticatedContext(STUDENT_UID).firestore();
+    const teacherLiveQuery = query(
+      publicCollection(teacherDb, 'typing_duels'),
+      where('status', '==', 'playing'),
+      limit(20),
+    );
+    const studentLiveQuery = query(
+      publicCollection(studentDb, 'typing_duels'),
+      where('status', '==', 'playing'),
+      limit(20),
+    );
+
+    await assertSucceeds(getDocs(teacherLiveQuery));
+    await assertFails(getDocs(studentLiveQuery));
   });
 
   test('student can update only their own allowed duel score fields', async () => {

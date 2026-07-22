@@ -10,6 +10,7 @@ import ShopPointManagementPanel from '../teacher/ShopPointManagementPanel.jsx';
 import StudentRosterPanel from '../teacher/StudentRosterPanel.jsx';
 import TeacherHeader from '../teacher/TeacherHeader.jsx';
 import TeacherDuelHistoryPanel from '../teacher/TeacherDuelHistoryPanel.jsx';
+import TeacherDuelLivePanel from '../teacher/TeacherDuelLivePanel.jsx';
 import WordManagementPanel from '../teacher/WordManagementPanel.jsx';
 
 export default function TeacherDashboardView({
@@ -110,6 +111,15 @@ export default function TeacherDashboardView({
   openDuelHistory = () => {},
   loadMoreDuelHistory = () => {},
   refreshDuelHistory = () => {},
+  liveDuels = [],
+  selectedLiveDuelId = '',
+  setSelectedLiveDuelId = () => {},
+  selectedLiveDuel = null,
+  selectedLiveScores = [],
+  liveDuelsLoading = false,
+  liveDuelsError = null,
+  liveDuelDetailError = null,
+  onLiveSectionChange = () => {},
 }) {
   const [activeSection, setActiveSection] = useState('overview');
 
@@ -149,6 +159,7 @@ export default function TeacherDashboardView({
   const selectSection = (sectionId) => {
     setActiveSection(sectionId);
     if (sectionId === 'duels') openDuelHistory();
+    onLiveSectionChange(sectionId === 'duelLive');
   };
 
   return (
@@ -321,6 +332,20 @@ export default function TeacherDashboardView({
             error={duelHistoryError}
             onLoadMore={loadMoreDuelHistory}
             onRefresh={refreshDuelHistory}
+          />
+        )}
+
+        {activeSection === 'duelLive' && (
+          <TeacherDuelLivePanel
+            duels={liveDuels}
+            selectedDuelId={selectedLiveDuelId}
+            setSelectedDuelId={setSelectedLiveDuelId}
+            selectedDuel={selectedLiveDuel}
+            scores={selectedLiveScores}
+            currentTime={currentTime}
+            isLoading={liveDuelsLoading}
+            error={liveDuelsError}
+            detailError={liveDuelDetailError}
           />
         )}
       </div>
