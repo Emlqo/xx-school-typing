@@ -254,13 +254,6 @@ export default function HallOfFamePanel({
             items={data.participationKing}
             valueLabel="회"
           />
-          <RankingList
-            title="성장왕 TOP 10"
-            description="월 초 기록 대비 월 말 기록의 점수 상승폭 기준"
-            items={data.growthKing}
-            valueLabel="점 상승"
-            valueKey="growth"
-          />
         </div>
       </div>
     </div>

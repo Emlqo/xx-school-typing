@@ -9,6 +9,7 @@ import RoomManagementPanel from '../teacher/RoomManagementPanel.jsx';
 import ShopPointManagementPanel from '../teacher/ShopPointManagementPanel.jsx';
 import StudentRosterPanel from '../teacher/StudentRosterPanel.jsx';
 import TeacherHeader from '../teacher/TeacherHeader.jsx';
+import TeacherDuelHistoryPanel from '../teacher/TeacherDuelHistoryPanel.jsx';
 import WordManagementPanel from '../teacher/WordManagementPanel.jsx';
 
 export default function TeacherDashboardView({
@@ -102,6 +103,13 @@ export default function TeacherDashboardView({
   refreshHallOfFame = () => {},
   isHallOfFameLoading = false,
   hallOfFameError = null,
+  duelHistoryRecords = [],
+  duelHistoryLoading = false,
+  duelHistoryHasMore = false,
+  duelHistoryError = '',
+  openDuelHistory = () => {},
+  loadMoreDuelHistory = () => {},
+  refreshDuelHistory = () => {},
 }) {
   const [activeSection, setActiveSection] = useState('overview');
 
@@ -138,6 +146,10 @@ export default function TeacherDashboardView({
       .filter((score) => score.studentId)
       .map((score) => score.studentId),
   ).size;
+  const selectSection = (sectionId) => {
+    setActiveSection(sectionId);
+    if (sectionId === 'duels') openDuelHistory();
+  };
 
   return (
     <div className="min-h-screen spring-bg p-4 md:p-8">
@@ -146,7 +158,7 @@ export default function TeacherDashboardView({
         <TeacherHeader
           onLogout={onLogout}
           activeSection={activeSection}
-          setActiveSection={setActiveSection}
+          setActiveSection={selectSection}
         />
 
         {activeSection === 'overview' && (
@@ -298,6 +310,17 @@ export default function TeacherDashboardView({
             words={words}
             handleSaveWord={handleSaveWord}
             handleDeleteWord={handleDeleteWord}
+          />
+        )}
+
+        {activeSection === 'duels' && (
+          <TeacherDuelHistoryPanel
+            records={duelHistoryRecords}
+            isLoading={duelHistoryLoading}
+            hasMore={duelHistoryHasMore}
+            error={duelHistoryError}
+            onLoadMore={loadMoreDuelHistory}
+            onRefresh={refreshDuelHistory}
           />
         )}
       </div>

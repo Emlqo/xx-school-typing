@@ -8,5 +8,6 @@ firestore-debug.log
 functions-debug.log
 *firebase-adminsdk*.json
 service-account*.json
+content-backups/
 
 .vercel

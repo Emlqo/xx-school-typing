@@ -15,6 +15,7 @@ import {
 import { APP_ID, GAME_RULES } from './constants/gameRules.js';
 import { isTeacherUser, TEACHER_IDLE_TIMEOUT_MS, TEACHER_PASSWORD_HASH, TEACHER_UID } from './constants/admin.js';
 import { KOREAN_WORDS, ENGLISH_WORDS } from './constants/words.js';
+import { LOCAL_QUIZZES } from './constants/quizzes.js';
 import { getCosmeticById } from './constants/cosmetics.js';
 import { FIRESTORE_PATHS } from './constants/firestorePaths.js';
 import { db, signInTeacherWithGoogle, signOutFirebaseUser } from './services/firebaseClient.js';
@@ -27,6 +28,7 @@ import {
   finalizeStudentReward,
   getActiveDuel,
   getDuelHistory,
+  getTeacherDuelHistory,
   getStudentSession,
   joinClassGame,
   joinGuestGame,
@@ -161,10 +163,16 @@ export default function App() {
   const [duelHistoryLoading, setDuelHistoryLoading] = useState(false);
   const [duelHistoryError, setDuelHistoryError] = useState('');
   const [duelHistoryStudentId, setDuelHistoryStudentId] = useState('');
+  const [teacherDuelHistoryRecords, setTeacherDuelHistoryRecords] = useState([]);
+  const [teacherDuelHistoryCursor, setTeacherDuelHistoryCursor] = useState(0);
+  const [teacherDuelHistoryHasMore, setTeacherDuelHistoryHasMore] = useState(false);
+  const [teacherDuelHistoryLoading, setTeacherDuelHistoryLoading] = useState(false);
+  const [teacherDuelHistoryError, setTeacherDuelHistoryError] = useState('');
+  const [teacherDuelHistoryLoaded, setTeacherDuelHistoryLoaded] = useState(false);
   const [localRooms] = useState([]);
   const [localScores, setLocalScores] = useState([]);
   const [localAnnouncements] = useState([]);
-  const [localQuizzes] = useState([]);
+  const [localQuizzes] = useState(() => LOCAL_QUIZZES);
 
   const inputRef = useRef(null);
   const audioCtxRef = useRef(null);
@@ -190,7 +198,12 @@ export default function App() {
   const scopedUser = view === 'teacher' && !teacherAuthorized ? null : user;
   const firestoreReadsEnabled = !(view === 'playing' && isPracticeMode);
   const { announcements: subscribedAnnouncements } = useAnnouncements({ user: scopedUser, enabled: firestoreReadsEnabled });
-  const { quizzes: subscribedQuizzes } = useQuizzes({ user: scopedUser, enabled: firestoreReadsEnabled });
+  const { quizzes: subscribedQuizzes } = useQuizzes({
+    user: scopedUser,
+    view,
+    isPracticeMode,
+    enabled: firestoreReadsEnabled,
+  });
   const { rooms: subscribedRooms } = useTeacherRooms({ user: scopedUser, view, enabled: firestoreReadsEnabled });
   const wordsView = isDuelMode && view === 'playing' ? 'duelPlaying' : view;
   const { words } = useWords({ user: scopedUser, view: wordsView, isPracticeMode, enabled: firestoreReadsEnabled });
@@ -417,7 +430,14 @@ export default function App() {
   }, [studentProfile]);
 
   const announcements = useMemo(() => [...localAnnouncements, ...subscribedAnnouncements], [localAnnouncements, subscribedAnnouncements]);
-  const quizzes = useMemo(() => [...localQuizzes, ...subscribedQuizzes], [localQuizzes, subscribedQuizzes]);
+  const quizzes = useMemo(
+    () => (view === 'teacher'
+      ? subscribedQuizzes
+      : subscribedQuizzes.length > 0
+        ? subscribedQuizzes
+        : localQuizzes),
+    [localQuizzes, subscribedQuizzes, view],
+  );
   const rooms = useMemo(() => [...localRooms, ...subscribedRooms], [localRooms, subscribedRooms]);
   const scores = useMemo(() => [...localScores, ...subscribedScores], [localScores, subscribedScores]);
   const enteredClassStudentIds = useMemo(
@@ -1837,6 +1857,36 @@ export default function App() {
     loadDuelHistoryPage(studentProfile.id, 0, true);
   };
 
+  const loadTeacherDuelHistoryPage = async (cursorMillis = 0, replace = false) => {
+    if (teacherDuelHistoryLoading) return;
+    setTeacherDuelHistoryLoading(true);
+    setTeacherDuelHistoryError('');
+    try {
+      const result = await getTeacherDuelHistory(cursorMillis);
+      const nextRecords = Array.isArray(result?.records) ? result.records : [];
+      setTeacherDuelHistoryRecords((previous) => replace ? nextRecords : [...previous, ...nextRecords]);
+      setTeacherDuelHistoryCursor(Number(result?.nextCursorMillis || 0));
+      setTeacherDuelHistoryHasMore(Boolean(result?.hasMore));
+      setTeacherDuelHistoryLoaded(true);
+    } catch (error) {
+      console.error(error);
+      setTeacherDuelHistoryError(error.message || '전체 결투 전적을 불러오지 못했습니다.');
+    } finally {
+      setTeacherDuelHistoryLoading(false);
+    }
+  };
+
+  const handleOpenTeacherDuelHistory = () => {
+    if (teacherDuelHistoryLoaded) return;
+    loadTeacherDuelHistoryPage(0, true);
+  };
+
+  const handleRefreshTeacherDuelHistory = () => {
+    setTeacherDuelHistoryCursor(0);
+    setTeacherDuelHistoryHasMore(false);
+    loadTeacherDuelHistoryPage(0, true);
+  };
+
   const handleCreateDuelChallenge = async (targetStudent) => {
     if (!studentProfile?.id || !targetStudent?.id || duelProcessing) return;
     if (Number(studentProfile.totalPoints || 0) < DUEL_RULES.stakePoints) {
@@ -2211,6 +2261,11 @@ export default function App() {
     window.sessionStorage.removeItem('pw_typing_teacher_gate');
     setTeacherGatePassed(false);
     setTeacherGatePassword('');
+    setTeacherDuelHistoryRecords([]);
+    setTeacherDuelHistoryCursor(0);
+    setTeacherDuelHistoryHasMore(false);
+    setTeacherDuelHistoryError('');
+    setTeacherDuelHistoryLoaded(false);
     handleBackToLogin();
   };
 
@@ -2556,6 +2611,13 @@ export default function App() {
         refreshHallOfFame={refreshMonthlyScores}
         isHallOfFameLoading={isHallOfFameLoading}
         hallOfFameError={hallOfFameError}
+        duelHistoryRecords={teacherDuelHistoryRecords}
+        duelHistoryLoading={teacherDuelHistoryLoading}
+        duelHistoryHasMore={teacherDuelHistoryHasMore}
+        duelHistoryError={teacherDuelHistoryError}
+        openDuelHistory={handleOpenTeacherDuelHistory}
+        loadMoreDuelHistory={() => loadTeacherDuelHistoryPage(teacherDuelHistoryCursor, false)}
+        refreshDuelHistory={handleRefreshTeacherDuelHistory}
       />
     );
   }
