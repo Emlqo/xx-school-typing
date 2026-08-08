@@ -85,6 +85,15 @@ export const COSMETIC_ITEMS = [
   },
 ];
 
+export const HALL_OF_FAME_TITLE_IDS = {
+  mvp: 'title_mvp',
+  quizKing: 'title_quiz_king',
+  participationKing: 'title_practice_king',
+  speedKing: 'title_speed_king',
+};
+
+export const HALL_OF_FAME_TITLE_ID_LIST = Object.values(HALL_OF_FAME_TITLE_IDS);
+
 export function getCosmeticById(cosmeticId) {
   return COSMETIC_ITEMS.find((item) => item.id === cosmeticId) || null;
 }

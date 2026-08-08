@@ -91,6 +91,7 @@ export default function useMonthlyScores({
   const [savedHallOfFame, setSavedHallOfFame] = useState(null);
   const [savedScoreCount, setSavedScoreCount] = useState(0);
   const [lastSavedAt, setLastSavedAt] = useState(null);
+  const [loadedMonthKey, setLoadedMonthKey] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const { monthStart, nextMonthStart } = useMemo(() => getMonthRange(monthKey), [monthKey]);
@@ -102,10 +103,12 @@ export default function useMonthlyScores({
       setSavedHallOfFame(null);
       setSavedScoreCount(0);
       setLastSavedAt(null);
+      setLoadedMonthKey('');
       return undefined;
     }
 
     let cancelled = false;
+    setLoadedMonthKey('');
 
     const loadSavedHallOfFame = async () => {
       setIsLoading(true);
@@ -121,6 +124,7 @@ export default function useMonthlyScores({
           setSavedHallOfFame(null);
           setSavedScoreCount(0);
           setLastSavedAt(null);
+          setLoadedMonthKey(monthKey);
           return;
         }
 
@@ -136,10 +140,12 @@ export default function useMonthlyScores({
         ));
         setSavedScoreCount(sourceScoreCount + sourcePracticeCount);
         setLastSavedAt(savedData.updatedAt || null);
+        setLoadedMonthKey(monthKey);
       } catch (loadError) {
         if (cancelled) return;
         console.error(loadError);
         setError(loadError);
+        setLoadedMonthKey('');
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -188,6 +194,7 @@ export default function useMonthlyScores({
       setSavedHallOfFame(nextHallOfFame);
       setSavedScoreCount(nextScores.length + nextPracticeRecords.length);
       setLastSavedAt(Date.now());
+      setLoadedMonthKey(monthKey);
 
       await setDoc(savedRef, {
         monthKey,
@@ -214,6 +221,7 @@ export default function useMonthlyScores({
     savedHallOfFame,
     savedScoreCount,
     lastSavedAt,
+    loadedMonthKey,
     monthStart,
     nextMonthStart,
     refreshMonthlyScores,

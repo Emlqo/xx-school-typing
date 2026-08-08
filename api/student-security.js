@@ -106,6 +106,26 @@ function toMillis(value) {
   return 0;
 }
 
+export function isDuelExpired(endsAt, now = Date.now(), graceMs = DUEL_RULES.finalizeGraceMs) {
+  const endsAtMillis = toMillis(endsAt);
+  return endsAtMillis > 0 && Number(now) >= endsAtMillis + Number(graceMs || 0);
+}
+
+export function calculateDuelSettlement(challengerScore, targetScore, stakePoints = DUEL_RULES.stakePoints) {
+  const challengerFinalScore = Number(challengerScore || 0);
+  const targetFinalScore = Number(targetScore || 0);
+  const stake = Math.max(0, Number(stakePoints || 0));
+  const isDraw = challengerFinalScore === targetFinalScore;
+  const winnerSide = isDraw ? null : challengerFinalScore > targetFinalScore ? 'challenger' : 'target';
+  return {
+    isDraw,
+    winnerSide,
+    pointTransfer: isDraw ? 0 : stake,
+    challengerRefund: isDraw ? stake : winnerSide === 'challenger' ? stake * 2 : 0,
+    targetRefund: isDraw ? stake : winnerSide === 'target' ? stake * 2 : 0,
+  };
+}
+
 function getKoreanDateKey(now = Date.now()) {
   const koreanTime = new Date(Number(now) + (9 * 60 * 60 * 1000));
   return koreanTime.toISOString().slice(0, 10);
@@ -1036,10 +1056,14 @@ async function getTeacherDuelHistory(uid, body) {
   };
 }
 
-async function finalizeDuel(uid, body) {
+async function finalizeDuelInternal(uid, body, teacherFinalize = false) {
   const duelId = requireString(body.duelId, 'duelId');
-  const studentId = requireString(body.studentId, 'studentId');
-  await requireSession(uid, studentId);
+  const studentId = teacherFinalize ? '' : requireString(body.studentId, 'studentId');
+  if (teacherFinalize) {
+    if (uid !== TEACHER_UID) throw new ApiError(403, 'api/permission-denied', '관리자 권한이 필요합니다.');
+  } else {
+    await requireSession(uid, studentId);
+  }
   const duelRef = publicCollection(PATHS.duels).doc(duelId);
   let finalizedDuel;
 
@@ -1047,7 +1071,7 @@ async function finalizeDuel(uid, body) {
     const duelSnapshot = await transaction.get(duelRef);
     if (!duelSnapshot.exists) throw new ApiError(404, 'api/not-found', '결투 기록을 찾을 수 없습니다.');
     const duel = duelSnapshot.data();
-    if (!duel.participantStudentIds?.includes(studentId) || !duel.participantUids?.includes(uid)) {
+    if (!teacherFinalize && (!duel.participantStudentIds?.includes(studentId) || !duel.participantUids?.includes(uid))) {
       throw new ApiError(403, 'api/permission-denied', '결투 결과를 확정할 권한이 없습니다.');
     }
     if (duel.status === 'completed') {
@@ -1067,7 +1091,11 @@ async function finalizeDuel(uid, body) {
     const challengerScore = challengerScoreSnapshot.data();
     const targetScore = targetScoreSnapshot.data();
     const bothFinished = Boolean(challengerScore.finishedAt) && Boolean(targetScore.finishedAt);
-    if (Date.now() < toMillis(duel.endsAt) + DUEL_RULES.finalizeGraceMs && !bothFinished) {
+    const isExpired = isDuelExpired(duel.endsAt);
+    if (teacherFinalize && !isExpired) {
+      throw new ApiError(409, 'api/failed-precondition', '종료 시간이 지난 결투만 관리자가 확정할 수 있습니다.');
+    }
+    if (!teacherFinalize && !isExpired && !bothFinished) {
       throw new ApiError(409, 'api/failed-precondition', '아직 결투가 종료되지 않았습니다.');
     }
 
@@ -1084,20 +1112,19 @@ async function finalizeDuel(uid, body) {
     const targetPoints = Math.max(0, Number(targetSnapshot.data().totalPoints || 0));
     const challengerFinalScore = Number(challengerScore.score || 0);
     const targetFinalScore = Number(targetScore.score || 0);
-    const isDraw = challengerFinalScore === targetFinalScore;
-    const winnerStudentId = isDraw
-      ? null
-      : challengerFinalScore > targetFinalScore
-        ? duel.challengerStudentId
-        : duel.targetStudentId;
+    const stake = Number(duel.stakePoints || DUEL_RULES.stakePoints);
+    const settlement = calculateDuelSettlement(challengerFinalScore, targetFinalScore, stake);
+    const { isDraw, challengerRefund, targetRefund } = settlement;
+    const winnerStudentId = settlement.winnerSide === 'challenger'
+      ? duel.challengerStudentId
+      : settlement.winnerSide === 'target'
+        ? duel.targetStudentId
+        : null;
     const loserStudentId = isDraw
       ? null
       : winnerStudentId === duel.challengerStudentId
         ? duel.targetStudentId
         : duel.challengerStudentId;
-    const stake = Number(duel.stakePoints || DUEL_RULES.stakePoints);
-    const challengerRefund = isDraw ? stake : winnerStudentId === duel.challengerStudentId ? stake * 2 : 0;
-    const targetRefund = isDraw ? stake : winnerStudentId === duel.targetStudentId ? stake * 2 : 0;
     const completedAt = Timestamp.now();
     const completedDateKey = getKoreanDateKey(completedAt.toMillis());
     const challengerDailyWinPoints = getDuelDailyWinPoints(challengerSnapshot.data(), completedDateKey);
@@ -1107,7 +1134,7 @@ async function finalizeDuel(uid, body) {
       result: isDraw ? 'draw' : 'win',
       winnerStudentId,
       loserStudentId,
-      pointTransfer: isDraw ? 0 : stake,
+      pointTransfer: settlement.pointTransfer,
       rewardDateKey: completedDateKey,
       finalScores: {
         challenger: {
@@ -1128,6 +1155,11 @@ async function finalizeDuel(uid, body) {
         },
       },
       completedAt,
+      ...(teacherFinalize ? {
+        finalizedBy: 'teacher',
+        finalizedByUid: uid,
+        finalizeReason: 'expired',
+      } : {}),
       updatedAt: FieldValue.serverTimestamp(),
     };
     transaction.update(challengerRef, {
@@ -1154,8 +1186,17 @@ async function finalizeDuel(uid, body) {
     finalizedDuel = safeDuel(duelSnapshot.id, { ...duel, ...updates });
   });
 
+  if (teacherFinalize) return { duel: finalizedDuel };
   const { data: student } = await getActiveStudent(studentId);
   return { duel: finalizedDuel, profile: await safeLoginProfile(studentId, student) };
+}
+
+async function finalizeDuel(uid, body) {
+  return finalizeDuelInternal(uid, body, false);
+}
+
+async function finalizeExpiredDuel(uid, body) {
+  return finalizeDuelInternal(uid, body, true);
 }
 
 async function syncPublicClassRoster(uid) {
@@ -1206,6 +1247,7 @@ const actions = {
   getDuelHistory,
   getTeacherDuelHistory,
   finalizeDuel,
+  finalizeExpiredDuel,
 };
 
 export default async function handler(request, response) {

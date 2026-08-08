@@ -184,6 +184,10 @@ export default function HallOfFamePanel({
   isLoading = false,
   error = null,
   readOnly = false,
+  onGrantTitles = () => {},
+  onRevokeTitles = () => {},
+  isTitleBatchUpdating = false,
+  titlesReady = false,
 }) {
   const data = { ...defaultHallOfFame, ...hallOfFame };
   const loadedScoreCount = scoreCount || monthlyScores.length;
@@ -227,6 +231,35 @@ export default function HallOfFamePanel({
           {error && (
             <div className="text-xs text-red-500 font-bold mt-2">
               기록을 불러오는 중 오류가 발생했습니다.
+            </div>
+          )}
+          {!readOnly && (
+            <div className="mt-3 pt-3 border-t border-yellow-100 space-y-2">
+              <div className="text-xs font-black text-gray-500">월간 칭호 관리</div>
+              <button
+                type="button"
+                onClick={onGrantTitles}
+                disabled={isLoading || isTitleBatchUpdating || !titlesReady}
+                className="w-full py-2.5 bg-gradient-to-r from-amber-400 via-yellow-300 to-orange-400 hover:from-amber-500 hover:to-orange-500 disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed text-amber-950 rounded-xl font-black transition-all shadow-sm"
+              >
+                {isTitleBatchUpdating ? '칭호 처리 중...' : '1위 칭호 한 번에 지급'}
+              </button>
+              <button
+                type="button"
+                onClick={onRevokeTitles}
+                disabled={isLoading || isTitleBatchUpdating}
+                className="w-full py-2.5 bg-white hover:bg-rose-50 disabled:bg-gray-100 disabled:cursor-not-allowed text-rose-600 border border-rose-200 rounded-xl font-black transition-colors"
+              >
+                현재 명예 칭호 한 번에 수거
+              </button>
+              <p className="text-[11px] leading-5 text-gray-400 font-bold">
+                MVP는 전체 반 최고 점수 1명, 나머지는 각 부문 1위 1명에게 지급됩니다.
+              </p>
+              {!titlesReady && !isLoading && (
+                <p className="text-[11px] leading-5 text-amber-600 font-black">
+                  선택한 달의 저장 기록을 확인한 뒤 지급할 수 있습니다.
+                </p>
+              )}
             </div>
           )}
         </div>

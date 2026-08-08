@@ -104,6 +104,10 @@ export default function TeacherDashboardView({
   refreshHallOfFame = () => {},
   isHallOfFameLoading = false,
   hallOfFameError = null,
+  grantHallOfFameTitles = () => {},
+  revokeHallOfFameTitles = () => {},
+  isHallTitleBatchUpdating = false,
+  hallOfFameTitlesReady = false,
   duelHistoryRecords = [],
   duelHistoryLoading = false,
   duelHistoryHasMore = false,
@@ -119,6 +123,8 @@ export default function TeacherDashboardView({
   liveDuelsLoading = false,
   liveDuelsError = null,
   liveDuelDetailError = null,
+  finalizingLiveDuelId = '',
+  finalizeSelectedLiveDuel = () => {},
   onLiveSectionChange = () => {},
 }) {
   const [activeSection, setActiveSection] = useState('overview');
@@ -261,6 +267,10 @@ export default function TeacherDashboardView({
               onRefresh={refreshHallOfFame}
               isLoading={isHallOfFameLoading}
               error={hallOfFameError}
+              onGrantTitles={grantHallOfFameTitles}
+              onRevokeTitles={revokeHallOfFameTitles}
+              isTitleBatchUpdating={isHallTitleBatchUpdating}
+              titlesReady={hallOfFameTitlesReady}
             />
 
             <AnnouncementManagementPanel
@@ -346,6 +356,8 @@ export default function TeacherDashboardView({
             isLoading={liveDuelsLoading}
             error={liveDuelsError}
             detailError={liveDuelDetailError}
+            finalizingDuelId={finalizingLiveDuelId}
+            onFinalizeSelected={finalizeSelectedLiveDuel}
           />
         )}
       </div>

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { formatTime, safeToLocaleNumber } from '../../utils/format.js';
+import { DUEL_RULES } from '../../constants/duelRules.js';
 
 const toMillis = (value) => {
   if (!value) return 0;
@@ -140,11 +141,24 @@ export default function TeacherDuelLivePanel({
   isLoading = false,
   error = null,
   detailError = null,
+  finalizingDuelId = '',
+  onFinalizeSelected = () => {},
 }) {
   const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
   const selectedStillListed = useMemo(
     () => duels.some((duel) => duel.id === selectedDuelId),
     [duels, selectedDuelId],
+  );
+  const canFinalizeSelected = Boolean(
+    selectedDuel
+      && selectedDuel.status === 'playing'
+      && toMillis(selectedDuel.endsAt) > 0
+      && toMillis(selectedDuel.endsAt) + DUEL_RULES.finalizeGraceMs <= currentTime
+      && scores.length === 2
+      && !detailError
+  );
+  const isFinalizingSelected = Boolean(
+    selectedDuel?.id && finalizingDuelId === selectedDuel.id,
   );
 
   useEffect(() => {
@@ -163,14 +177,25 @@ export default function TeacherDuelLivePanel({
             <h2 className="text-xl font-black text-gray-900">결투 LIVE 중계</h2>
             <p className="mt-1 text-sm font-bold text-gray-400">진행 중인 경기 하나를 선택해 실시간으로 확인합니다.</p>
           </div>
-          <button
-            type="button"
-            onClick={() => setIsBroadcastOpen(true)}
-            disabled={!selectedDuel}
-            className="rounded-xl bg-teal-600 px-4 py-2 font-black text-white shadow-md transition-colors hover:bg-teal-700 disabled:cursor-not-allowed disabled:bg-gray-300"
-          >
-            전체 화면 중계
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={onFinalizeSelected}
+              disabled={!canFinalizeSelected || isFinalizingSelected}
+              title={canFinalizeSelected ? '마지막 저장 점수로 승패를 확정합니다.' : '종료 시간이 지난 뒤 사용할 수 있습니다.'}
+              className="rounded-xl bg-rose-600 px-4 py-2 font-black text-white shadow-md transition-colors hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+            >
+              {isFinalizingSelected ? '결과 확정 중...' : '선택 경기 결과 확정'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsBroadcastOpen(true)}
+              disabled={!selectedDuel}
+              className="rounded-xl bg-teal-600 px-4 py-2 font-black text-white shadow-md transition-colors hover:bg-teal-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+            >
+              전체 화면 중계
+            </button>
+          </div>
         </div>
 
         <div className="grid min-h-[520px] grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)]">

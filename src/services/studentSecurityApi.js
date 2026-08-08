@@ -54,3 +54,4 @@ export const getTeacherDuelHistory = (cursorMillis = 0) => call(
   { cursorMillis },
 );
 export const finalizeDuel = (duelId, studentId) => call('finalizeDuel', { duelId, studentId });
+export const finalizeExpiredDuel = (duelId) => call('finalizeExpiredDuel', { duelId });

@@ -5,6 +5,7 @@ import {
   getDuelRemainingSeconds,
   getDuelWord,
 } from '../src/utils/duel.js';
+import { calculateDuelSettlement, isDuelExpired } from '../api/student-security.js';
 import { getCurrentDuelDailyWinPoints, getKoreanDateKey } from '../src/utils/classStudents.js';
 
 test('same duel seed produces the same word sequence', () => {
@@ -39,4 +40,28 @@ test('daily duel winnings reset at Korean midnight without a database write', ()
 
   assert.equal(getCurrentDuelDailyWinPoints(student, beforeMidnight), 15);
   assert.equal(getCurrentDuelDailyWinPoints(student, afterMidnight), 0);
+});
+
+test('teacher can finalize only after the duel end grace period', () => {
+  const endsAt = 1_000_000;
+  assert.equal(isDuelExpired(null, endsAt + 10_000, 3_000), false);
+  assert.equal(isDuelExpired(endsAt, endsAt + 2_999, 3_000), false);
+  assert.equal(isDuelExpired(endsAt, endsAt + 3_000, 3_000), true);
+});
+
+test('expired duel settlement awards the pot once or refunds a draw', () => {
+  assert.deepEqual(calculateDuelSettlement(1200, 800, 5), {
+    isDraw: false,
+    winnerSide: 'challenger',
+    pointTransfer: 5,
+    challengerRefund: 10,
+    targetRefund: 0,
+  });
+  assert.deepEqual(calculateDuelSettlement(900, 900, 5), {
+    isDraw: true,
+    winnerSide: null,
+    pointTransfer: 0,
+    challengerRefund: 5,
+    targetRefund: 5,
+  });
 });

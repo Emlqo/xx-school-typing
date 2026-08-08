@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   addDoc,
+  arrayRemove,
+  arrayUnion,
   deleteDoc,
   doc,
   getDocs,
@@ -16,7 +18,11 @@ import { APP_ID, GAME_RULES } from './constants/gameRules.js';
 import { isTeacherUser, TEACHER_IDLE_TIMEOUT_MS, TEACHER_PASSWORD_HASH, TEACHER_UID } from './constants/admin.js';
 import { KOREAN_WORDS, ENGLISH_WORDS } from './constants/words.js';
 import { LOCAL_QUIZZES } from './constants/quizzes.js';
-import { getCosmeticById } from './constants/cosmetics.js';
+import {
+  getCosmeticById,
+  HALL_OF_FAME_TITLE_IDS,
+  HALL_OF_FAME_TITLE_ID_LIST,
+} from './constants/cosmetics.js';
 import { FIRESTORE_PATHS } from './constants/firestorePaths.js';
 import { db, signInTeacherWithGoogle, signOutFirebaseUser } from './services/firebaseClient.js';
 import {
@@ -25,6 +31,7 @@ import {
   createDuelChallenge,
   equipStudentCosmetic,
   finalizeDuel,
+  finalizeExpiredDuel,
   finalizeStudentReward,
   getActiveDuel,
   getDuelHistory,
@@ -42,7 +49,7 @@ import {
   verifyStudentPin,
 } from './services/studentSecurityApi.js';
 import { getPublicCollection, getPublicDoc } from './utils/firestoreRefs.js';
-import { calculateHallOfFame, getMonthKey } from './utils/hallOfFame.js';
+import { calculateHallOfFame, getHallOfFameTitleWinners, getMonthKey } from './utils/hallOfFame.js';
 import { calculateCpm, calculateQuizScore, calculateTypingScore, getQuizWrongPenalty } from './utils/scoring.js';
 import { formatTime } from './utils/format.js';
 import { getCurrentDuelDailyWinPoints, normalizeClassStudent } from './utils/classStudents.js';
@@ -151,6 +158,7 @@ export default function App() {
   const [studentSessionExpiresAt, setStudentSessionExpiresAt] = useState(0);
   const [studentSessionChecked, setStudentSessionChecked] = useState(false);
   const [hallOfFameMonthKey, setHallOfFameMonthKey] = useState(() => getMonthKey(new Date()));
+  const [isHallTitleBatchUpdating, setIsHallTitleBatchUpdating] = useState(false);
   const [lastReward, setLastReward] = useState(() => getDefaultRewardState());
   const [duelClassId, setDuelClassId] = useState('');
   const [outgoingDuelTargetId, setOutgoingDuelTargetId] = useState('');
@@ -172,6 +180,7 @@ export default function App() {
   const [teacherDuelHistoryLoaded, setTeacherDuelHistoryLoaded] = useState(false);
   const [teacherLiveEnabled, setTeacherLiveEnabled] = useState(false);
   const [selectedTeacherLiveDuelId, setSelectedTeacherLiveDuelId] = useState('');
+  const [teacherFinalizingDuelId, setTeacherFinalizingDuelId] = useState('');
   const [localRooms] = useState([]);
   const [localScores, setLocalScores] = useState([]);
   const [localAnnouncements] = useState([]);
@@ -265,6 +274,7 @@ export default function App() {
     savedHallOfFame,
     savedScoreCount,
     lastSavedAt: hallOfFameSavedAt,
+    loadedMonthKey: hallOfFameLoadedMonthKey,
     refreshMonthlyScores,
     isLoading: isHallOfFameLoading,
     error: hallOfFameError,
@@ -1915,6 +1925,53 @@ export default function App() {
     loadTeacherDuelHistoryPage(0, true);
   };
 
+  const handleFinalizeSelectedDuel = async () => {
+    if (!requireTeacherAccess()) return;
+    const duel = selectedTeacherLiveDuel;
+    if (!duel?.id || duel.status !== 'playing' || teacherFinalizingDuelId) return;
+
+    const endsAtMillis = toDuelMillis(duel.endsAt);
+    if (!endsAtMillis) {
+      alert('종료 시간이 없는 결투는 결과를 확정할 수 없습니다.');
+      return;
+    }
+    const expiresAt = endsAtMillis + DUEL_RULES.finalizeGraceMs;
+    if (Date.now() < expiresAt) {
+      alert('종료 시간이 지난 결투만 결과를 확정할 수 있습니다.');
+      return;
+    }
+
+    const challengerScore = selectedTeacherLiveScores.find(
+      (scoreItem) => scoreItem.studentId === duel.challengerStudentId,
+    );
+    const targetScore = selectedTeacherLiveScores.find(
+      (scoreItem) => scoreItem.studentId === duel.targetStudentId,
+    );
+    const confirmed = window.confirm(
+      `${duel.challengerName || '선수'} ${Number(challengerScore?.score || 0).toLocaleString()}점\n`
+      + `${duel.targetName || '선수'} ${Number(targetScore?.score || 0).toLocaleString()}점\n\n`
+      + '마지막 저장 점수로 결투 결과를 확정할까요?',
+    );
+    if (!confirmed) return;
+
+    setTeacherFinalizingDuelId(duel.id);
+    try {
+      const result = await finalizeExpiredDuel(duel.id);
+      const finalized = result?.duel;
+      if (!finalized) throw new Error('결투 결과가 반환되지 않았습니다.');
+      const resultMessage = finalized.result === 'draw'
+        ? '무승부로 확정되어 양쪽 승부 포인트가 반환되었습니다.'
+        : `${finalized.winnerStudentId === finalized.challengerStudentId ? finalized.challengerName : finalized.targetName} 승리로 확정되었습니다.`;
+      alert(resultMessage);
+      if (teacherDuelHistoryLoaded) handleRefreshTeacherDuelHistory();
+    } catch (error) {
+      console.error(error);
+      alert(error.message || '결투 결과를 확정하지 못했습니다.');
+    } finally {
+      setTeacherFinalizingDuelId('');
+    }
+  };
+
   const handleCreateDuelChallenge = async (targetStudent) => {
     if (!studentProfile?.id || !targetStudent?.id || duelProcessing) return;
     if (Number(studentProfile.totalPoints || 0) < DUEL_RULES.stakePoints) {
@@ -2189,6 +2246,96 @@ export default function App() {
     } catch (error) {
       console.error(error);
       alert('학생 아이템 회수 중 오류가 발생했습니다.');
+    }
+  };
+
+  const getHallOfFameTitleAwards = () => {
+    return getHallOfFameTitleWinners(hallOfFame).map(({ category, winner }) => ({
+      titleId: HALL_OF_FAME_TITLE_IDS[category],
+      winner,
+    }));
+  };
+
+  const handleGrantHallOfFameTitles = async () => {
+    if (!requireTeacherAccess() || isHallTitleBatchUpdating) return;
+    if (hallOfFameLoadedMonthKey !== hallOfFameMonthKey) {
+      alert('선택한 달의 명예의 전당 기록을 불러온 뒤 칭호를 지급해 주세요.');
+      return;
+    }
+
+    const awards = getHallOfFameTitleAwards();
+    if (awards.length === 0) {
+      alert('지급할 명예의 전당 1위 기록이 없습니다. 먼저 해당 월 기록을 불러와 저장해 주세요.');
+      return;
+    }
+
+    const awardSummary = awards
+      .map(({ titleId, winner }) => `${getCosmeticById(titleId)?.name || titleId}: ${winner.className || ''} ${winner.nickname || ''}`.trim())
+      .join('\n');
+    if (!window.confirm(`${hallOfFameMonthKey} 명예의 전당 칭호를 다음 학생에게 지급할까요?\n\n${awardSummary}`)) return;
+
+    setIsHallTitleBatchUpdating(true);
+    try {
+      const awardsByStudent = new Map();
+      awards.forEach(({ titleId, winner }) => {
+        const studentId = String(winner.studentId);
+        const current = awardsByStudent.get(studentId) || [];
+        awardsByStudent.set(studentId, [...new Set([...current, titleId])]);
+      });
+
+      const batch = writeBatch(db);
+      awardsByStudent.forEach((titleIds, studentId) => {
+        batch.update(getPublicDoc(db, APP_ID, FIRESTORE_PATHS.classStudents, studentId), {
+          ownedCosmetics: arrayUnion(...titleIds),
+          updatedAt: serverTimestamp(),
+        });
+      });
+      await batch.commit();
+      alert(`명예의 전당 칭호 ${awards.length}개를 일괄 지급했습니다.`);
+    } catch (error) {
+      console.error(error);
+      alert('명예의 전당 칭호 일괄 지급 중 오류가 발생했습니다.');
+    } finally {
+      setIsHallTitleBatchUpdating(false);
+    }
+  };
+
+  const handleRevokeHallOfFameTitles = async () => {
+    if (!requireTeacherAccess() || isHallTitleBatchUpdating) return;
+    if (!window.confirm('현재 모든 학생이 보유한 MVP·퀴즈왕·스피드왕·꾸준왕 칭호를 회수할까요?\n일반 상점 장식은 유지됩니다.')) return;
+
+    setIsHallTitleBatchUpdating(true);
+    try {
+      const studentsRef = getPublicCollection(db, APP_ID, FIRESTORE_PATHS.classStudents);
+      const titleHoldersSnapshot = await getDocs(query(
+        studentsRef,
+        where('ownedCosmetics', 'array-contains-any', HALL_OF_FAME_TITLE_ID_LIST),
+      ));
+
+      if (titleHoldersSnapshot.empty) {
+        alert('회수할 명예의 전당 칭호가 없습니다.');
+        return;
+      }
+
+      const batch = writeBatch(db);
+      titleHoldersSnapshot.docs.forEach((studentSnapshot) => {
+        const student = studentSnapshot.data();
+        const updates = {
+          ownedCosmetics: arrayRemove(...HALL_OF_FAME_TITLE_ID_LIST),
+          updatedAt: serverTimestamp(),
+        };
+        if (HALL_OF_FAME_TITLE_ID_LIST.includes(student.equippedCosmetic)) {
+          updates.equippedCosmetic = null;
+        }
+        batch.update(studentSnapshot.ref, updates);
+      });
+      await batch.commit();
+      alert(`${titleHoldersSnapshot.size}명의 명예의 전당 칭호를 일괄 회수했습니다.`);
+    } catch (error) {
+      console.error(error);
+      alert('명예의 전당 칭호 일괄 회수 중 오류가 발생했습니다.');
+    } finally {
+      setIsHallTitleBatchUpdating(false);
     }
   };
 
@@ -2639,6 +2786,10 @@ export default function App() {
         refreshHallOfFame={refreshMonthlyScores}
         isHallOfFameLoading={isHallOfFameLoading}
         hallOfFameError={hallOfFameError}
+        grantHallOfFameTitles={handleGrantHallOfFameTitles}
+        revokeHallOfFameTitles={handleRevokeHallOfFameTitles}
+        isHallTitleBatchUpdating={isHallTitleBatchUpdating}
+        hallOfFameTitlesReady={hallOfFameLoadedMonthKey === hallOfFameMonthKey}
         duelHistoryRecords={teacherDuelHistoryRecords}
         duelHistoryLoading={teacherDuelHistoryLoading}
         duelHistoryHasMore={teacherDuelHistoryHasMore}
@@ -2654,6 +2805,8 @@ export default function App() {
         liveDuelsLoading={teacherLiveLoading}
         liveDuelsError={teacherLiveError}
         liveDuelDetailError={selectedTeacherLiveDuelError || selectedTeacherLiveScoresError}
+        finalizingLiveDuelId={teacherFinalizingDuelId}
+        finalizeSelectedLiveDuel={handleFinalizeSelectedDuel}
         onLiveSectionChange={(isEnabled) => {
           setTeacherLiveEnabled(isEnabled);
           if (!isEnabled) setSelectedTeacherLiveDuelId('');

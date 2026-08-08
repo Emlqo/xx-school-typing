@@ -262,3 +262,16 @@ export function calculateHallOfFame(monthlyScores = [], monthlyPracticeRecords =
     growthKing: calculateGrowthKing(monthlyScores),
   };
 }
+
+export function getHallOfFameTitleWinners(hallOfFame = {}) {
+  const overallMvp = (hallOfFame.classMvp || []).reduce((best, candidate) => (
+    !best || Number(candidate.value || 0) > Number(best.value || 0) ? candidate : best
+  ), null);
+
+  return [
+    { category: 'mvp', winner: overallMvp },
+    { category: 'quizKing', winner: hallOfFame.quizKing?.[0] || null },
+    { category: 'speedKing', winner: hallOfFame.speedKing?.[0] || null },
+    { category: 'participationKing', winner: hallOfFame.participationKing?.[0] || null },
+  ].filter(({ winner }) => winner?.studentId);
+}
