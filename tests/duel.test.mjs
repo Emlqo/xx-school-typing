@@ -3,10 +3,36 @@ import test from 'node:test';
 import {
   createDuelQuizSequence,
   getDuelRemainingSeconds,
+  getDuelScoreReadPlan,
   getDuelWord,
 } from '../src/utils/duel.js';
 import { calculateDuelSettlement, isDuelExpired } from '../api/student-security.js';
 import { getCurrentDuelDailyWinPoints, getKoreanDateKey } from '../src/utils/classStudents.js';
+import { DUEL_RULES } from '../src/constants/duelRules.js';
+
+test('duel score synchronization uses a traffic-safe interval', () => {
+  assert.equal(DUEL_RULES.scoreSyncIntervalMs, 15_000);
+});
+
+test('students listen only to the opponent score while teachers can listen to both', () => {
+  const duel = {
+    challengerStudentId: 'student-a',
+    challengerScoreId: 'score-a',
+    targetStudentId: 'student-b',
+    targetScoreId: 'score-b',
+  };
+
+  assert.deepEqual(getDuelScoreReadPlan(duel, 'student-a'), {
+    scoreIds: ['score-a', 'score-b'],
+    ownScoreId: 'score-a',
+    realtimeScoreIds: ['score-b'],
+  });
+  assert.deepEqual(getDuelScoreReadPlan(duel, ''), {
+    scoreIds: ['score-a', 'score-b'],
+    ownScoreId: '',
+    realtimeScoreIds: ['score-a', 'score-b'],
+  });
+});
 
 test('same duel seed produces the same word sequence', () => {
   const first = Array.from({ length: 30 }, (_, index) => getDuelWord(123456, index));

@@ -5,13 +5,15 @@ import { FIRESTORE_PATHS } from '../constants/firestorePaths.js';
 import { db } from '../services/firebaseClient.js';
 import { getPublicCollection } from '../utils/firestoreRefs.js';
 
-export default function useQuizzes({ user, view, isPracticeMode, enabled = true }) {
+export default function useQuizzes({ user, view, isPracticeMode, isDuelMode = false, enabled = true }) {
   const [quizzes, setQuizzes] = useState([]);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     const isTeacherView = view === 'teacher';
-    const isRealtimeGameView = !isPracticeMode && (view === 'waiting' || view === 'playing');
+    const isRealtimeGameView = !isPracticeMode
+      && !isDuelMode
+      && (view === 'waiting' || view === 'playing');
 
     if (!enabled || !user || !db || (!isTeacherView && !isRealtimeGameView)) {
       setQuizzes([]);
@@ -32,7 +34,7 @@ export default function useQuizzes({ user, view, isPracticeMode, enabled = true 
     );
 
     return () => unsubscribe();
-  }, [enabled, isPracticeMode, user, view]);
+  }, [enabled, isDuelMode, isPracticeMode, user, view]);
 
   return { quizzes, error };
 }

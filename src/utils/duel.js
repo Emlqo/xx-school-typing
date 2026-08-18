@@ -44,3 +44,20 @@ export function getDuelRemainingSeconds(duel, now = Date.now()) {
   const endsAt = toDuelMillis(duel?.endsAt);
   return endsAt ? Math.max(0, Math.ceil((endsAt - now) / 1000)) : 0;
 }
+
+export function getDuelScoreReadPlan(duel = {}, viewerStudentId = '') {
+  const scoreIds = [duel.challengerScoreId, duel.targetScoreId].filter(Boolean);
+  const ownScoreId = duel.challengerStudentId === viewerStudentId
+    ? duel.challengerScoreId
+    : duel.targetStudentId === viewerStudentId
+      ? duel.targetScoreId
+      : '';
+
+  return {
+    scoreIds,
+    ownScoreId,
+    realtimeScoreIds: ownScoreId
+      ? scoreIds.filter((scoreId) => scoreId !== ownScoreId)
+      : scoreIds,
+  };
+}

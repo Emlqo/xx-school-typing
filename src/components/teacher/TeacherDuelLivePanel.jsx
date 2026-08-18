@@ -126,7 +126,7 @@ function LiveScoreboard({ duel, scores, currentTime, isBroadcast = false }) {
         </div>
       </div>
       <p className={`${isBroadcast ? 'text-white/40' : 'text-gray-400'} mt-5 text-center text-xs font-bold`}>
-        점수는 학생 기기에서 변경될 때 최대 약 3초 간격으로 반영됩니다.
+        점수는 학생 기기에서 변경될 때 최대 약 {DUEL_RULES.scoreSyncIntervalMs / 1000}초 간격으로 반영됩니다.
       </p>
     </div>
   );

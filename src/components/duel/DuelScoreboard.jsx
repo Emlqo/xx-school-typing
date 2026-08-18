@@ -1,4 +1,5 @@
 import { safeToLocaleNumber } from '../../utils/format.js';
+import { DUEL_RULES } from '../../constants/duelRules.js';
 
 export default function DuelScoreboard({ myName = '', myScore = 0, opponentName = '', opponentScore = 0 }) {
   const leading = myScore === opponentScore ? 'draw' : myScore > opponentScore ? 'me' : 'opponent';
@@ -12,7 +13,9 @@ export default function DuelScoreboard({ myName = '', myScore = 0, opponentName 
         </div>
         <div className="flex flex-col items-center justify-center px-2">
           <div className="text-2xl">⚔️</div>
-          <div className="text-[10px] font-black text-amber-300">LIVE</div>
+          <div className="text-[10px] font-black text-amber-300">
+            {DUEL_RULES.scoreSyncIntervalMs / 1000}초 동기화
+          </div>
         </div>
         <div className={`rounded-xl p-3 text-center ${leading === 'opponent' ? 'bg-rose-500/30 ring-2 ring-rose-300' : 'bg-white/10'}`}>
           <div className="text-xs font-bold text-white/60">상대 · {opponentName}</div>

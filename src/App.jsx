@@ -217,6 +217,7 @@ export default function App() {
     user: scopedUser,
     view,
     isPracticeMode,
+    isDuelMode,
     enabled: firestoreReadsEnabled,
   });
   const { rooms: subscribedRooms } = useTeacherRooms({ user: scopedUser, view, enabled: firestoreReadsEnabled });
@@ -304,6 +305,7 @@ export default function App() {
   const { duelScores } = useDuelScores({
     user: scopedUser,
     duel: activeDuel,
+    viewerStudentId: studentProfile?.id || '',
     enabled: Boolean(studentProfile) && !isPracticeMode,
   });
   const {
@@ -315,11 +317,10 @@ export default function App() {
     view,
     enabled: teacherAuthorized && teacherLiveEnabled,
   });
-  const { duel: selectedTeacherLiveDuel, error: selectedTeacherLiveDuelError } = useDuel({
-    user: scopedUser,
-    duelId: selectedTeacherLiveDuelId,
-    enabled: teacherAuthorized && view === 'teacher' && teacherLiveEnabled,
-  });
+  const selectedTeacherLiveDuel = useMemo(
+    () => teacherLiveDuels.find((duel) => duel.id === selectedTeacherLiveDuelId) || null,
+    [selectedTeacherLiveDuelId, teacherLiveDuels],
+  );
   const { duelScores: selectedTeacherLiveScores, error: selectedTeacherLiveScoresError } = useDuelScores({
     user: scopedUser,
     duel: selectedTeacherLiveDuel,
@@ -1153,7 +1154,7 @@ export default function App() {
     const timer = window.setInterval(() => {
       if (!duelSyncDirtyRef.current) return;
       syncDuelScore().catch((error) => console.error('결투 점수 동기화 오류', error));
-    }, 3000);
+    }, DUEL_RULES.scoreSyncIntervalMs);
     return () => window.clearInterval(timer);
   }, [isDuelMode, myDuelScore?.id, syncDuelScore, view]);
 
@@ -2865,7 +2866,7 @@ export default function App() {
         selectedLiveScores={selectedTeacherLiveScores}
         liveDuelsLoading={teacherLiveLoading}
         liveDuelsError={teacherLiveError}
-        liveDuelDetailError={selectedTeacherLiveDuelError || selectedTeacherLiveScoresError}
+        liveDuelDetailError={selectedTeacherLiveScoresError}
         finalizingLiveDuelId={teacherFinalizingDuelId}
         finalizeSelectedLiveDuel={handleFinalizeSelectedDuel}
         cancelAllLiveDuels={handleCancelAllActiveDuels}
