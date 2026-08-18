@@ -46,11 +46,12 @@ export function getDuelRemainingSeconds(duel, now = Date.now()) {
 }
 
 export function getDuelScoreReadPlan(duel = {}, viewerStudentId = '') {
-  const scoreIds = [duel.challengerScoreId, duel.targetScoreId].filter(Boolean);
-  const ownScoreId = duel.challengerStudentId === viewerStudentId
-    ? duel.challengerScoreId
-    : duel.targetStudentId === viewerStudentId
-      ? duel.targetScoreId
+  const safeDuel = duel || {};
+  const scoreIds = [safeDuel.challengerScoreId, safeDuel.targetScoreId].filter(Boolean);
+  const ownScoreId = safeDuel.challengerStudentId === viewerStudentId
+    ? safeDuel.challengerScoreId
+    : safeDuel.targetStudentId === viewerStudentId
+      ? safeDuel.targetScoreId
       : '';
 
   return {

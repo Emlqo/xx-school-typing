@@ -34,6 +34,14 @@ test('students listen only to the opponent score while teachers can listen to bo
   });
 });
 
+test('missing active duel produces an empty score read plan', () => {
+  assert.deepEqual(getDuelScoreReadPlan(null, 'student-a'), {
+    scoreIds: [],
+    ownScoreId: '',
+    realtimeScoreIds: [],
+  });
+});
+
 test('same duel seed produces the same word sequence', () => {
   const first = Array.from({ length: 30 }, (_, index) => getDuelWord(123456, index));
   const second = Array.from({ length: 30 }, (_, index) => getDuelWord(123456, index));
