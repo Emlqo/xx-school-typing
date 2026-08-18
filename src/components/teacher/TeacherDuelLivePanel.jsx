@@ -15,6 +15,7 @@ const getDuelClock = (duel, currentTime) => {
   const startsAt = toMillis(duel.startsAt);
   const endsAt = toMillis(duel.endsAt);
   if (duel.status === 'completed') return { label: '종료', phase: 'completed' };
+  if (duel.status === 'cancelled') return { label: '취소', phase: 'cancelled' };
   if (startsAt > currentTime) {
     return { label: String(Math.max(1, Math.ceil((startsAt - currentTime) / 1000))), phase: 'countdown' };
   }
@@ -143,6 +144,8 @@ export default function TeacherDuelLivePanel({
   detailError = null,
   finalizingDuelId = '',
   onFinalizeSelected = () => {},
+  onCancelAll = () => {},
+  isCancellingAll = false,
 }) {
   const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
   const selectedStillListed = useMemo(
@@ -166,7 +169,7 @@ export default function TeacherDuelLivePanel({
   }, [duels, selectedDuelId, setSelectedDuelId]);
 
   useEffect(() => {
-    if (!selectedDuel && !selectedStillListed) setIsBroadcastOpen(false);
+    if ((!selectedDuel && !selectedStillListed) || selectedDuel?.status === 'cancelled') setIsBroadcastOpen(false);
   }, [selectedDuel, selectedStillListed]);
 
   return (
@@ -178,6 +181,15 @@ export default function TeacherDuelLivePanel({
             <p className="mt-1 text-sm font-bold text-gray-400">진행 중인 경기 하나를 선택해 실시간으로 확인합니다.</p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={onCancelAll}
+              disabled={duels.length === 0 || isCancellingAll}
+              title="수업 종료 시 모든 진행 중 결투를 취소하고 승부 포인트를 반환합니다."
+              className="rounded-xl border border-red-200 bg-white px-4 py-2 font-black text-red-600 shadow-sm transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-100 disabled:text-gray-400"
+            >
+              {isCancellingAll ? '전체 취소 중...' : '진행 경기 전체 취소'}
+            </button>
             <button
               type="button"
               onClick={onFinalizeSelected}

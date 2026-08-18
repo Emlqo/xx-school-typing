@@ -27,6 +27,7 @@ import { FIRESTORE_PATHS } from './constants/firestorePaths.js';
 import { db, signInTeacherWithGoogle, signOutFirebaseUser } from './services/firebaseClient.js';
 import {
   buyStudentShopItem,
+  cancelAllActiveDuels,
   acceptDuelChallenge,
   createDuelChallenge,
   equipStudentCosmetic,
@@ -181,6 +182,7 @@ export default function App() {
   const [teacherLiveEnabled, setTeacherLiveEnabled] = useState(false);
   const [selectedTeacherLiveDuelId, setSelectedTeacherLiveDuelId] = useState('');
   const [teacherFinalizingDuelId, setTeacherFinalizingDuelId] = useState('');
+  const [teacherCancellingAllDuels, setTeacherCancellingAllDuels] = useState(false);
   const [localRooms] = useState([]);
   const [localScores, setLocalScores] = useState([]);
   const [localAnnouncements] = useState([]);
@@ -203,6 +205,7 @@ export default function App() {
   const duelQuizIndexRef = useRef(0);
   const duelSyncDirtyRef = useRef(false);
   const duelSyncPromiseRef = useRef(null);
+  const cancelledDuelHandledRef = useRef('');
   const duelRecoveryStudentRef = useRef('');
 
   const { user, authReady } = useFirebaseAuth();
@@ -425,6 +428,26 @@ export default function App() {
         if (result?.profile) setStudentProfile(normalizeClassStudent(result.profile));
       })
       .catch((error) => console.error(error));
+  }, [activeDuel, activeDuelId]);
+
+  useEffect(() => {
+    if (!activeDuelId || activeDuel?.status !== 'cancelled') return;
+    setActiveDuelId('');
+    setDuelResultData(null);
+    setOutgoingDuelTargetId('');
+    setIsDuelMode(false);
+    setBoosterActive(false);
+    isEndingRef.current = false;
+    setView('login');
+    getStudentSession()
+      .then((result) => {
+        if (result?.profile) setStudentProfile(normalizeClassStudent(result.profile));
+      })
+      .catch((error) => console.error(error));
+    if (cancelledDuelHandledRef.current !== activeDuelId) {
+      cancelledDuelHandledRef.current = activeDuelId;
+      alert('선생님이 수업을 종료하여 진행 중인 결투가 취소되었습니다. 승부 포인트 5P는 반환됩니다.');
+    }
   }, [activeDuel, activeDuelId]);
 
   useEffect(() => {
@@ -882,6 +905,19 @@ export default function App() {
           }
         }
         if (finalized?.profile) setStudentProfile(normalizeClassStudent(finalized.profile));
+        if (finalized?.duel?.status === 'cancelled') {
+          if (cancelledDuelHandledRef.current !== finalized.duel.id) {
+            cancelledDuelHandledRef.current = finalized.duel.id;
+            alert('선생님이 수업을 종료하여 진행 중인 결투가 취소되었습니다. 승부 포인트 5P는 반환됩니다.');
+          }
+          setActiveDuelId('');
+          setDuelResultData(null);
+          setOutgoingDuelTargetId('');
+          setIsDuelMode(false);
+          isEndingRef.current = false;
+          setView('login');
+          return;
+        }
         if (finalized?.duel) setDuelResultData(finalized.duel);
         setView('duelResult');
       } catch (error) {
@@ -1972,6 +2008,31 @@ export default function App() {
     }
   };
 
+  const handleCancelAllActiveDuels = async () => {
+    if (!requireTeacherAccess() || teacherCancellingAllDuels) return;
+    if (teacherLiveDuels.length === 0) {
+      alert('현재 취소할 진행 중 결투가 없습니다.');
+      return;
+    }
+    if (!window.confirm('현재 진행 중인 모든 결투를 취소할까요?\n양쪽 학생에게 승부 포인트 5P가 반환됩니다.')) return;
+
+    setTeacherCancellingAllDuels(true);
+    try {
+      const result = await cancelAllActiveDuels();
+      const cancelledCount = Number(result?.cancelledCount || 0);
+      const failedCount = Number(result?.failedCount || 0);
+      setSelectedTeacherLiveDuelId('');
+      alert(failedCount > 0
+        ? `${cancelledCount}경기를 취소했습니다. ${failedCount}경기는 처리하지 못했으니 목록을 확인하고 다시 시도해 주세요.`
+        : `진행 중인 결투 ${cancelledCount}경기를 취소하고 승부 포인트를 반환했습니다.`);
+    } catch (error) {
+      console.error(error);
+      alert(error.message || '진행 중인 결투를 일괄 취소하지 못했습니다.');
+    } finally {
+      setTeacherCancellingAllDuels(false);
+    }
+  };
+
   const handleCreateDuelChallenge = async (targetStudent) => {
     if (!studentProfile?.id || !targetStudent?.id || duelProcessing) return;
     if (Number(studentProfile.totalPoints || 0) < DUEL_RULES.stakePoints) {
@@ -2807,6 +2868,8 @@ export default function App() {
         liveDuelDetailError={selectedTeacherLiveDuelError || selectedTeacherLiveScoresError}
         finalizingLiveDuelId={teacherFinalizingDuelId}
         finalizeSelectedLiveDuel={handleFinalizeSelectedDuel}
+        cancelAllLiveDuels={handleCancelAllActiveDuels}
+        isCancellingAllLiveDuels={teacherCancellingAllDuels}
         onLiveSectionChange={(isEnabled) => {
           setTeacherLiveEnabled(isEnabled);
           if (!isEnabled) setSelectedTeacherLiveDuelId('');

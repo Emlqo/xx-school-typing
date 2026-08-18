@@ -125,6 +125,8 @@ export default function TeacherDashboardView({
   liveDuelDetailError = null,
   finalizingLiveDuelId = '',
   finalizeSelectedLiveDuel = () => {},
+  cancelAllLiveDuels = () => {},
+  isCancellingAllLiveDuels = false,
   onLiveSectionChange = () => {},
 }) {
   const [activeSection, setActiveSection] = useState('overview');
@@ -358,6 +360,8 @@ export default function TeacherDashboardView({
             detailError={liveDuelDetailError}
             finalizingDuelId={finalizingLiveDuelId}
             onFinalizeSelected={finalizeSelectedLiveDuel}
+            onCancelAll={cancelAllLiveDuels}
+            isCancellingAll={isCancellingAllLiveDuels}
           />
         )}
       </div>

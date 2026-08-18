@@ -1074,7 +1074,7 @@ async function finalizeDuelInternal(uid, body, teacherFinalize = false) {
     if (!teacherFinalize && (!duel.participantStudentIds?.includes(studentId) || !duel.participantUids?.includes(uid))) {
       throw new ApiError(403, 'api/permission-denied', '결투 결과를 확정할 권한이 없습니다.');
     }
-    if (duel.status === 'completed') {
+    if (duel.status === 'completed' || duel.status === 'cancelled') {
       finalizedDuel = safeDuel(duelSnapshot.id, duel);
       return;
     }
@@ -1199,6 +1199,69 @@ async function finalizeExpiredDuel(uid, body) {
   return finalizeDuelInternal(uid, body, true);
 }
 
+async function cancelAllActiveDuels(uid) {
+  if (uid !== TEACHER_UID) {
+    throw new ApiError(403, 'api/permission-denied', '관리자 권한이 필요합니다.');
+  }
+
+  const activeSnapshot = await publicCollection(PATHS.duels)
+    .where('status', '==', 'playing')
+    .get();
+  const cancelledAt = Timestamp.now();
+
+  const results = await Promise.allSettled(activeSnapshot.docs.map(async (activeDuelSnapshot) => (
+    database().runTransaction(async (transaction) => {
+      const duelRef = activeDuelSnapshot.ref;
+      const duelSnapshot = await transaction.get(duelRef);
+      if (!duelSnapshot.exists || duelSnapshot.data().status !== 'playing') return false;
+
+      const duel = duelSnapshot.data();
+      const challengerRef = publicCollection(PATHS.classStudents).doc(duel.challengerStudentId);
+      const targetRef = publicCollection(PATHS.classStudents).doc(duel.targetStudentId);
+      const [challengerSnapshot, targetSnapshot] = await Promise.all([
+        transaction.get(challengerRef),
+        transaction.get(targetRef),
+      ]);
+      const stake = Math.max(0, Number(duel.stakePoints || DUEL_RULES.stakePoints));
+
+      if (challengerSnapshot.exists) {
+        const challenger = challengerSnapshot.data();
+        transaction.update(challengerRef, {
+          totalPoints: Math.max(0, Number(challenger.totalPoints || 0)) + stake,
+          ...(challenger.activeDuelId === duelSnapshot.id ? { activeDuelId: FieldValue.delete() } : {}),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      }
+      if (targetSnapshot.exists) {
+        const target = targetSnapshot.data();
+        transaction.update(targetRef, {
+          totalPoints: Math.max(0, Number(target.totalPoints || 0)) + stake,
+          ...(target.activeDuelId === duelSnapshot.id ? { activeDuelId: FieldValue.delete() } : {}),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      }
+
+      transaction.update(duelRef, {
+        status: 'cancelled',
+        result: 'cancelled',
+        pointTransfer: 0,
+        cancelledAt,
+        cancelledBy: 'teacher',
+        cancelledByUid: uid,
+        cancelReason: 'class_ended',
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      return true;
+    })
+  )));
+
+  return {
+    cancelledCount: results.filter((result) => result.status === 'fulfilled' && result.value).length,
+    failedCount: results.filter((result) => result.status === 'rejected').length,
+    requestedCount: activeSnapshot.size,
+  };
+}
+
 async function syncPublicClassRoster(uid) {
   if (uid !== TEACHER_UID) throw new ApiError(403, 'api/permission-denied', '관리자 권한이 없습니다.');
   const students = await publicCollection(PATHS.classStudents).get();
@@ -1248,6 +1311,7 @@ const actions = {
   getTeacherDuelHistory,
   finalizeDuel,
   finalizeExpiredDuel,
+  cancelAllActiveDuels,
 };
 
 export default async function handler(request, response) {

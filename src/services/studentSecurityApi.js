@@ -55,3 +55,4 @@ export const getTeacherDuelHistory = (cursorMillis = 0) => call(
 );
 export const finalizeDuel = (duelId, studentId) => call('finalizeDuel', { duelId, studentId });
 export const finalizeExpiredDuel = (duelId) => call('finalizeExpiredDuel', { duelId });
+export const cancelAllActiveDuels = () => call('cancelAllActiveDuels');
