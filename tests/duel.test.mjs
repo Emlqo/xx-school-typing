@@ -6,12 +6,21 @@ import {
   getDuelScoreReadPlan,
   getDuelWord,
 } from '../src/utils/duel.js';
-import { calculateDuelSettlement, isDuelExpired } from '../api/student-security.js';
+import {
+  calculateDuelSettlement,
+  DUEL_RULES as DUEL_SERVER_RULES,
+  isDuelExpired,
+} from '../api/student-security.js';
 import { getCurrentDuelDailyWinPoints, getKoreanDateKey } from '../src/utils/classStudents.js';
 import { DUEL_RULES } from '../src/constants/duelRules.js';
 
 test('duel score synchronization uses a traffic-safe interval', () => {
   assert.equal(DUEL_RULES.scoreSyncIntervalMs, 15_000);
+});
+
+test('duel duration is three minutes on the client and server', () => {
+  assert.equal(DUEL_RULES.durationSeconds, 180);
+  assert.equal(DUEL_SERVER_RULES.durationMs, 180_000);
 });
 
 test('students listen only to the opponent score while teachers can listen to both', () => {

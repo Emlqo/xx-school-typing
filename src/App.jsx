@@ -696,7 +696,8 @@ export default function App() {
   const startDuelGame = useCallback(() => {
     if (!activeDuel || !myDuelScore || !studentProfile?.id) return;
     const remainingSeconds = getDuelRemainingSeconds(activeDuel);
-    resetPlayingState({ practiceMode: false, duration: 300, mode: 'mixed' });
+    const duelDuration = Number(activeDuel.duration || DUEL_RULES.durationSeconds);
+    resetPlayingState({ practiceMode: false, duration: duelDuration, mode: 'mixed' });
     setIsDuelMode(true);
     setSelectedRoomId('');
     setCurrentScoreDocId(null);

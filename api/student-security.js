@@ -22,10 +22,10 @@ const PATHS = {
   duelScores: 'typing_duel_scores',
 };
 
-const DUEL_RULES = {
+export const DUEL_RULES = {
   challengeDurationMs: 60 * 1000,
   countdownMs: 5 * 1000,
-  durationMs: 5 * 60 * 1000,
+  durationMs: 3 * 60 * 1000,
   stakePoints: 5,
   dailyWinPointLimit: 15,
   finalizeGraceMs: 3 * 1000,
