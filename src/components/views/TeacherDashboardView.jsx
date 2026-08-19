@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import CherryBlossomBackground from '../common/CherryBlossomBackground.jsx';
 import AnnouncementManagementPanel from '../teacher/AnnouncementManagementPanel.jsx';
 import ClassManagementPanel from '../teacher/ClassManagementPanel.jsx';
@@ -14,6 +13,8 @@ import TeacherDuelLivePanel from '../teacher/TeacherDuelLivePanel.jsx';
 import WordManagementPanel from '../teacher/WordManagementPanel.jsx';
 
 export default function TeacherDashboardView({
+  activeSection = 'overview',
+  setActiveSection = () => {},
   getLeaderboard = () => [],
   currentTime = Date.now(),
   onLogout = () => {},
@@ -102,6 +103,7 @@ export default function TeacherDashboardView({
   hallOfFameScoreCount = 0,
   hallOfFameSavedAt = null,
   refreshHallOfFame = () => {},
+  canRefreshHallOfFameToday = true,
   isHallOfFameLoading = false,
   hallOfFameError = null,
   grantHallOfFameTitles = () => {},
@@ -134,8 +136,6 @@ export default function TeacherDashboardView({
   isUpdatingDuelAvailability = false,
   onLiveSectionChange = () => {},
 }) {
-  const [activeSection, setActiveSection] = useState('overview');
-
   const toMillis = (value) => {
     if (!value) return 0;
     if (typeof value === 'number') return value;
@@ -272,6 +272,7 @@ export default function TeacherDashboardView({
               scoreCount={hallOfFameScoreCount}
               savedAt={hallOfFameSavedAt}
               onRefresh={refreshHallOfFame}
+              canRefreshToday={canRefreshHallOfFameToday}
               isLoading={isHallOfFameLoading}
               error={hallOfFameError}
               onGrantTitles={grantHallOfFameTitles}

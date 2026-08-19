@@ -30,7 +30,8 @@ export default function useStudentRoomWatcher({
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!enabled || !user || !db || !selectedRoomId || view === 'teacher') {
+    const shouldWatchRoom = view === 'waiting' || view === 'playing';
+    if (!enabled || !user || !db || !selectedRoomId || !shouldWatchRoom) {
       setRoom(null);
       return undefined;
     }

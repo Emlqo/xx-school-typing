@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { onSnapshot, orderBy, query } from 'firebase/firestore';
+import { useCallback, useEffect, useState } from 'react';
+import { getDocs, orderBy, query } from 'firebase/firestore';
 import { APP_ID } from '../constants/gameRules.js';
 import { FIRESTORE_PATHS } from '../constants/firestorePaths.js';
 import { db } from '../services/firebaseClient.js';
@@ -9,29 +9,29 @@ export default function useAnnouncements({ user, enabled = true }) {
   const [announcements, setAnnouncements] = useState([]);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
+  const refreshAnnouncements = useCallback(async () => {
     if (!enabled || !user || !db) {
       setAnnouncements([]);
-      return undefined;
+      return [];
     }
 
-    const announcementsRef = getPublicCollection(db, APP_ID, FIRESTORE_PATHS.announcements);
-    const announcementsQuery = query(announcementsRef, orderBy('createdAt', 'desc'));
-
-    const unsubscribe = onSnapshot(
-      announcementsQuery,
-      (snapshot) => {
-        setAnnouncements(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-        setError(null);
-      },
-      (snapshotError) => {
-        console.error(snapshotError);
-        setError(snapshotError);
-      },
-    );
-
-    return () => unsubscribe();
+    try {
+      const announcementsRef = getPublicCollection(db, APP_ID, FIRESTORE_PATHS.announcements);
+      const snapshot = await getDocs(query(announcementsRef, orderBy('createdAt', 'desc')));
+      const nextAnnouncements = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      setAnnouncements(nextAnnouncements);
+      setError(null);
+      return nextAnnouncements;
+    } catch (loadError) {
+      console.error(loadError);
+      setError(loadError);
+      return [];
+    }
   }, [enabled, user]);
 
-  return { announcements, error };
+  useEffect(() => {
+    refreshAnnouncements();
+  }, [refreshAnnouncements]);
+
+  return { announcements, error, refreshAnnouncements };
 }

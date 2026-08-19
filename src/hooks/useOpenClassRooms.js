@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { onSnapshot, query, where } from 'firebase/firestore';
+import { useCallback, useEffect, useState } from 'react';
+import { getDocs, limit, query, where } from 'firebase/firestore';
 import { APP_ID } from '../constants/gameRules.js';
 import { FIRESTORE_PATHS } from '../constants/firestorePaths.js';
 import { db } from '../services/firebaseClient.js';
@@ -29,39 +29,54 @@ export default function useOpenClassRooms({
   enabled = true,
 }) {
   const [openClassRooms, setOpenClassRooms] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
+  const refreshOpenClassRooms = useCallback(async () => {
     const canSubscribe = view === 'studentRoomEntry';
     if (!enabled || !user || !db || !canSubscribe || isPracticeMode) {
       setOpenClassRooms([]);
-      return undefined;
+      setIsLoading(false);
+      return [];
     }
 
-    const roomsRef = getPublicCollection(db, APP_ID, FIRESTORE_PATHS.rooms);
-    const roomsQuery = query(
-      roomsRef,
-      where('entryType', '==', 'class'),
-      where('status', 'in', ['waiting', 'playing']),
-    );
-    const unsubscribe = onSnapshot(
-      roomsQuery,
-      (snapshot) => {
-        const nextRooms = snapshot.docs
-          .map((doc) => ({ id: doc.id, ...doc.data() }))
-          .filter(isOpenRoom)
-          .sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
-        setOpenClassRooms(nextRooms);
-        setError(null);
-      },
-      (snapshotError) => {
-        console.error(snapshotError);
-        setError(snapshotError);
-      },
-    );
-
-    return () => unsubscribe();
+    setIsLoading(true);
+    try {
+      const roomsRef = getPublicCollection(db, APP_ID, FIRESTORE_PATHS.rooms);
+      const [waitingSnapshot, playingSnapshot] = await Promise.all([
+        getDocs(query(
+          roomsRef,
+          where('entryType', '==', 'class'),
+          where('status', '==', 'waiting'),
+          limit(20),
+        )),
+        getDocs(query(
+          roomsRef,
+          where('expiresAt', '>', Date.now()),
+          limit(20),
+        )),
+      ]);
+      const roomDocuments = [...waitingSnapshot.docs, ...playingSnapshot.docs];
+      const nextRooms = roomDocuments
+        .map((doc) => ({ id: doc.id, ...doc.data() }))
+        .filter(isOpenRoom)
+        .sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
+      setOpenClassRooms(nextRooms);
+      setError(null);
+      return nextRooms;
+    } catch (loadError) {
+      console.error(loadError);
+      setOpenClassRooms([]);
+      setError(loadError);
+      return [];
+    } finally {
+      setIsLoading(false);
+    }
   }, [enabled, isPracticeMode, user, view]);
 
-  return { openClassRooms, error };
+  useEffect(() => {
+    refreshOpenClassRooms();
+  }, [refreshOpenClassRooms]);
+
+  return { openClassRooms, error, isLoading, refreshOpenClassRooms };
 }

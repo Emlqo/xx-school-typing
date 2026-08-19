@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { onSnapshot, query, where } from 'firebase/firestore';
+import { getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { APP_ID } from '../constants/gameRules.js';
 import { FIRESTORE_PATHS } from '../constants/firestorePaths.js';
 import { db } from '../services/firebaseClient.js';
@@ -33,20 +33,33 @@ export default function useClassStudents({
       where('classId', '==', classId),
       where('active', '==', true),
     );
-    const unsubscribe = onSnapshot(
-      studentsQuery,
-      (snapshot) => {
-        const nextStudents = snapshot.docs
-          .map((doc) => normalizeClassStudent({ id: doc.id, ...doc.data() }))
-          .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
-        setStudents(nextStudents);
-        setError(null);
-      },
-      (snapshotError) => {
-        console.error(snapshotError);
-        setError(snapshotError);
-      },
-    );
+    const applySnapshot = (snapshot) => {
+      const nextStudents = snapshot.docs
+        .map((doc) => normalizeClassStudent({ id: doc.id, ...doc.data() }))
+        .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+      setStudents(nextStudents);
+      setError(null);
+    };
+    const handleError = (snapshotError) => {
+      console.error(snapshotError);
+      setError(snapshotError);
+    };
+
+    if (view !== 'teacher') {
+      let cancelled = false;
+      getDocs(studentsQuery)
+        .then((snapshot) => {
+          if (!cancelled) applySnapshot(snapshot);
+        })
+        .catch((snapshotError) => {
+          if (!cancelled) handleError(snapshotError);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const unsubscribe = onSnapshot(studentsQuery, applySnapshot, handleError);
 
     return () => unsubscribe();
   }, [classId, enabled, isPracticeMode, user, view]);

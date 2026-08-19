@@ -8,6 +8,17 @@ import { getPublicCollection, getPublicDoc } from '../utils/firestoreRefs.js';
 
 const HALL_OF_FAME_CALCULATION_VERSION = 2;
 
+function getKoreanDateKey(value = new Date()) {
+  const sourceDate = typeof value?.toDate === 'function' ? value.toDate() : new Date(value);
+  if (Number.isNaN(sourceDate.getTime())) return '';
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(sourceDate);
+}
+
 function getMonthRange(monthKey) {
   const [yearText, monthText] = String(monthKey || '').split('-');
   const year = Number(yearText);
@@ -91,6 +102,7 @@ export default function useMonthlyScores({
   const [savedHallOfFame, setSavedHallOfFame] = useState(null);
   const [savedScoreCount, setSavedScoreCount] = useState(0);
   const [lastSavedAt, setLastSavedAt] = useState(null);
+  const [lastRefreshDateKey, setLastRefreshDateKey] = useState('');
   const [loadedMonthKey, setLoadedMonthKey] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -103,6 +115,7 @@ export default function useMonthlyScores({
       setSavedHallOfFame(null);
       setSavedScoreCount(0);
       setLastSavedAt(null);
+      setLastRefreshDateKey('');
       setLoadedMonthKey('');
       return undefined;
     }
@@ -124,6 +137,7 @@ export default function useMonthlyScores({
           setSavedHallOfFame(null);
           setSavedScoreCount(0);
           setLastSavedAt(null);
+          setLastRefreshDateKey('');
           setLoadedMonthKey(monthKey);
           return;
         }
@@ -140,6 +154,9 @@ export default function useMonthlyScores({
         ));
         setSavedScoreCount(sourceScoreCount + sourcePracticeCount);
         setLastSavedAt(savedData.updatedAt || null);
+        setLastRefreshDateKey(
+          String(savedData.refreshDateKey || '') || getKoreanDateKey(savedData.updatedAt),
+        );
         setLoadedMonthKey(monthKey);
       } catch (loadError) {
         if (cancelled) return;
@@ -163,6 +180,12 @@ export default function useMonthlyScores({
       return [];
     }
 
+    const todayKey = getKoreanDateKey();
+    if (lastRefreshDateKey === todayKey) {
+      setError(new Error('오늘은 이미 이 달의 명예의 전당 기록을 갱신했습니다. 내일 다시 갱신할 수 있습니다.'));
+      return [];
+    }
+
     setIsLoading(true);
     setError(null);
 
@@ -171,6 +194,7 @@ export default function useMonthlyScores({
       const practiceRecordsRef = getPublicCollection(db, APP_ID, FIRESTORE_PATHS.practiceRecords);
       const monthlyScoresQuery = query(
         scoresRef,
+        where('entryType', '==', 'class'),
         where('createdAt', '>=', monthStart),
         where('createdAt', '<', nextMonthStart),
       );
@@ -194,6 +218,7 @@ export default function useMonthlyScores({
       setSavedHallOfFame(nextHallOfFame);
       setSavedScoreCount(nextScores.length + nextPracticeRecords.length);
       setLastSavedAt(Date.now());
+      setLastRefreshDateKey(todayKey);
       setLoadedMonthKey(monthKey);
 
       await setDoc(savedRef, {
@@ -202,6 +227,7 @@ export default function useMonthlyScores({
         calculationVersion: HALL_OF_FAME_CALCULATION_VERSION,
         sourceScoreCount: nextScores.length,
         sourcePracticeCount: nextPracticeRecords.length,
+        refreshDateKey: todayKey,
         updatedBy: user.uid,
         updatedAt: serverTimestamp(),
       }, { merge: true });
@@ -214,13 +240,14 @@ export default function useMonthlyScores({
     } finally {
       setIsLoading(false);
     }
-  }, [enabled, isPracticeMode, monthKey, monthStart, nextMonthStart, user, view]);
+  }, [enabled, isPracticeMode, lastRefreshDateKey, monthKey, monthStart, nextMonthStart, user, view]);
 
   return {
     monthlyScores,
     savedHallOfFame,
     savedScoreCount,
     lastSavedAt,
+    canRefreshToday: lastRefreshDateKey !== getKoreanDateKey(),
     loadedMonthKey,
     monthStart,
     nextMonthStart,

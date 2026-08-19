@@ -33,6 +33,14 @@
       ]
     },
     {
+      "collectionGroup": "typing_scores",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "entryType", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "typing_duels",
       "queryScope": "COLLECTION",
       "fields": [

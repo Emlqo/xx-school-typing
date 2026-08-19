@@ -1,11 +1,28 @@
 import CherryBlossomBackground from '../common/CherryBlossomBackground.jsx';
 
-export default function StudentRoomEntryView({ student, rooms = [], onJoin = () => {}, onBack = () => {} }) {
+export default function StudentRoomEntryView({
+  student,
+  rooms = [],
+  isLoading = false,
+  onRefresh = () => {},
+  onJoin = () => {},
+  onBack = () => {},
+}) {
   return (
     <div className="min-h-screen spring-bg flex items-center justify-center p-4">
       <CherryBlossomBackground />
       <main className="glass-box rounded-3xl p-6 md:p-9 max-w-3xl w-full z-10 relative shadow-2xl border-2 border-cyan-100">
-        <button type="button" onClick={onBack} className="text-sm font-black text-gray-500 hover:text-teal-700 mb-5">← 메인으로</button>
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <button type="button" onClick={onBack} className="text-sm font-black text-gray-500 hover:text-teal-700">← 메인으로</button>
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={isLoading}
+            className="rounded-xl border border-cyan-100 bg-white px-3 py-2 text-sm font-black text-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isLoading ? '확인 중...' : '↻ 방 새로고침'}
+          </button>
+        </div>
         <div className="text-center mb-7">
           <div className="text-5xl mb-2">🎮</div>
           <h1 className="text-3xl font-black text-gray-800">선수 입장</h1>

@@ -241,7 +241,7 @@ export default function ShopPointManagementPanel({
             <h3 className="text-lg font-black text-gray-800">선택 학급 최근 구매 기록</h3>
           </div>
           <span className="text-xs font-black px-3 py-1 rounded-full bg-cyan-50 border border-cyan-100 text-cyan-700">
-            총 {safeToLocaleNumber(shopPurchases.length)}건
+            최근 {safeToLocaleNumber(shopPurchases.length)}건 (최대 100건)
           </span>
         </div>
         {recentPurchases.length > 0 ? (

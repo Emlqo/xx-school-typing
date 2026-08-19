@@ -181,6 +181,7 @@ export default function HallOfFamePanel({
   scoreCount = 0,
   savedAt = null,
   onRefresh = () => {},
+  canRefreshToday = true,
   isLoading = false,
   error = null,
   readOnly = false,
@@ -217,10 +218,12 @@ export default function HallOfFamePanel({
               <button
                 type="button"
                 onClick={onRefresh}
-                disabled={isLoading}
+                disabled={isLoading || !canRefreshToday}
                 className="w-full mt-3 py-2 bg-yellow-400 hover:bg-yellow-500 disabled:bg-gray-300 disabled:cursor-not-allowed text-yellow-950 rounded-xl font-black transition-colors"
               >
-                {isLoading ? '기록 처리 중...' : '선택한 월 기록 갱신하고 저장'}
+                {isLoading
+                  ? '기록 처리 중...'
+                  : canRefreshToday ? '선택한 월 기록 갱신하고 저장' : '오늘 기록 갱신 완료'}
               </button>
               <div className="text-xs text-gray-400 font-bold mt-2">계산에 사용한 기록 {loadedScoreCount}개</div>
             </>
@@ -230,7 +233,7 @@ export default function HallOfFamePanel({
           )}
           {error && (
             <div className="text-xs text-red-500 font-bold mt-2">
-              기록을 불러오는 중 오류가 발생했습니다.
+              {error.message || '기록을 불러오는 중 오류가 발생했습니다.'}
             </div>
           )}
           {!readOnly && (

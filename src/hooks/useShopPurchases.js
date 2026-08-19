@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { onSnapshot, query, where } from 'firebase/firestore';
+import { limit, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { APP_ID } from '../constants/gameRules.js';
 import { FIRESTORE_PATHS } from '../constants/firestorePaths.js';
 import { db } from '../services/firebaseClient.js';
@@ -32,12 +32,17 @@ export default function useShopPurchases({
     }
 
     const purchasesRef = getPublicCollection(db, APP_ID, FIRESTORE_PATHS.shopPurchases);
-    const purchasesQuery = query(purchasesRef, where('classId', '==', classId));
+    const purchasesQuery = query(
+      purchasesRef,
+      orderBy('createdAt', 'desc'),
+      limit(100),
+    );
     const unsubscribe = onSnapshot(
       purchasesQuery,
       (snapshot) => {
         const nextPurchases = snapshot.docs
           .map((purchaseDoc) => ({ id: purchaseDoc.id, ...purchaseDoc.data() }))
+          .filter((purchase) => purchase.classId === classId)
           .sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
         setShopPurchases(nextPurchases);
         setError(null);

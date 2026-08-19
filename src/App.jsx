@@ -181,6 +181,7 @@ export default function App() {
   const [teacherDuelHistoryLoading, setTeacherDuelHistoryLoading] = useState(false);
   const [teacherDuelHistoryError, setTeacherDuelHistoryError] = useState('');
   const [teacherDuelHistoryLoaded, setTeacherDuelHistoryLoaded] = useState(false);
+  const [teacherSection, setTeacherSection] = useState('overview');
   const [teacherLiveEnabled, setTeacherLiveEnabled] = useState(false);
   const [selectedTeacherLiveDuelId, setSelectedTeacherLiveDuelId] = useState('');
   const [teacherFinalizingDuelId, setTeacherFinalizingDuelId] = useState('');
@@ -215,19 +216,43 @@ export default function App() {
   const teacherAuthorized = useMemo(() => isTeacherUser(user), [user]);
   const scopedUser = view === 'teacher' && !teacherAuthorized ? null : user;
   const firestoreReadsEnabled = !(view === 'playing' && isPracticeMode);
-  const { announcements: subscribedAnnouncements } = useAnnouncements({ user: scopedUser, enabled: firestoreReadsEnabled });
+  const teacherOverviewActive = view !== 'teacher' || teacherSection === 'overview' || teacherSection === 'classes';
+  const teacherClassDataActive = view !== 'teacher' || ['overview', 'classes', 'shop'].includes(teacherSection);
+  const { announcements: subscribedAnnouncements, refreshAnnouncements } = useAnnouncements({
+    user: scopedUser,
+    enabled: firestoreReadsEnabled
+      && (view === 'login' || (view === 'teacher' && teacherSection === 'records')),
+  });
   const { quizzes: subscribedQuizzes } = useQuizzes({
     user: scopedUser,
     view,
     isPracticeMode,
     isDuelMode,
-    enabled: firestoreReadsEnabled,
+    enabled: firestoreReadsEnabled && view === 'teacher' && teacherSection === 'quizzes',
   });
-  const { rooms: subscribedRooms } = useTeacherRooms({ user: scopedUser, view, enabled: firestoreReadsEnabled });
+  const { rooms: subscribedRooms } = useTeacherRooms({
+    user: scopedUser,
+    view,
+    enabled: firestoreReadsEnabled && teacherOverviewActive,
+  });
   const wordsView = isDuelMode && view === 'playing' ? 'duelPlaying' : view;
-  const { words } = useWords({ user: scopedUser, view: wordsView, isPracticeMode, enabled: firestoreReadsEnabled });
-  const { classes } = useClasses({ user: scopedUser, view, isPracticeMode, enabled: firestoreReadsEnabled });
-  const { openClassRooms } = useOpenClassRooms({ user: scopedUser, view, isPracticeMode, enabled: firestoreReadsEnabled });
+  const { words } = useWords({
+    user: scopedUser,
+    view: wordsView,
+    isPracticeMode,
+    enabled: firestoreReadsEnabled && view === 'teacher' && teacherSection === 'words',
+  });
+  const { classes } = useClasses({
+    user: scopedUser,
+    view,
+    isPracticeMode,
+    enabled: firestoreReadsEnabled && teacherClassDataActive,
+  });
+  const {
+    openClassRooms,
+    isLoading: openClassRoomsLoading,
+    refreshOpenClassRooms,
+  } = useOpenClassRooms({ user: scopedUser, view, isPracticeMode, enabled: firestoreReadsEnabled });
   const selectedOpenClassRoom = useMemo(
     () => openClassRooms.find((room) => room.id === selectedOpenClassRoomId) || null,
     [openClassRooms, selectedOpenClassRoomId],
@@ -243,7 +268,7 @@ export default function App() {
         ? selectedOpenClassRoom?.classId || ''
         : selectedClassId,
     isPracticeMode,
-    enabled: firestoreReadsEnabled,
+    enabled: firestoreReadsEnabled && teacherClassDataActive,
   });
   const { roomScores: selectedOpenClassRoomScores } = useRoomScores({
     user: scopedUser,
@@ -255,32 +280,34 @@ export default function App() {
   const shopClassId = view === 'teacher'
     ? selectedClassId
     : studentProfile?.classId || selectedOpenClassRoom?.classId || '';
-  const { shopItems } = useShopItems({
+  const { shopItems, refreshShopItems } = useShopItems({
     user: scopedUser,
     view,
     classId: shopClassId,
     isPracticeMode,
-    enabled: firestoreReadsEnabled,
+    enabled: firestoreReadsEnabled
+      && (view === 'login' || (view === 'teacher' && teacherSection === 'shop')),
   });
   const { shopPurchases } = useShopPurchases({
     user: scopedUser,
     view,
     classId: selectedClassId,
     isPracticeMode,
-    enabled: firestoreReadsEnabled && view === 'teacher',
+    enabled: firestoreReadsEnabled && view === 'teacher' && teacherSection === 'shop',
   });
   const { scores: subscribedScores } = useScores({
     user: scopedUser,
     view,
     viewingRoomId,
     currentScoreDocId,
-    enabled: firestoreReadsEnabled || view === 'teacher',
+    enabled: firestoreReadsEnabled && teacherOverviewActive,
   });
   const {
     monthlyScores,
     savedHallOfFame,
     savedScoreCount,
     lastSavedAt: hallOfFameSavedAt,
+    canRefreshToday: canRefreshHallOfFameToday,
     loadedMonthKey: hallOfFameLoadedMonthKey,
     refreshMonthlyScores,
     isLoading: isHallOfFameLoading,
@@ -290,7 +317,8 @@ export default function App() {
     view,
     monthKey: hallOfFameMonthKey,
     isPracticeMode,
-    enabled: firestoreReadsEnabled && (view === 'teacher' || view === 'hallOfFame'),
+    enabled: firestoreReadsEnabled
+      && (view === 'hallOfFame' || (view === 'teacher' && teacherSection === 'records')),
   });
   const { incomingChallenge, outgoingChallenge } = useDuelChallenge({
     user: scopedUser,
@@ -308,7 +336,8 @@ export default function App() {
     user: scopedUser,
     enabled: firestoreReadsEnabled
       && Boolean(scopedUser)
-      && (view === 'teacher' || (Boolean(studentProfile) && (view === 'login' || view === 'duelChallenge'))),
+      && ((view === 'teacher' && teacherSection === 'duelLive')
+        || (Boolean(studentProfile) && (view === 'login' || view === 'duelChallenge'))),
   });
   const { duel: activeDuel } = useDuel({
     user: scopedUser,
@@ -1018,6 +1047,10 @@ export default function App() {
       }
     } catch (error) {
       console.error(error);
+    } finally {
+      setSelectedRoomId('');
+      setCurrentScoreDocId(null);
+      setMyRoomData(null);
     }
   }, [activeDuel?.id, currentScoreDocId, gameDuration, isDuelMode, isPracticeMode, scores, studentProfile?.id, syncDuelScore]);
 
@@ -1562,6 +1595,7 @@ export default function App() {
           isAlert: annIsAlert,
           updatedAt: serverTimestamp(),
         });
+        await refreshAnnouncements();
         clearAnnouncementForm();
         return;
       }
@@ -1573,6 +1607,7 @@ export default function App() {
         isAlert: annIsAlert,
         createdAt: serverTimestamp(),
       });
+      await refreshAnnouncements();
       clearAnnouncementForm();
     } catch (error) {
       console.error(error);
@@ -1587,6 +1622,7 @@ export default function App() {
     try {
       const announcementRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.announcements, announcementId);
       await deleteDoc(announcementRef);
+      await refreshAnnouncements();
       if (editingAnnId === announcementId) clearAnnouncementForm();
     } catch (error) {
       console.error(error);
@@ -2174,6 +2210,7 @@ export default function App() {
       if (result?.profile && studentProfile?.id === normalizedStudent.id) {
         setStudentProfile((previous) => normalizeClassStudent({ ...previous, ...result.profile }));
       }
+      await refreshShopItems();
       return result;
     } catch (error) {
       console.error(error);
@@ -2224,6 +2261,7 @@ export default function App() {
           createdBy: user?.uid || null,
         });
       }
+      await refreshShopItems();
       return true;
     } catch (error) {
       console.error(error);
@@ -2239,6 +2277,7 @@ export default function App() {
     try {
       const itemRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.shopItems, itemId);
       await deleteDoc(itemRef);
+      await refreshShopItems();
     } catch (error) {
       console.error(error);
       alert('상품 삭제 중 오류가 발생했습니다.');
@@ -2254,6 +2293,7 @@ export default function App() {
       if (result?.profile && studentProfile?.id === normalizedStudent.id) {
         setStudentProfile((previous) => normalizeClassStudent({ ...previous, ...result.profile }));
       }
+      await refreshShopItems();
       alert(`${item.name} 구매가 완료되었습니다.`);
       return result;
     } catch (error) {
@@ -2532,6 +2572,9 @@ export default function App() {
     setPwdError('');
     setIsPracticeMode(false);
     setSelectedOpenClassRoomId('');
+    setSelectedRoomId('');
+    setCurrentScoreDocId(null);
+    setMyRoomData(null);
   };
 
   const handleTeacherLogout = async () => {
@@ -2672,6 +2715,8 @@ export default function App() {
       <StudentRoomEntryView
         student={studentProfile}
         rooms={studentOpenClassRooms}
+        isLoading={openClassRoomsLoading}
+        onRefresh={refreshOpenClassRooms}
         onJoin={handleJoinClassStudent}
         onBack={() => setView('login')}
       />
@@ -2683,7 +2728,13 @@ export default function App() {
       <WaitingView
         nickname={nickname}
         myRoomData={myRoomData}
-        onLeave={() => setView(studentProfile && myRoomData?.entryType === 'class' ? 'studentRoomEntry' : 'studentLobby')}
+        onLeave={() => {
+          const nextView = studentProfile && myRoomData?.entryType === 'class' ? 'studentRoomEntry' : 'studentLobby';
+          setSelectedRoomId('');
+          setCurrentScoreDocId(null);
+          setMyRoomData(null);
+          setView(nextView);
+        }}
       />
     );
   }
@@ -2801,6 +2852,8 @@ export default function App() {
   if (view === 'teacher') {
     return (
       <TeacherDashboardView
+        activeSection={teacherSection}
+        setActiveSection={setTeacherSection}
         getLeaderboard={getLeaderboard}
         currentTime={currentTime}
         onLogout={handleTeacherLogout}
@@ -2889,6 +2942,7 @@ export default function App() {
         hallOfFameScoreCount={savedScoreCount}
         hallOfFameSavedAt={hallOfFameSavedAt}
         refreshHallOfFame={refreshMonthlyScores}
+        canRefreshHallOfFameToday={canRefreshHallOfFameToday}
         isHallOfFameLoading={isHallOfFameLoading}
         hallOfFameError={hallOfFameError}
         grantHallOfFameTitles={handleGrantHallOfFameTitles}
