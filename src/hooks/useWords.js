@@ -15,7 +15,8 @@ export default function useWords({
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const canSubscribeWords = view === 'teacher' || (view === 'playing' && !isPracticeMode);
+    // Student games use the bundled word lists to avoid one read per word and student.
+    const canSubscribeWords = view === 'teacher';
 
     if (!enabled || !user || !db || !canSubscribeWords || isPracticeMode) {
       setWords([]);

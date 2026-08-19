@@ -10,12 +10,10 @@ export default function useQuizzes({ user, view, isPracticeMode, isDuelMode = fa
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    // Student games use LOCAL_QUIZZES; only the teacher management view reads this collection.
     const isTeacherView = view === 'teacher';
-    const isRealtimeGameView = !isPracticeMode
-      && !isDuelMode
-      && (view === 'waiting' || view === 'playing');
 
-    if (!enabled || !user || !db || (!isTeacherView && !isRealtimeGameView)) {
+    if (!enabled || !user || !db || !isTeacherView) {
       setQuizzes([]);
       return undefined;
     }
