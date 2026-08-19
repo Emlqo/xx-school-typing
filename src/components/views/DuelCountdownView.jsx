@@ -47,7 +47,7 @@ export default function DuelCountdownView({ duel = null, studentId = '', onReady
           <div key={count} className="text-8xl md:text-9xl font-black text-transparent bg-clip-text bg-gradient-to-br from-rose-500 to-orange-400 animate-success-pop">
             {count > 0 ? count : '시작!'}
           </div>
-          <p className="mt-6 font-bold text-gray-500">5분 혼합 타자 · 동일 단어와 동일 퀴즈 · 승부 포인트 5P</p>
+          <p className="mt-6 font-bold text-gray-500">3분 혼합 타자 · 동일 단어와 동일 퀴즈 · 승부 포인트 5P</p>
         </div>
       </div>
     </div>

@@ -127,6 +127,11 @@ export default function TeacherDashboardView({
   finalizeSelectedLiveDuel = () => {},
   cancelAllLiveDuels = () => {},
   isCancellingAllLiveDuels = false,
+  duelEnabled = true,
+  duelAvailabilityLoading = false,
+  duelAvailabilityError = null,
+  toggleDuelAvailability = () => {},
+  isUpdatingDuelAvailability = false,
   onLiveSectionChange = () => {},
 }) {
   const [activeSection, setActiveSection] = useState('overview');
@@ -362,6 +367,11 @@ export default function TeacherDashboardView({
             onFinalizeSelected={finalizeSelectedLiveDuel}
             onCancelAll={cancelAllLiveDuels}
             isCancellingAll={isCancellingAllLiveDuels}
+            duelEnabled={duelEnabled}
+            availabilityLoading={duelAvailabilityLoading}
+            availabilityError={duelAvailabilityError}
+            onToggleAvailability={toggleDuelAvailability}
+            isUpdatingAvailability={isUpdatingDuelAvailability}
           />
         )}
       </div>

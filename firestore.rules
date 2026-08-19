@@ -173,6 +173,11 @@ service cloud.firestore {
       allow create, delete: if false;
     }
 
+    match /artifacts/{appId}/public/data/typing_settings/{settingId} {
+      allow read: if isSupportedApp(appId) && isSignedIn();
+      allow create, update, delete: if isSupportedApp(appId) && isTeacher();
+    }
+
     match /artifacts/{appId}/users/{userId}/{document=**} {
       allow read, write: if isSignedIn() && request.auth.uid == userId;
     }

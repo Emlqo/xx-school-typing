@@ -9,12 +9,17 @@ export default function DuelChallengeView({
   selectedClassId = '',
   setSelectedClassId = () => {},
   isSubmitting = false,
+  duelEnabled = true,
+  availabilityLoading = false,
   onChallenge = () => {},
   onBack = () => {},
 }) {
   const dailyWinPoints = getCurrentDuelDailyWinPoints(student);
   const reachedDailyLimit = dailyWinPoints >= DUEL_RULES.dailyWinPointLimit;
-  const canChallenge = Number(student?.totalPoints || 0) >= DUEL_RULES.stakePoints && !reachedDailyLimit;
+  const canChallenge = duelEnabled
+    && !availabilityLoading
+    && Number(student?.totalPoints || 0) >= DUEL_RULES.stakePoints
+    && !reachedDailyLimit;
 
   return (
     <div className="min-h-screen spring-bg p-4 md:p-8 relative overflow-hidden">
@@ -25,7 +30,7 @@ export default function DuelChallengeView({
             <div>
               <div className="text-xs font-black tracking-widest text-rose-500">1:1 KEYBOARD DUEL</div>
               <h1 className="text-3xl font-black text-gray-800 mt-1">⚔️ 결투 상대 선택</h1>
-              <p className="text-sm font-bold text-gray-500 mt-2">상대 학급과 이름을 선택해 60초 결투 신청서를 보냅니다.</p>
+              <p className="text-sm font-bold text-gray-500 mt-2">상대 학급과 이름을 선택해 3분 결투 신청서를 보냅니다.</p>
             </div>
             <button type="button" onClick={onBack} className="px-4 py-3 bg-white border border-cyan-100 text-teal-700 rounded-2xl font-black">
               ← 학생 홈
@@ -39,7 +44,7 @@ export default function DuelChallengeView({
             </div>
             <div className="bg-white/90 border border-cyan-100 rounded-2xl p-4">
               <div className="text-xs font-bold text-gray-400">경기 시간</div>
-              <div className="text-2xl font-black text-gray-800">5분 혼합</div>
+              <div className="text-2xl font-black text-gray-800">3분 혼합</div>
             </div>
             <div className="bg-white/90 border border-cyan-100 rounded-2xl p-4">
               <div className="text-xs font-bold text-gray-400">승부 포인트</div>
@@ -54,7 +59,15 @@ export default function DuelChallengeView({
             </div>
           </div>
 
-          {reachedDailyLimit ? (
+          {!duelEnabled ? (
+            <div className="mb-5 rounded-2xl bg-gray-100 border border-gray-200 p-4 text-gray-600 font-black">
+              선생님이 현재 결투 기능을 닫았습니다. 학생 홈으로 돌아가 주세요.
+            </div>
+          ) : availabilityLoading ? (
+            <div className="mb-5 rounded-2xl bg-cyan-50 border border-cyan-200 p-4 text-cyan-700 font-black">
+              결투 가능 여부를 확인하고 있습니다.
+            </div>
+          ) : reachedDailyLimit ? (
             <div className="mb-5 rounded-2xl bg-amber-50 border border-amber-200 p-4 text-amber-700 font-black">
               오늘 결투 획득 한도 15P를 모두 채웠습니다. 자정 이후 다시 도전하세요.
             </div>

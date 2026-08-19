@@ -10,6 +10,7 @@ import {
   query,
   runTransaction,
   serverTimestamp,
+  setDoc,
   updateDoc,
   where,
   writeBatch,
@@ -66,6 +67,7 @@ import useFirebaseAuth from './hooks/useFirebaseAuth.js';
 import useDuel from './hooks/useDuel.js';
 import useDuelChallenge from './hooks/useDuelChallenge.js';
 import useDuelScores from './hooks/useDuelScores.js';
+import useDuelSettings from './hooks/useDuelSettings.js';
 import useMonthlyScores from './hooks/useMonthlyScores.js';
 import useOpenClassRooms from './hooks/useOpenClassRooms.js';
 import useQuizzes from './hooks/useQuizzes.js';
@@ -183,6 +185,7 @@ export default function App() {
   const [selectedTeacherLiveDuelId, setSelectedTeacherLiveDuelId] = useState('');
   const [teacherFinalizingDuelId, setTeacherFinalizingDuelId] = useState('');
   const [teacherCancellingAllDuels, setTeacherCancellingAllDuels] = useState(false);
+  const [teacherUpdatingDuelAvailability, setTeacherUpdatingDuelAvailability] = useState(false);
   const [localRooms] = useState([]);
   const [localScores, setLocalScores] = useState([]);
   const [localAnnouncements] = useState([]);
@@ -296,6 +299,16 @@ export default function App() {
     enabled: Boolean(studentProfile)
       && !isPracticeMode
       && (view === 'login' || view === 'duelChallenge'),
+  });
+  const {
+    duelEnabled,
+    isLoading: duelAvailabilityLoading,
+    error: duelAvailabilityError,
+  } = useDuelSettings({
+    user: scopedUser,
+    enabled: firestoreReadsEnabled
+      && Boolean(scopedUser)
+      && (view === 'teacher' || (Boolean(studentProfile) && (view === 'login' || view === 'duelChallenge'))),
   });
   const { duel: activeDuel } = useDuel({
     user: scopedUser,
@@ -2035,8 +2048,30 @@ export default function App() {
     }
   };
 
+  const handleToggleDuelAvailability = async () => {
+    if (!requireTeacherAccess() || teacherUpdatingDuelAvailability) return;
+    setTeacherUpdatingDuelAvailability(true);
+    try {
+      const settingsRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.settings, 'duel');
+      await setDoc(settingsRef, {
+        enabled: !duelEnabled,
+        updatedAt: serverTimestamp(),
+        updatedBy: user?.uid || '',
+      }, { merge: true });
+    } catch (error) {
+      console.error(error);
+      alert('결투 기능 설정을 변경하지 못했습니다. 관리자 권한과 Firestore Rules를 확인해 주세요.');
+    } finally {
+      setTeacherUpdatingDuelAvailability(false);
+    }
+  };
+
   const handleCreateDuelChallenge = async (targetStudent) => {
     if (!studentProfile?.id || !targetStudent?.id || duelProcessing) return;
+    if (!duelEnabled || duelAvailabilityLoading) {
+      alert('선생님이 현재 결투 기능을 닫았습니다.');
+      return;
+    }
     if (Number(studentProfile.totalPoints || 0) < DUEL_RULES.stakePoints) {
       alert('결투를 신청하려면 최소 5P가 필요합니다.');
       return;
@@ -2054,6 +2089,7 @@ export default function App() {
     } catch (error) {
       console.error(error);
       const messages = {
+        'api/duels-disabled': '선생님이 현재 결투 기능을 닫았습니다.',
         'api/failed-precondition': error.message,
         'api/already-exists': error.message,
         'api/permission-denied': '학생 로그인 시간이 만료되었습니다. 다시 로그인해주세요.',
@@ -2079,6 +2115,10 @@ export default function App() {
 
   const handleAcceptDuelChallenge = async () => {
     if (!studentProfile?.id || duelProcessing) return;
+    if (!duelEnabled || duelAvailabilityLoading) {
+      alert('선생님이 현재 결투 기능을 닫았습니다.');
+      return;
+    }
     if (getCurrentDuelDailyWinPoints(studentProfile) >= DUEL_RULES.dailyWinPointLimit) {
       alert('오늘 결투 획득 한도 15P를 모두 채웠습니다. 자정 이후 다시 도전하세요.');
       return;
@@ -2577,6 +2617,8 @@ export default function App() {
         selectedClassId={duelClassId}
         setSelectedClassId={setDuelClassId}
         isSubmitting={duelProcessing}
+        duelEnabled={duelEnabled}
+        availabilityLoading={duelAvailabilityLoading}
         onChallenge={handleCreateDuelChallenge}
         onBack={() => setView('login')}
       />
@@ -2872,6 +2914,11 @@ export default function App() {
         finalizeSelectedLiveDuel={handleFinalizeSelectedDuel}
         cancelAllLiveDuels={handleCancelAllActiveDuels}
         isCancellingAllLiveDuels={teacherCancellingAllDuels}
+        duelEnabled={duelEnabled}
+        duelAvailabilityLoading={duelAvailabilityLoading}
+        duelAvailabilityError={duelAvailabilityError}
+        toggleDuelAvailability={handleToggleDuelAvailability}
+        isUpdatingDuelAvailability={teacherUpdatingDuelAvailability}
         onLiveSectionChange={(isEnabled) => {
           setTeacherLiveEnabled(isEnabled);
           if (!isEnabled) setSelectedTeacherLiveDuelId('');
@@ -2915,9 +2962,15 @@ export default function App() {
         onGuestClick={() => setView('studentLobby')}
         onHallOfFameClick={() => setView('hallOfFame')}
         onDuelClick={() => {
+          if (!duelEnabled || duelAvailabilityLoading) {
+            alert('선생님이 현재 결투 기능을 닫았습니다.');
+            return;
+          }
           setDuelClassId('');
           setView('duelChallenge');
         }}
+        duelEnabled={duelEnabled}
+        duelAvailabilityLoading={duelAvailabilityLoading}
         onDuelHistoryClick={handleOpenDuelHistory}
         onStudentLogout={handleStudentLogout}
         onTeacherClick={openTeacherLogin}
@@ -2932,8 +2985,14 @@ export default function App() {
         <DuelChallengeModal
           challenge={incomingChallenge?.targetStudentId === studentProfile?.id ? incomingChallenge : null}
           isProcessing={duelProcessing}
-          canAccept={getCurrentDuelDailyWinPoints(studentProfile) < DUEL_RULES.dailyWinPointLimit}
-          disabledReason="오늘 결투 획득 한도 15P를 모두 채워 수락할 수 없습니다."
+          canAccept={duelEnabled
+            && !duelAvailabilityLoading
+            && getCurrentDuelDailyWinPoints(studentProfile) < DUEL_RULES.dailyWinPointLimit}
+          disabledReason={!duelEnabled
+            ? '선생님이 현재 결투 기능을 닫았습니다.'
+            : duelAvailabilityLoading
+              ? '결투 가능 여부를 확인하고 있습니다.'
+              : '오늘 결투 획득 한도 15P를 모두 채워 수락할 수 없습니다.'}
           onAccept={handleAcceptDuelChallenge}
           onReject={handleRejectDuelChallenge}
         />

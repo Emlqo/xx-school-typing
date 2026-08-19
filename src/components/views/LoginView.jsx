@@ -130,6 +130,8 @@ export default function LoginView({
   onGuestClick = () => {},
   onHallOfFameClick = () => {},
   onDuelClick = () => {},
+  duelEnabled = true,
+  duelAvailabilityLoading = false,
   onDuelHistoryClick = () => {},
   onStudentLogout = () => {},
   onTeacherClick = () => {},
@@ -193,8 +195,12 @@ export default function LoginView({
             <button onClick={onHallOfFameClick} className="w-full py-4 bg-gradient-to-r from-amber-300 via-yellow-300 to-orange-300 hover:from-amber-400 hover:via-yellow-400 hover:to-orange-400 text-amber-950 rounded-2xl font-black text-lg shadow-lg shadow-yellow-300/50 transition-all flex items-center justify-center gap-2 transform hover:scale-105">
               🏆 명예의 전당
             </button>
-            <button onClick={onDuelClick} className="w-full py-4 bg-gradient-to-r from-rose-500 via-red-500 to-orange-500 hover:from-rose-600 hover:via-red-600 hover:to-orange-600 text-white rounded-2xl font-black text-lg shadow-lg shadow-rose-300/50 transition-all flex items-center justify-center gap-2 transform hover:scale-105">
-              ⚔️ 1:1 결투 신청
+            <button
+              onClick={onDuelClick}
+              disabled={!duelEnabled || duelAvailabilityLoading}
+              className="w-full py-4 bg-gradient-to-r from-rose-500 via-red-500 to-orange-500 hover:from-rose-600 hover:via-red-600 hover:to-orange-600 text-white rounded-2xl font-black text-lg shadow-lg shadow-rose-300/50 transition-all flex items-center justify-center gap-2 transform hover:scale-105 disabled:from-gray-400 disabled:via-gray-400 disabled:to-gray-500 disabled:shadow-none disabled:hover:scale-100 disabled:cursor-not-allowed"
+            >
+              {duelAvailabilityLoading ? '⚔️ 결투 상태 확인 중' : duelEnabled ? '⚔️ 1:1 결투 신청' : '🔒 결투 일시 중지'}
             </button>
             <button onClick={onDuelHistoryClick} className="w-full py-3 bg-white/90 hover:bg-white text-rose-600 rounded-2xl font-black border-2 border-rose-100 transition-all flex items-center justify-center gap-2">
               📜 최근 결투 전적 보기

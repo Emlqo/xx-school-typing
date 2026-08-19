@@ -263,6 +263,15 @@ describe('practice records', () => {
 });
 
 describe('duel security boundary', () => {
+  test('signed-in students can read duel settings but only the teacher can change them', async () => {
+    await seed('typing_settings', 'duel', { enabled: true });
+    const studentDb = testEnv.authenticatedContext(STUDENT_UID).firestore();
+    const teacherDb = testEnv.authenticatedContext(TEACHER_UID).firestore();
+    await assertSucceeds(getDoc(publicDoc(studentDb, 'typing_settings', 'duel')));
+    await assertFails(updateDoc(publicDoc(studentDb, 'typing_settings', 'duel'), { enabled: false }));
+    await assertSucceeds(updateDoc(publicDoc(teacherDb, 'typing_settings', 'duel'), { enabled: false }));
+  });
+
   test('student can watch their own duel inbox but cannot forge a challenge', async () => {
     const db = testEnv.authenticatedContext(STUDENT_UID).firestore();
     await assertSucceeds(getDoc(publicDoc(db, 'typing_duel_challenges', STUDENT_UID)));

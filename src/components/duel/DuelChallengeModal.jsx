@@ -37,7 +37,7 @@ export default function DuelChallengeModal({
         <div className="grid grid-cols-3 gap-2 my-6">
           <div className="bg-white rounded-2xl p-3 border border-rose-100">
             <div className="text-xs font-bold text-gray-400">시간</div>
-            <div className="font-black text-gray-800">5분</div>
+            <div className="font-black text-gray-800">3분</div>
           </div>
           <div className="bg-white rounded-2xl p-3 border border-rose-100">
             <div className="text-xs font-bold text-gray-400">모드</div>

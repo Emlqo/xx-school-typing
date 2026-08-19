@@ -7,6 +7,7 @@ import {
   getDuelWord,
 } from '../src/utils/duel.js';
 import {
+  areDuelsEnabled,
   calculateDuelSettlement,
   DUEL_RULES as DUEL_SERVER_RULES,
   isDuelExpired,
@@ -21,6 +22,13 @@ test('duel score synchronization uses a traffic-safe interval', () => {
 test('duel duration is three minutes on the client and server', () => {
   assert.equal(DUEL_RULES.durationSeconds, 180);
   assert.equal(DUEL_SERVER_RULES.durationMs, 180_000);
+});
+
+test('duel availability defaults to on and respects the teacher switch', () => {
+  assert.equal(areDuelsEnabled(null), true);
+  assert.equal(areDuelsEnabled({}), true);
+  assert.equal(areDuelsEnabled({ enabled: true }), true);
+  assert.equal(areDuelsEnabled({ enabled: false }), false);
 });
 
 test('students listen only to the opponent score while teachers can listen to both', () => {

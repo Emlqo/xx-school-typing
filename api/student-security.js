@@ -20,6 +20,7 @@ const PATHS = {
   duelChallenges: 'typing_duel_challenges',
   duels: 'typing_duels',
   duelScores: 'typing_duel_scores',
+  settings: 'typing_settings',
 };
 
 export const DUEL_RULES = {
@@ -109,6 +110,17 @@ function toMillis(value) {
 export function isDuelExpired(endsAt, now = Date.now(), graceMs = DUEL_RULES.finalizeGraceMs) {
   const endsAtMillis = toMillis(endsAt);
   return endsAtMillis > 0 && Number(now) >= endsAtMillis + Number(graceMs || 0);
+}
+
+export function areDuelsEnabled(settings = null) {
+  return settings?.enabled !== false;
+}
+
+async function requireDuelsEnabled() {
+  const snapshot = await publicCollection(PATHS.settings).doc('duel').get();
+  if (!areDuelsEnabled(snapshot.exists ? snapshot.data() : null)) {
+    throw new ApiError(409, 'api/duels-disabled', '선생님이 현재 결투 기능을 닫았습니다.');
+  }
 }
 
 export function calculateDuelSettlement(challengerScore, targetScore, stakePoints = DUEL_RULES.stakePoints) {
@@ -726,6 +738,7 @@ async function createDuelChallenge(uid, body) {
   if (!callerSession.exists || toMillis(callerSession.data().expiresAt) <= Date.now()) {
     throw new ApiError(403, 'api/permission-denied', '학생 인증이 만료되었습니다.');
   }
+  await requireDuelsEnabled();
   const challengerStudentId = callerSession.data().studentId;
   if (!challengerStudentId || challengerStudentId === targetStudentId) {
     throw new ApiError(400, 'api/invalid-argument', '본인에게는 결투를 신청할 수 없습니다.');
@@ -854,6 +867,7 @@ async function rejectDuelChallenge(uid, body) {
 async function acceptDuelChallenge(uid, body) {
   const targetStudentId = requireString(body.targetStudentId, 'targetStudentId');
   await requireSession(uid, targetStudentId);
+  await requireDuelsEnabled();
   const quizSequence = sanitizeQuizSequence(body.quizSequence);
   const challengeRef = publicCollection(PATHS.duelChallenges).doc(uid);
   const duelRef = publicCollection(PATHS.duels).doc();

@@ -146,6 +146,11 @@ export default function TeacherDuelLivePanel({
   onFinalizeSelected = () => {},
   onCancelAll = () => {},
   isCancellingAll = false,
+  duelEnabled = true,
+  availabilityLoading = false,
+  availabilityError = null,
+  onToggleAvailability = () => {},
+  isUpdatingAvailability = false,
 }) {
   const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
   const selectedStillListed = useMemo(
@@ -183,6 +188,17 @@ export default function TeacherDuelLivePanel({
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
+              onClick={onToggleAvailability}
+              disabled={availabilityLoading || isUpdatingAvailability}
+              title={duelEnabled ? '새 결투 신청과 수락을 중지합니다.' : '새 결투 신청과 수락을 허용합니다.'}
+              className={`rounded-xl border px-4 py-2 font-black shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${duelEnabled ? 'border-emerald-200 bg-emerald-500 text-white hover:bg-emerald-600' : 'border-gray-300 bg-gray-700 text-white hover:bg-gray-800'}`}
+            >
+              {availabilityLoading || isUpdatingAvailability
+                ? '결투 설정 확인 중...'
+                : duelEnabled ? '결투 신청 ON' : '결투 신청 OFF'}
+            </button>
+            <button
+              type="button"
               onClick={onCancelAll}
               disabled={duels.length === 0 || isCancellingAll}
               title="수업 종료 시 모든 진행 중 결투를 취소하고 승부 포인트를 반환합니다."
@@ -209,6 +225,17 @@ export default function TeacherDuelLivePanel({
             </button>
           </div>
         </div>
+
+        {availabilityError && (
+          <div className="border-b border-red-200 bg-red-50 px-5 py-3 text-sm font-black text-red-700">
+            결투 설정을 불러오지 못해 안전하게 결투 신청을 막았습니다.
+          </div>
+        )}
+        {!availabilityLoading && !duelEnabled && !availabilityError && (
+          <div className="border-b border-amber-200 bg-amber-50 px-5 py-3 text-sm font-black text-amber-800">
+            새 결투 신청과 수락이 중지되어 있습니다. 이미 시작된 경기는 계속 진행됩니다.
+          </div>
+        )}
 
         <div className="grid min-h-[520px] grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)]">
           <aside className="border-b border-cyan-100 bg-cyan-50/60 p-4 lg:border-b-0 lg:border-r">
