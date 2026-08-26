@@ -145,6 +145,13 @@ export default function AssessmentManagementPanel({ classes = [] }) {
     const nameDiff = a.name.localeCompare(b.name, 'ko');
     return statusSortKey === 'name' && statusSortDirection === 'desc' ? -nameDiff : nameDiff;
   }), [statusRows, statusSortDirection, statusSortKey]);
+  const statusTableColumns = useMemo(() => {
+    const middleIndex = Math.ceil(sortedStatusRows.length / 2);
+    return [
+      sortedStatusRows.slice(0, middleIndex),
+      sortedStatusRows.slice(middleIndex),
+    ];
+  }, [sortedStatusRows]);
 
   const resetForm = () => {
     setForm(createEmptyForm());
@@ -502,49 +509,45 @@ export default function AssessmentManagementPanel({ classes = [] }) {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {statusLoading && (
-            <div className="md:col-span-2 rounded-2xl border border-cyan-100 bg-white/90 py-14 text-center text-base font-black text-teal-600">
+            <div className="lg:col-span-2 rounded-2xl border border-cyan-100 bg-white/90 py-14 text-center text-base font-black text-teal-600">
               응시 현황을 연결하고 있습니다.
             </div>
           )}
-          {sortedStatusRows.map((row) => {
-            const submission = row.submission;
-            const isCompleted = submission?.status === 'completed';
-            const stateText = !submission ? '미응시' : isCompleted ? '제출 완료' : '응시 중';
-            return (
-              <article key={row.studentId} className="min-h-40 rounded-2xl border-2 border-cyan-100 bg-white/95 p-5 shadow-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="min-w-0 truncate text-xl font-black text-gray-800">{row.name}</h3>
-                  <span className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-black ${!submission ? 'bg-gray-100 text-gray-500' : isCompleted ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                    {stateText}
-                  </span>
-                </div>
-
-                <div className="mt-5 grid grid-cols-2 border-y border-cyan-100 py-4">
-                  <div className="border-r border-cyan-100 text-center">
-                    <div className="text-sm font-bold text-gray-400">최근 점수</div>
-                    <div className="mt-1 text-2xl font-black text-sky-600">{isCompleted ? `${submission.latestScore}점` : '-'}</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-sm font-bold text-gray-400">최고 점수</div>
-                    <div className="mt-1 text-2xl font-black text-emerald-600">{submission?.attemptCount ? `${submission.bestScore}점` : '-'}</div>
-                  </div>
-                </div>
-
-                {showStatusDetails && (
-                  <div className="mt-4 flex items-center justify-between gap-3">
-                    <span className="text-base font-black text-gray-500">응시 {submission?.attemptCount || 0}회</span>
-                    <button type="button" onClick={() => resetSubmission(row.studentId)} disabled={!submission} className="rounded-lg bg-red-50 px-3 py-2 text-sm font-black text-red-500 disabled:bg-gray-50 disabled:text-gray-300">
-                      기록 초기화
-                    </button>
-                  </div>
-                )}
-              </article>
-            );
-          })}
+          {!statusLoading && statusRows.length > 0 && statusTableColumns.map((columnRows, columnIndex) => (
+            <div key={`status-column-${columnIndex + 1}`} className="overflow-x-auto rounded-2xl border-2 border-cyan-100 bg-white/95 shadow-sm">
+              <table className="w-full min-w-[520px] text-base">
+                <thead className="bg-cyan-50 text-teal-800">
+                  <tr>
+                    <th className="px-4 py-4 text-left text-base">학생</th>
+                    <th className="px-3 py-4 text-center text-base">상태</th>
+                    <th className="px-3 py-4 text-center text-base">최근</th>
+                    <th className="px-3 py-4 text-center text-base">최고</th>
+                    {showStatusDetails && <><th className="px-3 py-4 text-center text-base">횟수</th><th className="px-3 py-4 text-center text-base">관리</th></>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {columnRows.map((row) => {
+                    const submission = row.submission;
+                    const isCompleted = submission?.status === 'completed';
+                    const stateText = !submission ? '미응시' : isCompleted ? '제출 완료' : '응시 중';
+                    return (
+                      <tr key={row.studentId} className="border-t border-cyan-100">
+                        <td className="px-4 py-4 text-lg font-black text-gray-800">{row.name}</td>
+                        <td className="px-3 py-4 text-center"><span className={`whitespace-nowrap rounded-full px-2.5 py-1.5 text-sm font-black ${!submission ? 'bg-gray-100 text-gray-500' : isCompleted ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{stateText}</span></td>
+                        <td className="px-3 py-4 text-center text-lg font-black text-sky-600">{isCompleted ? `${submission.latestScore}점` : '-'}</td>
+                        <td className="px-3 py-4 text-center text-lg font-black text-emerald-600">{submission?.attemptCount ? `${submission.bestScore}점` : '-'}</td>
+                        {showStatusDetails && <><td className="px-3 py-4 text-center font-black text-gray-500">{submission?.attemptCount || 0}회</td><td className="px-3 py-4 text-center"><button type="button" onClick={() => resetSubmission(row.studentId)} disabled={!submission} className="whitespace-nowrap rounded-lg bg-red-50 px-2.5 py-2 text-sm font-black text-red-500 disabled:bg-gray-50 disabled:text-gray-300">초기화</button></td></>}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ))}
           {!statusLoading && statusRows.length === 0 && (
-            <div className="md:col-span-2 rounded-2xl border border-cyan-100 bg-white/90 py-14 text-center text-base font-bold text-gray-400">
+            <div className="lg:col-span-2 rounded-2xl border border-cyan-100 bg-white/90 py-14 text-center text-base font-bold text-gray-400">
               평가와 학급을 선택하면 응시 현황이 실시간으로 표시됩니다.
             </div>
           )}
