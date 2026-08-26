@@ -51,6 +51,7 @@ import {
   verifyStudentLoginPin,
   verifyStudentPin,
 } from './services/studentSecurityApi.js';
+import { clearStudentDirectoryCache } from './services/studentDirectoryCache.js';
 import { getPublicCollection, getPublicDoc } from './utils/firestoreRefs.js';
 import { calculateHallOfFame, getHallOfFameTitleWinners, getMonthKey } from './utils/hallOfFame.js';
 import { calculateCpm, calculateQuizScore, calculateTypingScore, getQuizWrongPenalty } from './utils/scoring.js';
@@ -390,12 +391,14 @@ export default function App() {
   useEffect(() => {
     if (!authReady) return undefined;
     if (!user) {
+      clearStudentDirectoryCache();
       setStudentProfile(null);
       setStudentSessionExpiresAt(0);
       setStudentSessionChecked(true);
       return undefined;
     }
     if (!user.isAnonymous) {
+      clearStudentDirectoryCache();
       setStudentProfile(null);
       setStudentSessionExpiresAt(0);
       setStudentSessionChecked(true);
@@ -413,6 +416,7 @@ export default function App() {
           setNickname(result.profile.name || '');
           setView((currentView) => currentView === 'entry' ? 'login' : currentView);
         } else {
+          clearStudentDirectoryCache(user.uid);
           setStudentProfile(null);
           setStudentSessionExpiresAt(0);
         }
@@ -420,6 +424,7 @@ export default function App() {
       .catch((error) => {
         console.error(error);
         if (!cancelled) {
+          clearStudentDirectoryCache(user.uid);
           setStudentProfile(null);
           setStudentSessionExpiresAt(0);
         }
@@ -507,6 +512,7 @@ export default function App() {
     if (!studentProfile || !studentSessionExpiresAt) return undefined;
     const remaining = studentSessionExpiresAt - Date.now();
     if (remaining <= 0) {
+      clearStudentDirectoryCache(user?.uid || '');
       setStudentProfile(null);
       setStudentSessionExpiresAt(0);
       setView('entry');
@@ -514,13 +520,14 @@ export default function App() {
     }
 
     const timer = window.setTimeout(() => {
+      clearStudentDirectoryCache(user?.uid || '');
       setStudentProfile(null);
       setStudentSessionExpiresAt(0);
       setView('entry');
       alert('학생 로그인 시간이 만료되었습니다. 다시 로그인해 주세요.');
     }, remaining);
     return () => window.clearTimeout(timer);
-  }, [studentProfile, studentSessionExpiresAt]);
+  }, [studentProfile, studentSessionExpiresAt, user?.uid]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -1959,6 +1966,7 @@ export default function App() {
 
   const handleStudentLogout = async () => {
     await logoutStudentSession().catch((error) => console.error(error));
+    clearStudentDirectoryCache(user?.uid || '');
     setStudentProfile(null);
     setStudentSessionExpiresAt(0);
     setStudentLoginClassId('');

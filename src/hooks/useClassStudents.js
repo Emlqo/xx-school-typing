@@ -3,6 +3,7 @@ import { getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { APP_ID } from '../constants/gameRules.js';
 import { FIRESTORE_PATHS } from '../constants/firestorePaths.js';
 import { db } from '../services/firebaseClient.js';
+import { getCachedStudentDirectory } from '../services/studentDirectoryCache.js';
 import { normalizeClassStudent } from '../utils/classStudents.js';
 import { getPublicCollection } from '../utils/firestoreRefs.js';
 
@@ -47,9 +48,17 @@ export default function useClassStudents({
 
     if (view !== 'teacher') {
       let cancelled = false;
-      getDocs(studentsQuery)
-        .then((snapshot) => {
-          if (!cancelled) applySnapshot(snapshot);
+      const cacheKey = `${user.uid}:class-students:${classId}`;
+      getCachedStudentDirectory(cacheKey, () => getDocs(studentsQuery).then((snapshot) => (
+        snapshot.docs
+          .map((doc) => normalizeClassStudent({ id: doc.id, ...doc.data() }))
+          .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))
+      )))
+        .then((nextStudents) => {
+          if (!cancelled) {
+            setStudents(nextStudents);
+            setError(null);
+          }
         })
         .catch((snapshotError) => {
           if (!cancelled) handleError(snapshotError);

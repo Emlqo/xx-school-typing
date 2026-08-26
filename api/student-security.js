@@ -406,7 +406,24 @@ async function createSession(uid, studentId, student) {
     createdAt: FieldValue.serverTimestamp(),
     expiresAt,
   });
+  await cleanupExpiredStudentSessions(studentId).catch((error) => {
+    console.error('Failed to clean up expired student sessions:', error);
+  });
   return expiresAt.toMillis();
+}
+
+async function cleanupExpiredStudentSessions(studentId) {
+  const expiredSessions = await publicCollection(PATHS.studentSessions)
+    .where('studentId', '==', studentId)
+    .where('expiresAt', '<=', Timestamp.now())
+    .orderBy('expiresAt', 'desc')
+    .limit(10)
+    .get();
+  if (expiredSessions.empty) return;
+
+  const batch = database().batch();
+  expiredSessions.docs.forEach((snapshot) => batch.delete(snapshot.ref));
+  await batch.commit();
 }
 
 async function getStudentSession(uid) {
@@ -829,12 +846,14 @@ async function recordPracticeCompletion(uid, body) {
 async function findActiveStudentSession(studentId) {
   const sessions = await publicCollection(PATHS.studentSessions)
     .where('studentId', '==', studentId)
+    .where('expiresAt', '>', Timestamp.now())
+    .orderBy('expiresAt', 'desc')
+    .limit(1)
     .get();
-  const activeSessions = sessions.docs
-    .map((snapshot) => ({ uid: snapshot.id, data: snapshot.data() }))
-    .filter((session) => toMillis(session.data.expiresAt) > Date.now())
-    .sort((a, b) => toMillis(b.data.expiresAt) - toMillis(a.data.expiresAt));
-  return activeSessions[0] || null;
+  const activeSession = sessions.docs[0];
+  return activeSession
+    ? { uid: activeSession.id, data: activeSession.data() }
+    : null;
 }
 
 async function createDuelChallenge(uid, body) {
