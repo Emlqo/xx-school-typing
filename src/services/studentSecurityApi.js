@@ -56,3 +56,22 @@ export const getTeacherDuelHistory = (cursorMillis = 0) => call(
 export const finalizeDuel = (duelId, studentId) => call('finalizeDuel', { duelId, studentId });
 export const finalizeExpiredDuel = (duelId) => call('finalizeExpiredDuel', { duelId });
 export const cancelAllActiveDuels = () => call('cancelAllActiveDuels');
+export const listActiveAssessments = () => call('listActiveAssessments');
+export const startAssessment = (assessmentId) => call('startAssessment', { assessmentId });
+export const submitAssessment = (assessmentId, answers) => call('submitAssessment', { assessmentId, answers });
+export const listTeacherAssessments = () => call('listTeacherAssessments');
+export const getTeacherAssessment = (assessmentId) => call('getTeacherAssessment', { assessmentId });
+export const saveTeacherAssessment = (assessment) => call('saveTeacherAssessment', { assessment });
+export const updateTeacherAssessmentStatus = (assessmentId, status) => call(
+  'updateTeacherAssessmentStatus',
+  { assessmentId, status },
+);
+export const deleteTeacherAssessment = (assessmentId) => call('deleteTeacherAssessment', { assessmentId });
+export const getTeacherAssessmentStatus = (assessmentId, classId) => call(
+  'getTeacherAssessmentStatus',
+  { assessmentId, classId },
+);
+export const resetTeacherAssessmentSubmission = (assessmentId, studentId) => call(
+  'resetTeacherAssessmentSubmission',
+  { assessmentId, studentId },
+);

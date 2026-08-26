@@ -1,6 +1,7 @@
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore';
+import { calculateAssessmentResult, createAssessmentSubmissionId } from '../src/utils/assessments.js';
 
 const APP_ID = 'xx-school-typing-app';
 const TEACHER_UID = String(process.env.TEACHER_UID || 'hnjJNGDuydcd4SfQ2Xq5cE6IujD3').trim();
@@ -21,7 +22,13 @@ const PATHS = {
   duels: 'typing_duels',
   duelScores: 'typing_duel_scores',
   settings: 'typing_settings',
+  assessments: 'typing_assessments',
+  assessmentKeys: 'typing_assessment_keys',
+  assessmentSubmissions: 'typing_assessment_submissions',
 };
+
+const ASSESSMENT_STATUSES = new Set(['draft', 'active', 'closed']);
+const ASSESSMENT_MAX_QUESTIONS = 50;
 
 export const DUEL_RULES = {
   challengeDurationMs: 60 * 1000,
@@ -98,6 +105,87 @@ function requirePracticeRunId(value) {
     throw new ApiError(400, 'api/invalid-argument', '연습 기록 식별자가 올바르지 않습니다.');
   }
   return runId;
+}
+
+function requireTeacher(uid) {
+  if (uid !== TEACHER_UID) {
+    throw new ApiError(403, 'api/permission-denied', '관리자 권한이 필요합니다.');
+  }
+}
+
+function requireAssessmentStatus(value) {
+  const status = String(value || 'draft');
+  if (!ASSESSMENT_STATUSES.has(status)) {
+    throw new ApiError(400, 'api/invalid-argument', '형성평가 상태가 올바르지 않습니다.');
+  }
+  return status;
+}
+
+function sanitizeAssessmentQuestions(value) {
+  if (!Array.isArray(value) || value.length === 0 || value.length > ASSESSMENT_MAX_QUESTIONS) {
+    throw new ApiError(400, 'api/invalid-argument', `문항은 1개 이상 ${ASSESSMENT_MAX_QUESTIONS}개 이하여야 합니다.`);
+  }
+
+  const usedIds = new Set();
+  return value.map((question, index) => {
+    const id = requireString(question?.id || `question-${index + 1}`, `문항 ${index + 1} ID`, 80);
+    if (usedIds.has(id)) throw new ApiError(400, 'api/invalid-argument', '중복된 문항 ID가 있습니다.');
+    usedIds.add(id);
+    const text = requireString(question?.text, `${index + 1}번 문항`, 500);
+    const options = Array.isArray(question?.options)
+      ? question.options.map((option) => requireString(option, `${index + 1}번 보기`, 200))
+      : [];
+    if (options.length !== 4) {
+      throw new ApiError(400, 'api/invalid-argument', `${index + 1}번 문항은 보기 4개가 필요합니다.`);
+    }
+    const answer = Number(question?.answer);
+    if (!Number.isInteger(answer) || answer < 0 || answer > 3) {
+      throw new ApiError(400, 'api/invalid-argument', `${index + 1}번 문항의 정답이 올바르지 않습니다.`);
+    }
+    return { id, text, options, answer };
+  });
+}
+
+function safeAssessment(assessmentId, data = {}, includeQuestions = true) {
+  return {
+    id: assessmentId,
+    title: data.title || '',
+    description: data.description || '',
+    status: data.status || 'draft',
+    targetClassIds: Array.isArray(data.targetClassIds) ? data.targetClassIds : [],
+    questionCount: Array.isArray(data.questions) ? data.questions.length : Number(data.questionCount || 0),
+    ...(includeQuestions ? {
+      questions: Array.isArray(data.questions)
+        ? data.questions.map((question) => ({
+          id: question.id || '',
+          text: question.text || '',
+          options: Array.isArray(question.options) ? question.options : [],
+        }))
+        : [],
+    } : {}),
+    createdAt: toMillis(data.createdAt),
+    updatedAt: toMillis(data.updatedAt),
+  };
+}
+
+function sanitizeSubmittedAnswers(value, questions) {
+  if (!Array.isArray(value)) {
+    throw new ApiError(400, 'api/invalid-argument', '제출 답안이 올바르지 않습니다.');
+  }
+  const questionIds = new Set(questions.map((question) => String(question.id || '')));
+  const answerMap = new Map();
+  value.forEach((item) => {
+    const id = String(item?.id || '').trim();
+    const answer = Number(item?.answer);
+    if (!questionIds.has(id) || !Number.isInteger(answer) || answer < 0 || answer > 3 || answerMap.has(id)) {
+      throw new ApiError(400, 'api/invalid-argument', '제출 답안이 올바르지 않습니다.');
+    }
+    answerMap.set(id, answer);
+  });
+  if (answerMap.size !== questions.length) {
+    throw new ApiError(400, 'api/incomplete-assessment', '모든 문항에 답한 뒤 제출하세요.');
+  }
+  return questions.map((question) => ({ id: question.id, answer: answerMap.get(question.id) }));
 }
 
 function toMillis(value) {
@@ -1303,6 +1391,265 @@ async function syncPublicClassRoster(uid) {
   return { synced };
 }
 
+async function requireCurrentStudentSession(uid) {
+  const snapshot = await publicCollection(PATHS.studentSessions).doc(uid).get();
+  if (!snapshot.exists) throw new ApiError(403, 'api/permission-denied', '학생 PIN 로그인이 필요합니다.');
+  const session = snapshot.data();
+  if (!session.studentId || !session.classId || toMillis(session.expiresAt) <= Date.now()) {
+    throw new ApiError(403, 'api/permission-denied', '학생 인증이 만료되었습니다. 다시 로그인하세요.');
+  }
+  return session;
+}
+
+function assertAssessmentAvailable(assessment, classId) {
+  const targetClassIds = Array.isArray(assessment.targetClassIds) ? assessment.targetClassIds : [];
+  if (assessment.status !== 'active' || !targetClassIds.includes(classId)) {
+    throw new ApiError(403, 'api/permission-denied', '현재 참여할 수 없는 형성평가입니다.');
+  }
+}
+
+async function listActiveAssessments(uid) {
+  const session = await requireCurrentStudentSession(uid);
+  const snapshot = await publicCollection(PATHS.assessments)
+    .where('status', '==', 'active')
+    .where('targetClassIds', 'array-contains', session.classId)
+    .limit(10)
+    .get();
+  const assessments = snapshot.docs
+    .map((item) => safeAssessment(item.id, item.data(), false))
+    .sort((a, b) => b.createdAt - a.createdAt);
+  return { assessments };
+}
+
+async function startAssessment(uid, body) {
+  const assessmentId = requireString(body.assessmentId, 'assessmentId', 100);
+  const session = await requireCurrentStudentSession(uid);
+  const assessmentRef = publicCollection(PATHS.assessments).doc(assessmentId);
+  const assessmentSnapshot = await assessmentRef.get();
+  if (!assessmentSnapshot.exists) throw new ApiError(404, 'api/not-found', '형성평가를 찾을 수 없습니다.');
+  const assessment = assessmentSnapshot.data();
+  assertAssessmentAvailable(assessment, session.classId);
+
+  const { data: student } = await getActiveStudent(session.studentId);
+  if (student.classId !== session.classId) {
+    throw new ApiError(403, 'api/permission-denied', '학생의 학급 정보가 일치하지 않습니다.');
+  }
+
+  const submissionId = createAssessmentSubmissionId(assessmentId, session.studentId);
+  await publicCollection(PATHS.assessmentSubmissions).doc(submissionId).set({
+    assessmentId,
+    assessmentTitle: assessment.title || '',
+    classId: session.classId,
+    className: student.className || '',
+    studentId: session.studentId,
+    nickname: student.name || '',
+    userId: uid,
+    status: 'in_progress',
+    startedAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+
+  return { assessment: safeAssessment(assessmentId, assessment, true) };
+}
+
+async function submitAssessment(uid, body) {
+  const assessmentId = requireString(body.assessmentId, 'assessmentId', 100);
+  const session = await requireCurrentStudentSession(uid);
+  const assessmentRef = publicCollection(PATHS.assessments).doc(assessmentId);
+  const keyRef = publicCollection(PATHS.assessmentKeys).doc(assessmentId);
+  const submissionRef = publicCollection(PATHS.assessmentSubmissions)
+    .doc(createAssessmentSubmissionId(assessmentId, session.studentId));
+  let responseData;
+
+  await database().runTransaction(async (transaction) => {
+    const [assessmentSnapshot, keySnapshot, submissionSnapshot] = await Promise.all([
+      transaction.get(assessmentRef),
+      transaction.get(keyRef),
+      transaction.get(submissionRef),
+    ]);
+    if (!assessmentSnapshot.exists || !keySnapshot.exists) {
+      throw new ApiError(404, 'api/not-found', '형성평가 또는 정답표를 찾을 수 없습니다.');
+    }
+    if (!submissionSnapshot.exists || submissionSnapshot.data().status !== 'in_progress') {
+      throw new ApiError(409, 'api/failed-precondition', '형성평가 참여를 다시 시작한 뒤 제출하세요.');
+    }
+
+    const assessment = assessmentSnapshot.data();
+    assertAssessmentAvailable(assessment, session.classId);
+    const questions = Array.isArray(assessment.questions) ? assessment.questions : [];
+    const answers = sanitizeSubmittedAnswers(body.answers, questions);
+    const key = Array.isArray(keySnapshot.data().answers) ? keySnapshot.data().answers : [];
+    const result = calculateAssessmentResult(questions, key, answers);
+    const previous = submissionSnapshot.data();
+    const attemptCount = Math.max(0, Number(previous.attemptCount || 0)) + 1;
+    const bestScore = Math.max(Math.max(0, Number(previous.bestScore || 0)), result.score);
+
+    transaction.update(submissionRef, {
+      status: 'completed',
+      attemptCount,
+      latestScore: result.score,
+      bestScore,
+      correctCount: result.correctCount,
+      totalQuestions: result.totalQuestions,
+      latestAnswers: answers,
+      submittedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    responseData = { ...result, attemptCount, bestScore };
+  });
+
+  return responseData;
+}
+
+async function listTeacherAssessments(uid) {
+  requireTeacher(uid);
+  const snapshot = await publicCollection(PATHS.assessments)
+    .orderBy('createdAt', 'desc')
+    .limit(50)
+    .get();
+  return {
+    assessments: snapshot.docs.map((item) => safeAssessment(item.id, item.data(), false)),
+  };
+}
+
+async function getTeacherAssessment(uid, body) {
+  requireTeacher(uid);
+  const assessmentId = requireString(body.assessmentId, 'assessmentId', 100);
+  const [assessmentSnapshot, keySnapshot] = await Promise.all([
+    publicCollection(PATHS.assessments).doc(assessmentId).get(),
+    publicCollection(PATHS.assessmentKeys).doc(assessmentId).get(),
+  ]);
+  if (!assessmentSnapshot.exists) throw new ApiError(404, 'api/not-found', '형성평가를 찾을 수 없습니다.');
+  const assessment = safeAssessment(assessmentId, assessmentSnapshot.data(), true);
+  const answerMap = new Map(
+    (keySnapshot.exists && Array.isArray(keySnapshot.data().answers) ? keySnapshot.data().answers : [])
+      .map((item) => [String(item.id || ''), Number(item.answer)]),
+  );
+  return {
+    assessment: {
+      ...assessment,
+      questions: assessment.questions.map((question) => ({
+        ...question,
+        answer: answerMap.has(question.id) ? answerMap.get(question.id) : 0,
+      })),
+    },
+  };
+}
+
+async function saveTeacherAssessment(uid, body) {
+  requireTeacher(uid);
+  const source = body.assessment || {};
+  const title = requireString(source.title, '평가 제목', 100);
+  const description = String(source.description || '').trim().slice(0, 500);
+  const status = requireAssessmentStatus(source.status);
+  const targetClassIds = [...new Set(
+    (Array.isArray(source.targetClassIds) ? source.targetClassIds : [])
+      .map((classId) => requireString(classId, '대상 학급', 100)),
+  )];
+  if (targetClassIds.length === 0) {
+    throw new ApiError(400, 'api/invalid-argument', '대상 학급을 한 개 이상 선택하세요.');
+  }
+  const questions = sanitizeAssessmentQuestions(source.questions);
+  const assessmentId = source.id
+    ? requireString(source.id, 'assessmentId', 100)
+    : publicCollection(PATHS.assessments).doc().id;
+  const assessmentRef = publicCollection(PATHS.assessments).doc(assessmentId);
+  const keyRef = publicCollection(PATHS.assessmentKeys).doc(assessmentId);
+  const existingSnapshot = await assessmentRef.get();
+  const batch = database().batch();
+  const timestampFields = existingSnapshot.exists
+    ? { updatedAt: FieldValue.serverTimestamp() }
+    : { createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() };
+
+  batch.set(assessmentRef, {
+    title,
+    description,
+    status,
+    targetClassIds,
+    questionCount: questions.length,
+    questions: questions.map(({ id, text, options }) => ({ id, text, options })),
+    createdBy: uid,
+    ...timestampFields,
+  }, { merge: true });
+  batch.set(keyRef, {
+    assessmentId,
+    answers: questions.map(({ id, answer }) => ({ id, answer })),
+    updatedBy: uid,
+    ...timestampFields,
+  }, { merge: true });
+  await batch.commit();
+  return { assessmentId };
+}
+
+async function updateTeacherAssessmentStatus(uid, body) {
+  requireTeacher(uid);
+  const assessmentId = requireString(body.assessmentId, 'assessmentId', 100);
+  const status = requireAssessmentStatus(body.status);
+  await publicCollection(PATHS.assessments).doc(assessmentId).update({
+    status,
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+  return { assessmentId, status };
+}
+
+async function deleteTeacherAssessment(uid, body) {
+  requireTeacher(uid);
+  const assessmentId = requireString(body.assessmentId, 'assessmentId', 100);
+  const batch = database().batch();
+  batch.delete(publicCollection(PATHS.assessments).doc(assessmentId));
+  batch.delete(publicCollection(PATHS.assessmentKeys).doc(assessmentId));
+  await batch.commit();
+  return { assessmentId };
+}
+
+function safeAssessmentSubmission(data = {}) {
+  return {
+    status: data.status || '',
+    attemptCount: Math.max(0, Number(data.attemptCount || 0)),
+    latestScore: Math.max(0, Number(data.latestScore || 0)),
+    bestScore: Math.max(0, Number(data.bestScore || 0)),
+    correctCount: Math.max(0, Number(data.correctCount || 0)),
+    totalQuestions: Math.max(0, Number(data.totalQuestions || 0)),
+    startedAt: toMillis(data.startedAt),
+    submittedAt: toMillis(data.submittedAt),
+  };
+}
+
+async function getTeacherAssessmentStatus(uid, body) {
+  requireTeacher(uid);
+  const assessmentId = requireString(body.assessmentId, 'assessmentId', 100);
+  const classId = requireString(body.classId, 'classId', 100);
+  const [studentsSnapshot, submissionsSnapshot] = await Promise.all([
+    publicCollection(PATHS.classStudents).where('classId', '==', classId).get(),
+    publicCollection(PATHS.assessmentSubmissions)
+      .where('assessmentId', '==', assessmentId)
+      .where('classId', '==', classId)
+      .get(),
+  ]);
+  const submissionMap = new Map(
+    submissionsSnapshot.docs.map((item) => [item.data().studentId, safeAssessmentSubmission(item.data())]),
+  );
+  const rows = studentsSnapshot.docs
+    .filter((item) => item.data().active !== false)
+    .map((item) => ({
+      studentId: item.id,
+      name: item.data().name || '',
+      submission: submissionMap.get(item.id) || null,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+  return { rows };
+}
+
+async function resetTeacherAssessmentSubmission(uid, body) {
+  requireTeacher(uid);
+  const assessmentId = requireString(body.assessmentId, 'assessmentId', 100);
+  const studentId = requireString(body.studentId, 'studentId', 100);
+  await publicCollection(PATHS.assessmentSubmissions)
+    .doc(createAssessmentSubmissionId(assessmentId, studentId))
+    .delete();
+  return { assessmentId, studentId };
+}
+
 const actions = {
   getStudentSession,
   logoutStudentSession,
@@ -1326,6 +1673,16 @@ const actions = {
   finalizeDuel,
   finalizeExpiredDuel,
   cancelAllActiveDuels,
+  listActiveAssessments,
+  startAssessment,
+  submitAssessment,
+  listTeacherAssessments,
+  getTeacherAssessment,
+  saveTeacherAssessment,
+  updateTeacherAssessmentStatus,
+  deleteTeacherAssessment,
+  getTeacherAssessmentStatus,
+  resetTeacherAssessmentSubmission,
 };
 
 export default async function handler(request, response) {

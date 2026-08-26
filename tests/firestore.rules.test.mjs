@@ -262,6 +262,28 @@ describe('practice records', () => {
   });
 });
 
+describe('assessment server boundary', () => {
+  test('students cannot read assessment content, answer keys, or submissions directly', async () => {
+    await seed('typing_assessments', 'assessment-1', { title: '평가', status: 'active' });
+    await seed('typing_assessment_keys', 'assessment-1', { answers: [{ id: 'q1', answer: 0 }] });
+    await seed('typing_assessment_submissions', 'assessment-1_student-1', {
+      assessmentId: 'assessment-1',
+      studentId: 'student-1',
+      latestScore: 100,
+    });
+    const db = testEnv.authenticatedContext(STUDENT_UID).firestore();
+    await assertFails(getDoc(publicDoc(db, 'typing_assessments', 'assessment-1')));
+    await assertFails(getDoc(publicDoc(db, 'typing_assessment_keys', 'assessment-1')));
+    await assertFails(getDoc(publicDoc(db, 'typing_assessment_submissions', 'assessment-1_student-1')));
+  });
+
+  test('teacher client also uses the trusted API for assessment data', async () => {
+    const db = testEnv.authenticatedContext(TEACHER_UID).firestore();
+    await assertFails(setDoc(publicDoc(db, 'typing_assessments', 'assessment-1'), { title: '직접 쓰기' }));
+    await assertFails(getDoc(publicDoc(db, 'typing_assessment_keys', 'assessment-1')));
+  });
+});
+
 describe('duel security boundary', () => {
   test('signed-in students can read duel settings but only the teacher can change them', async () => {
     await seed('typing_settings', 'duel', { enabled: true });

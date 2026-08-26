@@ -91,6 +91,7 @@ import ResultView from './components/views/ResultView.jsx';
 import StudentLobbyView from './components/views/StudentLobbyView.jsx';
 import StudentLoginView from './components/views/StudentLoginView.jsx';
 import StudentHallOfFameView from './components/views/StudentHallOfFameView.jsx';
+import AssessmentView from './components/views/AssessmentView.jsx';
 import StudentRoomEntryView from './components/views/StudentRoomEntryView.jsx';
 import TeacherDashboardView from './components/views/TeacherDashboardView.jsx';
 import TeacherLoginView from './components/views/TeacherLoginView.jsx';
@@ -158,6 +159,7 @@ export default function App() {
   const [selectedOpenClassRoomId, setSelectedOpenClassRoomId] = useState('');
   const [studentLoginClassId, setStudentLoginClassId] = useState('');
   const [studentProfile, setStudentProfile] = useState(null);
+  const [selectedAssessmentId, setSelectedAssessmentId] = useState('');
   const [studentSessionExpiresAt, setStudentSessionExpiresAt] = useState(0);
   const [studentSessionChecked, setStudentSessionChecked] = useState(false);
   const [hallOfFameMonthKey, setHallOfFameMonthKey] = useState(() => getMonthKey(new Date()));
@@ -217,7 +219,7 @@ export default function App() {
   const scopedUser = view === 'teacher' && !teacherAuthorized ? null : user;
   const firestoreReadsEnabled = !(view === 'playing' && isPracticeMode);
   const teacherOverviewActive = view !== 'teacher' || teacherSection === 'overview' || teacherSection === 'classes';
-  const teacherClassDataActive = view !== 'teacher' || ['overview', 'classes', 'shop'].includes(teacherSection);
+  const teacherClassDataActive = view !== 'teacher' || ['overview', 'classes', 'shop', 'assessments'].includes(teacherSection);
   const { announcements: subscribedAnnouncements, refreshAnnouncements } = useAnnouncements({
     user: scopedUser,
     enabled: firestoreReadsEnabled
@@ -2651,6 +2653,19 @@ export default function App() {
     );
   }
 
+  if (view === 'assessment' && studentProfile && selectedAssessmentId) {
+    return (
+      <AssessmentView
+        assessmentId={selectedAssessmentId}
+        studentProfile={studentProfile}
+        onHome={() => {
+          setSelectedAssessmentId('');
+          setView('login');
+        }}
+      />
+    );
+  }
+
   if (view === 'duelChallenge' && studentProfile) {
     return (
       <DuelChallengeView
@@ -3034,6 +3049,10 @@ export default function App() {
         onBuyStockItem={handleBuyStockItem}
         onEquipCosmetic={handleEquipCosmetic}
         onRefreshStudentProfile={refreshStudentProfile}
+        onOpenAssessment={(assessmentId) => {
+          setSelectedAssessmentId(assessmentId);
+          setView('assessment');
+        }}
       />
       {view === 'login' && (
         <DuelChallengeModal

@@ -178,6 +178,20 @@ service cloud.firestore {
       allow create, update, delete: if isSupportedApp(appId) && isTeacher();
     }
 
+    // Assessments, answer keys, and submissions are available only through the
+    // trusted server API so answer keys and submitted scores cannot be forged.
+    match /artifacts/{appId}/public/data/typing_assessments/{assessmentId} {
+      allow read, write: if false;
+    }
+
+    match /artifacts/{appId}/public/data/typing_assessment_keys/{assessmentId} {
+      allow read, write: if false;
+    }
+
+    match /artifacts/{appId}/public/data/typing_assessment_submissions/{submissionId} {
+      allow read, write: if false;
+    }
+
     match /artifacts/{appId}/users/{userId}/{document=**} {
       allow read, write: if isSignedIn() && request.auth.uid == userId;
     }

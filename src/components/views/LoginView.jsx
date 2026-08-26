@@ -3,6 +3,7 @@ import CherryBlossomBackground from '../common/CherryBlossomBackground.jsx';
 import LinkifiedText from '../common/LinkifiedText.jsx';
 import { REWARD_RULES } from '../../constants/rewards.js';
 import StudentHomeShopPanel from '../common/StudentHomeShopPanel.jsx';
+import StudentAssessmentBoard from '../common/StudentAssessmentBoard.jsx';
 
 const SECOND_SEMESTER_START = { year: 2026, monthIndex: 7, day: 18 };
 
@@ -141,6 +142,7 @@ export default function LoginView({
   onBuyStockItem = async () => null,
   onEquipCosmetic = async () => null,
   onRefreshStudentProfile = async () => null,
+  onOpenAssessment = () => {},
 }) {
   const secondSemesterDay = calculateSecondSemesterDay();
 
@@ -173,7 +175,7 @@ export default function LoginView({
           <div className="text-6xl mb-3 animate-bounce">🎮🏔️</div>
 
           <h1 className="text-4xl md:text-5xl font-black mb-3 italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-sky-600 via-teal-500 to-emerald-500 drop-shadow-sm">
-            풍양중학교<br />키보드 배틀
+            풍양중학교<br />정보 시스템
           </h1>
 
           <p className="text-teal-900/70 font-bold mb-5 tracking-wide">
@@ -217,6 +219,7 @@ export default function LoginView({
         </div>
 
         <div className="glass-box rounded-3xl p-5 md:p-6 shadow-2xl border-2 border-cyan-100 space-y-5">
+          <StudentAssessmentBoard onOpenAssessment={onOpenAssessment} />
           <AnnouncementBoard
             announcements={announcements}
             onOpenModal={() => setShowAnnouncementModal(true)}

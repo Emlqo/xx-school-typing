@@ -1,4 +1,4 @@
-# 풍양중학교 키보드 배틀
+# 풍양중학교 정보 시스템
 
 중학교 정보/컴퓨터 수업에서 사용할 수 있는 웹 기반 타자 연습 및 실시간 퀴즈 게임 플랫폼입니다.
 학생은 4자리 PIN 코드로 반에 입장하고, 교사는 대시보드에서 방 생성, 게임 시작, 점수판 확인, 공지사항, 퀴즈, 게임 밸런스를 관리할 수 있습니다.
@@ -16,6 +16,8 @@
 - 학생별 부스터 ON/OFF, 점수 배율, 난이도 조정
 - 공지사항 등록, 수정, 삭제, 팝업 공지
 - 퀴즈 등록, 삭제
+- 4지선다 형성평가 출제, 재응시, 서버 자동 채점
+- 학급별 미응시/응시 중/제출 완료 및 점수 현황
 
 ## 기술 스택
 
@@ -83,6 +85,9 @@ artifacts/[appId]/public/data/typing_class_students
 artifacts/[appId]/public/data/typing_class_roster
 artifacts/[appId]/public/data/typing_student_sessions
 artifacts/[appId]/public/data/typing_room_presence
+artifacts/[appId]/public/data/typing_assessments
+artifacts/[appId]/public/data/typing_assessment_keys
+artifacts/[appId]/public/data/typing_assessment_submissions
 ```
 
 컬렉션 역할:
@@ -95,6 +100,9 @@ artifacts/[appId]/public/data/typing_room_presence
 - `typing_class_roster`: 학생이 읽을 수 있는 이름, 학급, PIN 설정 여부
 - `typing_student_sessions`: PIN 인증 후 서버가 발급하는 학생 세션
 - `typing_room_presence`: 방별 최소 입장 현황
+- `typing_assessments`: 학생에게 공개할 평가 정보와 정답 없는 문제
+- `typing_assessment_keys`: 서버 채점용 정답표, 클라이언트 직접 접근 금지
+- `typing_assessment_submissions`: 학생별 응시 상태, 최근/최고 점수, 응시 횟수
 
 PIN 검증, 학생 입장, 포인트 보상, 구매, 장착은 `/api/student-security`에서 Firebase ID 토큰을 검증한 후 처리합니다.
 
@@ -108,6 +116,8 @@ PIN 검증, 학생 입장, 포인트 보상, 구매, 장착은 `/api/student-sec
 - 점수 동기화는 점수가 실제로 변경된 경우에만 `updateDoc`을 호출해야 합니다.
 - 퀴즈 오답 감점처럼 점수가 감소하는 경우도 동기화 대상이므로 `!==` 비교를 유지해야 합니다.
 - Firestore 경로 helper와 `FIRESTORE_PATHS` 상수를 통해 경로를 유지해야 합니다.
+- 형성평가는 시작·제출 시에만 쓰고, 교사 현황은 수동 새로고침으로만 조회합니다.
+- 재응시는 `assessmentId_studentId` 고정 문서를 갱신해 제출 문서 수를 늘리지 않습니다.
 
 ## 배포 후 확인 체크리스트
 

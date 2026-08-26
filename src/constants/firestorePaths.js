@@ -17,4 +17,7 @@ export const FIRESTORE_PATHS = {
   duels: 'typing_duels',
   duelScores: 'typing_duel_scores',
   settings: 'typing_settings',
+  assessments: 'typing_assessments',
+  assessmentKeys: 'typing_assessment_keys',
+  assessmentSubmissions: 'typing_assessment_submissions',
 };

@@ -1,5 +1,6 @@
 import CherryBlossomBackground from '../common/CherryBlossomBackground.jsx';
 import AnnouncementManagementPanel from '../teacher/AnnouncementManagementPanel.jsx';
+import AssessmentManagementPanel from '../teacher/AssessmentManagementPanel.jsx';
 import ClassManagementPanel from '../teacher/ClassManagementPanel.jsx';
 import HallOfFamePanel from '../teacher/HallOfFamePanel.jsx';
 import LeaderboardPanel from '../teacher/LeaderboardPanel.jsx';
@@ -328,6 +329,10 @@ export default function TeacherDashboardView({
             quizzes={quizzes}
             handleDeleteQuiz={handleDeleteQuiz}
           />
+        )}
+
+        {activeSection === 'assessments' && (
+          <AssessmentManagementPanel classes={classes} />
         )}
 
         {activeSection === 'words' && (

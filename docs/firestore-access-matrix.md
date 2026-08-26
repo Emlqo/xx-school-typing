@@ -26,6 +26,9 @@ The rules are for local Emulator verification only until the compatibility gaps 
 | `typing_hall_of_fame` | Deny | Allow | Deny | Full CRUD |
 | `typing_shop_items` | Deny | Allow | Deny | Full CRUD |
 | `typing_shop_purchases` | Deny | Deny | Deny | Read only; writes reserved for server |
+| `typing_assessments` | Deny | Deny | Deny | Server API only |
+| `typing_assessment_keys` | Deny | Deny | Deny | Server API only |
+| `typing_assessment_submissions` | Deny | Deny | Deny | Server API only |
 
 ## Current client access inventory
 
@@ -41,6 +44,9 @@ The rules are for local Emulator verification only until the compatibility gaps 
 | `typing_hall_of_fame` | Signed-in users/teacher panel | Teacher save action | Teacher save action | None |
 | `typing_shop_items` | Teacher and selected-class students | Teacher | Teacher; current student purchase transaction also decrements stock | Teacher |
 | `typing_shop_purchases` | No normal UI list identified | Current student purchase transaction | None | None |
+| `typing_assessments` | Trusted API only | Trusted API only | Trusted API only | Trusted API only |
+| `typing_assessment_keys` | Trusted API only | Trusted API only | Trusted API only | Trusted API only |
+| `typing_assessment_submissions` | Trusted API only | Trusted API only | Trusted API only | Trusted API only |
 
 ## Required query shapes
 

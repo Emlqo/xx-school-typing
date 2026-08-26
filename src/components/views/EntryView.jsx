@@ -11,7 +11,7 @@ export default function EntryView({
       <main className="glass-box rounded-3xl p-7 md:p-10 max-w-lg w-full z-10 relative shadow-2xl border-2 border-cyan-100 text-center">
         <div className="text-6xl mb-3 animate-bounce">🎮🏔️</div>
         <h1 className="text-4xl md:text-5xl font-black mb-3 text-transparent bg-clip-text bg-gradient-to-r from-sky-600 via-teal-500 to-emerald-500">
-          풍양중학교<br />키보드 배틀
+          풍양중학교<br />정보 시스템
         </h1>
         <p className="text-teal-900/70 font-bold mb-8">개인 PIN으로 로그인하고 내 기록과 상점을 확인하세요.</p>
 
