@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ASSESSMENT_STATUS, createEmptyAssessmentQuestion } from '../../constants/assessments.js';
+import {
+  ASSESSMENT_LIMITS,
+  ASSESSMENT_STATUS,
+  createEmptyAssessmentQuestion,
+} from '../../constants/assessments.js';
+import { parseBulkAssessmentQuestions } from '../../utils/assessments.js';
 import {
   deleteTeacherAssessment,
   getTeacherAssessment,
@@ -48,6 +53,9 @@ export default function AssessmentManagementPanel({ classes = [] }) {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
+  const [bulkText, setBulkText] = useState('');
+  const [bulkErrors, setBulkErrors] = useState([]);
+  const [bulkMessage, setBulkMessage] = useState('');
   const [statusAssessmentId, setStatusAssessmentId] = useState('');
   const [statusClassId, setStatusClassId] = useState('');
   const [statusRows, setStatusRows] = useState([]);
@@ -94,6 +102,9 @@ export default function AssessmentManagementPanel({ classes = [] }) {
   const resetForm = () => {
     setForm(createEmptyForm());
     setError('');
+    setBulkText('');
+    setBulkErrors([]);
+    setBulkMessage('');
   };
 
   const toggleTargetClass = (classId) => {
@@ -144,6 +155,37 @@ export default function AssessmentManagementPanel({ classes = [] }) {
         ? current.questions
         : current.questions.filter((_, index) => index !== questionIndex),
     }));
+  };
+
+  const applyBulkQuestions = (mode) => {
+    setBulkErrors([]);
+    setBulkMessage('');
+    const parsed = parseBulkAssessmentQuestions(bulkText, `bulk-${Date.now()}`);
+    if (parsed.errors.length > 0) {
+      setBulkErrors(parsed.errors);
+      return;
+    }
+    if (parsed.questions.length === 0) {
+      setBulkErrors(['등록할 문항을 입력하세요.']);
+      return;
+    }
+
+    const currentQuestions = form.questions.length === 1
+      && !form.questions[0].text.trim()
+      && form.questions[0].options.every((option) => !option.trim())
+      ? []
+      : form.questions;
+    const nextQuestions = mode === 'replace'
+      ? parsed.questions
+      : [...currentQuestions, ...parsed.questions];
+    if (nextQuestions.length > ASSESSMENT_LIMITS.maxQuestions) {
+      setBulkErrors([`형성평가는 최대 ${ASSESSMENT_LIMITS.maxQuestions}문항까지 등록할 수 있습니다.`]);
+      return;
+    }
+
+    setForm((current) => ({ ...current, questions: nextQuestions }));
+    setBulkText('');
+    setBulkMessage(`${parsed.questions.length}개 문항을 ${mode === 'replace' ? '교체' : '추가'}했습니다. 저장 버튼을 눌러야 DB에 반영됩니다.`);
   };
 
   const save = async (status) => {
@@ -284,6 +326,41 @@ export default function AssessmentManagementPanel({ classes = [] }) {
               {classes.length === 0 && <p className="col-span-2 text-sm font-bold text-gray-400">등록된 학급이 없습니다.</p>}
             </div>
           </div>
+        </div>
+
+        <div className="mt-6 rounded-2xl border border-teal-100 bg-teal-50/60 p-4 md:p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="font-black text-teal-800">문항 일괄등록</h3>
+              <p className="mt-1 text-xs font-bold text-teal-600">한 줄에 문제 | 보기1 | 보기2 | 보기3 | 보기4 | 정답번호 형식으로 입력하세요. 엑셀 6개 열을 그대로 붙여넣어도 됩니다.</p>
+            </div>
+            <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-teal-700">최대 {ASSESSMENT_LIMITS.maxQuestions}문항</span>
+          </div>
+          <textarea
+            value={bulkText}
+            onChange={(event) => {
+              setBulkText(event.target.value);
+              setBulkErrors([]);
+              setBulkMessage('');
+            }}
+            rows={7}
+            placeholder={'컴퓨터의 두뇌 역할을 하는 장치는? | CPU | RAM | 키보드 | 모니터 | 1\n정보를 임시 저장하는 장치는? | CPU | RAM | 마우스 | 프린터 | 2'}
+            className="mt-4 w-full resize-y rounded-xl border border-teal-100 bg-white/95 px-4 py-3 font-bold text-gray-700 outline-none focus:ring-2 focus:ring-teal-400"
+          />
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" onClick={() => applyBulkQuestions('replace')} className="rounded-xl bg-teal-600 px-4 py-2 text-sm font-black text-white shadow-sm">
+              현재 문항 교체
+            </button>
+            <button type="button" onClick={() => applyBulkQuestions('append')} className="rounded-xl border border-teal-200 bg-white px-4 py-2 text-sm font-black text-teal-700">
+              기존 문항 뒤에 추가
+            </button>
+          </div>
+          {bulkMessage && <p className="mt-3 text-sm font-black text-emerald-700">{bulkMessage}</p>}
+          {bulkErrors.length > 0 && (
+            <div className="mt-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-600">
+              {bulkErrors.map((bulkError) => <p key={bulkError}>{bulkError}</p>)}
+            </div>
+          )}
         </div>
 
         <div className="mt-6 space-y-4">
