@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   createDuelQuizSequence,
+  getDuelBoosterState,
   getDuelRemainingSeconds,
   getDuelScoreReadPlan,
   getDuelWord,
@@ -22,6 +23,11 @@ test('duel score synchronization uses a traffic-safe interval', () => {
 test('duel duration is three minutes on the client and server', () => {
   assert.equal(DUEL_RULES.durationSeconds, 180);
   assert.equal(DUEL_SERVER_RULES.durationMs, 180_000);
+});
+
+test('duel booster duration matches on the client and trusted server', () => {
+  assert.equal(DUEL_RULES.boosterDurationSeconds, 25);
+  assert.equal(DUEL_SERVER_RULES.boosterDurationMs, 25_000);
 });
 
 test('duel availability defaults to on and respects the teacher switch', () => {
@@ -79,6 +85,25 @@ test('duel quiz snapshot keeps only valid four-option quizzes', () => {
 test('remaining duel time is calculated from the shared server end time', () => {
   assert.equal(getDuelRemainingSeconds({ endsAt: 310000 }, 10000), 300);
   assert.equal(getDuelRemainingSeconds({ endsAt: 9000 }, 10000), 0);
+});
+
+test('duel booster use survives refresh and restores only the remaining time', () => {
+  const now = 100_000;
+  assert.deepEqual(getDuelBoosterState({}, now), {
+    available: true,
+    active: false,
+    timeLeft: 0,
+  });
+  assert.deepEqual(getDuelBoosterState({ boosterUsed: true, boosterEndsAt: now + 12_400 }, now), {
+    available: false,
+    active: true,
+    timeLeft: 13,
+  });
+  assert.deepEqual(getDuelBoosterState({ boosterUsed: true, boosterEndsAt: now - 1 }, now), {
+    available: false,
+    active: false,
+    timeLeft: 0,
+  });
 });
 
 test('daily duel winnings reset at Korean midnight without a database write', () => {

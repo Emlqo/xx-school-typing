@@ -66,3 +66,22 @@ export function parseBulkAssessmentQuestions(text, idPrefix = 'bulk-question') {
 
   return { questions, errors };
 }
+
+export function calculateAssessmentClassSummary(rows = []) {
+  const completedSubmissions = rows
+    .map((row) => row?.submission)
+    .filter((submission) => submission?.status === 'completed');
+  const totalScore = completedSubmissions.reduce(
+    (sum, submission) => sum + Math.max(0, Number(submission.latestScore || 0)),
+    0,
+  );
+  return {
+    completedCount: completedSubmissions.length,
+    averageScore: completedSubmissions.length > 0
+      ? Math.round((totalScore / completedSubmissions.length) * 10) / 10
+      : 0,
+    perfectCount: completedSubmissions.filter(
+      (submission) => Number(submission.latestScore || 0) === 100,
+    ).length,
+  };
+}

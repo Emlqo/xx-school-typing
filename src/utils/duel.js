@@ -45,6 +45,19 @@ export function getDuelRemainingSeconds(duel, now = Date.now()) {
   return endsAt ? Math.max(0, Math.ceil((endsAt - now) / 1000)) : 0;
 }
 
+export function getDuelBoosterState(score = {}, now = Date.now()) {
+  const used = score?.boosterUsed === true;
+  const endsAt = toDuelMillis(score?.boosterEndsAt);
+  const timeLeft = used && endsAt > now
+    ? Math.max(0, Math.ceil((endsAt - now) / 1000))
+    : 0;
+  return {
+    available: !used,
+    active: used && timeLeft > 0,
+    timeLeft,
+  };
+}
+
 export function getDuelScoreReadPlan(duel = {}, viewerStudentId = '') {
   const safeDuel = duel || {};
   const scoreIds = [safeDuel.challengerScoreId, safeDuel.targetScoreId].filter(Boolean);

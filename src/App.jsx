@@ -27,6 +27,7 @@ import {
 import { FIRESTORE_PATHS } from './constants/firestorePaths.js';
 import { db, signInTeacherWithGoogle, signOutFirebaseUser } from './services/firebaseClient.js';
 import {
+  activateDuelBooster,
   buyStudentShopItem,
   cancelAllActiveDuels,
   acceptDuelChallenge,
@@ -59,7 +60,13 @@ import { DUEL_RULES } from './constants/duelRules.js';
 import { verifyTeacherPassword } from './utils/teacherAuth.js';
 import { PRACTICE_RECORD_RULES } from './constants/rewards.js';
 import { calculateRankRewards, getDefaultRewardState } from './utils/rewards.js';
-import { createDuelQuizSequence, getDuelRemainingSeconds, getDuelWord, toDuelMillis } from './utils/duel.js';
+import {
+  createDuelQuizSequence,
+  getDuelBoosterState,
+  getDuelRemainingSeconds,
+  getDuelWord,
+  toDuelMillis,
+} from './utils/duel.js';
 import useAnnouncements from './hooks/useAnnouncements.js';
 import useClasses from './hooks/useClasses.js';
 import useClassStudents from './hooks/useClassStudents.js';
@@ -211,6 +218,7 @@ export default function App() {
   const duelQuizIndexRef = useRef(0);
   const duelSyncDirtyRef = useRef(false);
   const duelSyncPromiseRef = useRef(null);
+  const duelBoosterActivationRef = useRef(false);
   const cancelledDuelHandledRef = useRef('');
   const duelRecoveryStudentRef = useRef('');
 
@@ -747,11 +755,15 @@ export default function App() {
     setCurrentScoreDocId(null);
     setMyRoomData(null);
     restoreScoreState(myDuelScore);
+    const restoredBooster = getDuelBoosterState(myDuelScore);
+    setBoosterAvailable(restoredBooster.available);
+    setBoosterActive(restoredBooster.active);
+    setBoosterTimeLeft(restoredBooster.timeLeft);
     duelWordIndexRef.current = Math.max(0, Number(myDuelScore.wordIndex || 0));
     duelQuizIndexRef.current = Math.max(0, Number(myDuelScore.quizIndex || 0));
     wordCountRef.current = Math.max(0, Number(myDuelScore.wordCountSinceQuiz || 0));
     setTimeLeft(remainingSeconds);
-    gameInfoRef.current.elapsed = Math.max(0, 300 - remainingSeconds);
+    gameInfoRef.current.elapsed = Math.max(0, duelDuration - remainingSeconds);
     isEndingRef.current = false;
     if (remainingSeconds <= 0) {
       setView('duelFinishing');
@@ -1131,8 +1143,8 @@ export default function App() {
     else pickRandomWord(gameMode);
   }, [boosterActive, currentQuiz, currentScoreDocId, gameMode, isDuelMode, myDuelScore, pickDuelContent, pickRandomWord, scores]);
 
-  const activateBooster = useCallback(() => {
-    if (!boosterAvailable || boosterActive) return;
+  const activateBooster = useCallback(async () => {
+    if (!boosterAvailable || boosterActive || duelBoosterActivationRef.current) return;
 
     const myInfo = isDuelMode ? myDuelScore || {} : scores.find((item) => item.id === currentScoreDocId) || {};
     if (myInfo.boosterEnabled === false) {
@@ -1140,10 +1152,37 @@ export default function App() {
       return;
     }
 
+    if (isDuelMode) {
+      if (!activeDuel?.id || !studentProfile?.id) return;
+      duelBoosterActivationRef.current = true;
+      setBoosterAvailable(false);
+      try {
+        const result = await activateDuelBooster(activeDuel.id, studentProfile.id);
+        const approvedBooster = getDuelBoosterState(result);
+        setBoosterAvailable(approvedBooster.available);
+        setBoosterActive(approvedBooster.active);
+        setBoosterTimeLeft(approvedBooster.timeLeft);
+      } catch (error) {
+        console.error('결투 부스터 활성화 오류', error);
+        if (error.code === 'api/booster-already-used') {
+          setBoosterAvailable(false);
+          setBoosterActive(false);
+          setBoosterTimeLeft(0);
+          alert('이 결투에서는 이미 부스터를 사용했습니다.');
+        } else {
+          setBoosterAvailable(true);
+          alert(error.message || '부스터를 활성화하지 못했습니다.');
+        }
+      } finally {
+        duelBoosterActivationRef.current = false;
+      }
+      return;
+    }
+
     setBoosterActive(true);
     setBoosterAvailable(false);
     setBoosterTimeLeft(GAME_RULES.boosterDuration);
-  }, [boosterActive, boosterAvailable, currentScoreDocId, isDuelMode, myDuelScore, scores]);
+  }, [activeDuel?.id, boosterActive, boosterAvailable, currentScoreDocId, isDuelMode, myDuelScore, scores, studentProfile?.id]);
 
   useStudentRoomWatcher({
     user,

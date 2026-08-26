@@ -1,19 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ASSESSMENT_STATUS } from '../../constants/assessments.js';
+import { calculateAssessmentClassSummary } from '../../utils/assessments.js';
 import {
-  ASSESSMENT_LIMITS,
-  ASSESSMENT_STATUS,
-  createEmptyAssessmentQuestion,
-} from '../../constants/assessments.js';
-import { parseBulkAssessmentQuestions } from '../../utils/assessments.js';
-import {
+  createTeacherAssessmentQuestions,
+  deleteTeacherAssessmentQuestion,
   deleteTeacherAssessment,
   getTeacherAssessment,
   getTeacherAssessmentStatus,
+  listTeacherAssessmentQuestions,
   listTeacherAssessments,
   resetTeacherAssessmentSubmission,
   saveTeacherAssessment,
+  updateTeacherAssessmentQuestion,
   updateTeacherAssessmentStatus,
 } from '../../services/studentSecurityApi.js';
+import AssessmentQuestionBankPanel from './AssessmentQuestionBankPanel.jsx';
 
 function createEmptyForm() {
   return {
@@ -21,7 +22,8 @@ function createEmptyForm() {
     title: '',
     description: '',
     targetClassIds: [],
-    questions: [createEmptyAssessmentQuestion(0)],
+    questionIds: [],
+    legacyQuestions: [],
   };
 }
 
@@ -49,13 +51,12 @@ function formatDate(value) {
 
 export default function AssessmentManagementPanel({ classes = [] }) {
   const [assessments, setAssessments] = useState([]);
+  const [questionBank, setQuestionBank] = useState([]);
   const [form, setForm] = useState(createEmptyForm);
   const [isLoading, setIsLoading] = useState(false);
+  const [isBankLoading, setIsBankLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
-  const [bulkText, setBulkText] = useState('');
-  const [bulkErrors, setBulkErrors] = useState([]);
-  const [bulkMessage, setBulkMessage] = useState('');
   const [statusAssessmentId, setStatusAssessmentId] = useState('');
   const [statusClassId, setStatusClassId] = useState('');
   const [statusRows, setStatusRows] = useState([]);
@@ -78,13 +79,32 @@ export default function AssessmentManagementPanel({ classes = [] }) {
     }
   }, []);
 
+  const loadQuestionBank = useCallback(async () => {
+    setIsBankLoading(true);
+    setError('');
+    try {
+      const result = await listTeacherAssessmentQuestions();
+      setQuestionBank(result?.questions || []);
+    } catch (loadError) {
+      console.error(loadError);
+      setError(loadError.message || '문제은행을 불러오지 못했습니다.');
+    } finally {
+      setIsBankLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadAssessments();
-  }, [loadAssessments]);
+    loadQuestionBank();
+  }, [loadAssessments, loadQuestionBank]);
 
   const classNameMap = useMemo(
     () => new Map(classes.map((classItem) => [classItem.id, classItem.name])),
     [classes],
+  );
+  const questionBankMap = useMemo(
+    () => new Map(questionBank.map((question) => [question.id, question])),
+    [questionBank],
   );
   const statusAssessment = assessments.find((item) => item.id === statusAssessmentId) || null;
 
@@ -96,15 +116,16 @@ export default function AssessmentManagementPanel({ classes = [] }) {
     }
   }, [statusAssessment, statusClassId]);
 
-  const completedCount = statusRows.filter((row) => row.submission?.status === 'completed').length;
+  const classSummary = useMemo(
+    () => calculateAssessmentClassSummary(statusRows),
+    [statusRows],
+  );
+  const completedCount = classSummary.completedCount;
   const inProgressCount = statusRows.filter((row) => row.submission?.status === 'in_progress').length;
 
   const resetForm = () => {
     setForm(createEmptyForm());
     setError('');
-    setBulkText('');
-    setBulkErrors([]);
-    setBulkMessage('');
   };
 
   const toggleTargetClass = (classId) => {
@@ -116,83 +137,83 @@ export default function AssessmentManagementPanel({ classes = [] }) {
     }));
   };
 
-  const updateQuestion = (questionIndex, patch) => {
+  const toggleQuestion = (questionId) => {
     setForm((current) => ({
       ...current,
-      questions: current.questions.map((question, index) => (
-        index === questionIndex ? { ...question, ...patch } : question
-      )),
+      questionIds: current.questionIds.includes(questionId)
+        ? current.questionIds.filter((id) => id !== questionId)
+        : [...current.questionIds, questionId],
     }));
   };
 
-  const updateOption = (questionIndex, optionIndex, value) => {
-    setForm((current) => ({
-      ...current,
-      questions: current.questions.map((question, index) => (
-        index === questionIndex
-          ? {
-            ...question,
-            options: question.options.map((option, currentOptionIndex) => (
-              currentOptionIndex === optionIndex ? value : option
-            )),
-          }
-          : question
-      )),
-    }));
-  };
-
-  const addQuestion = () => {
-    setForm((current) => ({
-      ...current,
-      questions: [...current.questions, createEmptyAssessmentQuestion(current.questions.length)],
-    }));
-  };
-
-  const removeQuestion = (questionIndex) => {
-    setForm((current) => ({
-      ...current,
-      questions: current.questions.length === 1
-        ? current.questions
-        : current.questions.filter((_, index) => index !== questionIndex),
-    }));
-  };
-
-  const applyBulkQuestions = (mode) => {
-    setBulkErrors([]);
-    setBulkMessage('');
-    const parsed = parseBulkAssessmentQuestions(bulkText, `bulk-${Date.now()}`);
-    if (parsed.errors.length > 0) {
-      setBulkErrors(parsed.errors);
-      return;
+  const createBankQuestions = async (questions) => {
+    setError('');
+    try {
+      await createTeacherAssessmentQuestions(questions);
+      await loadQuestionBank();
+    } catch (createError) {
+      setError(createError.message || '문제은행에 문항을 등록하지 못했습니다.');
+      throw createError;
     }
-    if (parsed.questions.length === 0) {
-      setBulkErrors(['등록할 문항을 입력하세요.']);
-      return;
-    }
+  };
 
-    const currentQuestions = form.questions.length === 1
-      && !form.questions[0].text.trim()
-      && form.questions[0].options.every((option) => !option.trim())
-      ? []
-      : form.questions;
-    const nextQuestions = mode === 'replace'
-      ? parsed.questions
-      : [...currentQuestions, ...parsed.questions];
-    if (nextQuestions.length > ASSESSMENT_LIMITS.maxQuestions) {
-      setBulkErrors([`형성평가는 최대 ${ASSESSMENT_LIMITS.maxQuestions}문항까지 등록할 수 있습니다.`]);
-      return;
+  const updateBankQuestion = async (question) => {
+    setError('');
+    try {
+      await updateTeacherAssessmentQuestion(question);
+      setForm((current) => ({
+        ...current,
+        legacyQuestions: current.legacyQuestions.map((legacyQuestion) => (
+          legacyQuestion.id === question.id ? question : legacyQuestion
+        )),
+      }));
+      await loadQuestionBank();
+    } catch (updateError) {
+      setError(updateError.message || '문제은행 문항을 수정하지 못했습니다.');
+      throw updateError;
     }
+  };
 
-    setForm((current) => ({ ...current, questions: nextQuestions }));
-    setBulkText('');
-    setBulkMessage(`${parsed.questions.length}개 문항을 ${mode === 'replace' ? '교체' : '추가'}했습니다. 저장 버튼을 눌러야 DB에 반영됩니다.`);
+  const deleteBankQuestion = async (questionId) => {
+    if (!window.confirm('문제은행에서 이 문항을 삭제할까요? 이미 저장된 평가는 기존 문항 스냅샷을 유지합니다.')) return;
+    setError('');
+    try {
+      const question = questionBank.find((item) => item.id === questionId);
+      await deleteTeacherAssessmentQuestion(questionId);
+      setQuestionBank((current) => current.filter((item) => item.id !== questionId));
+      setForm((current) => {
+        const isSelected = current.questionIds.includes(questionId);
+        if (current.id && isSelected && question) {
+          return {
+            ...current,
+            legacyQuestions: current.legacyQuestions.some((item) => item.id === questionId)
+              ? current.legacyQuestions
+              : [...current.legacyQuestions, question],
+          };
+        }
+        return {
+          ...current,
+          questionIds: current.questionIds.filter((id) => id !== questionId),
+        };
+      });
+    } catch (deleteError) {
+      console.error(deleteError);
+      setError(deleteError.message || '문제은행 문항을 삭제하지 못했습니다.');
+    }
   };
 
   const save = async (status) => {
     setIsSaving(true);
     setError('');
     try {
-      await saveTeacherAssessment({ ...form, status });
+      const legacyMap = new Map(form.legacyQuestions.map((question) => [question.id, question]));
+      const questions = form.questionIds
+        .map((questionId) => questionBankMap.get(questionId) || legacyMap.get(questionId))
+        .filter(Boolean);
+      if (questions.length !== form.questionIds.length || questions.length === 0) {
+        throw new Error('문제은행에서 평가에 사용할 문항을 한 개 이상 선택하세요.');
+      }
+      await saveTeacherAssessment({ ...form, questions, status });
       resetForm();
       await loadAssessments();
     } catch (saveError) {
@@ -209,7 +230,11 @@ export default function AssessmentManagementPanel({ classes = [] }) {
     try {
       const result = await getTeacherAssessment(assessmentId);
       if (!result?.assessment) throw new Error('형성평가를 찾을 수 없습니다.');
-      setForm(result.assessment);
+      setForm({
+        ...result.assessment,
+        questionIds: result.assessment.questions.map((question) => question.id),
+        legacyQuestions: result.assessment.questions,
+      });
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (editError) {
       console.error(editError);
@@ -276,6 +301,17 @@ export default function AssessmentManagementPanel({ classes = [] }) {
 
   return (
     <div className="space-y-6">
+      <AssessmentQuestionBankPanel
+        questions={questionBank}
+        selectedQuestionIds={form.questionIds}
+        isLoading={isBankLoading}
+        onRefresh={loadQuestionBank}
+        onCreateQuestions={createBankQuestions}
+        onUpdateQuestion={updateBankQuestion}
+        onDeleteQuestion={deleteBankQuestion}
+        onToggleQuestion={toggleQuestion}
+      />
+
       <section className="glass-box rounded-3xl p-5 md:p-7 border-2 border-cyan-100 shadow-xl">
         <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
           <div>
@@ -328,94 +364,39 @@ export default function AssessmentManagementPanel({ classes = [] }) {
           </div>
         </div>
 
-        <div className="mt-6 rounded-2xl border border-teal-100 bg-teal-50/60 p-4 md:p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="mt-6 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="font-black text-teal-800">문항 일괄등록</h3>
-              <p className="mt-1 text-xs font-bold text-teal-600">한 줄에 문제 | 보기1 | 보기2 | 보기3 | 보기4 | 정답번호 형식으로 입력하세요. 엑셀 6개 열을 그대로 붙여넣어도 됩니다.</p>
+              <h3 className="font-black text-emerald-800">평가 문항 구성</h3>
+              <p className="mt-1 text-xs font-bold text-emerald-600">위 문제은행에서 `평가에 사용`을 체크하면 이 평가에 문항이 들어갑니다.</p>
             </div>
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-teal-700">최대 {ASSESSMENT_LIMITS.maxQuestions}문항</span>
+            <span className="rounded-full bg-white px-3 py-2 text-sm font-black text-emerald-700">선택 {form.questionIds.length}문항</span>
           </div>
-          <textarea
-            value={bulkText}
-            onChange={(event) => {
-              setBulkText(event.target.value);
-              setBulkErrors([]);
-              setBulkMessage('');
-            }}
-            rows={7}
-            placeholder={'컴퓨터의 두뇌 역할을 하는 장치는? | CPU | RAM | 키보드 | 모니터 | 1\n정보를 임시 저장하는 장치는? | CPU | RAM | 마우스 | 프린터 | 2'}
-            className="mt-4 w-full resize-y rounded-xl border border-teal-100 bg-white/95 px-4 py-3 font-bold text-gray-700 outline-none focus:ring-2 focus:ring-teal-400"
-          />
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button type="button" onClick={() => applyBulkQuestions('replace')} className="rounded-xl bg-teal-600 px-4 py-2 text-sm font-black text-white shadow-sm">
-              현재 문항 교체
-            </button>
-            <button type="button" onClick={() => applyBulkQuestions('append')} className="rounded-xl border border-teal-200 bg-white px-4 py-2 text-sm font-black text-teal-700">
-              기존 문항 뒤에 추가
-            </button>
-          </div>
-          {bulkMessage && <p className="mt-3 text-sm font-black text-emerald-700">{bulkMessage}</p>}
-          {bulkErrors.length > 0 && (
-            <div className="mt-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-600">
-              {bulkErrors.map((bulkError) => <p key={bulkError}>{bulkError}</p>)}
+          {form.questionIds.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {form.questionIds.map((questionId, index) => {
+                const question = questionBankMap.get(questionId)
+                  || form.legacyQuestions.find((item) => item.id === questionId);
+                return (
+                  <button
+                    key={questionId}
+                    type="button"
+                    onClick={() => toggleQuestion(questionId)}
+                    title="평가에서 제외"
+                    className="max-w-full truncate rounded-lg border border-emerald-100 bg-white px-3 py-2 text-left text-xs font-black text-gray-600 hover:border-red-200 hover:text-red-600"
+                  >
+                    {index + 1}. {question?.text || '삭제된 문항'} ×
+                  </button>
+                );
+              })}
             </div>
           )}
-        </div>
-
-        <div className="mt-6 space-y-4">
-          {form.questions.map((question, questionIndex) => (
-            <div key={question.id} className="bg-white/90 border border-cyan-100 rounded-2xl p-4 md:p-5">
-              <div className="flex items-center justify-between gap-3 mb-3">
-                <div className="font-black text-teal-700">문항 {questionIndex + 1}</div>
-                <button
-                  type="button"
-                  onClick={() => removeQuestion(questionIndex)}
-                  disabled={form.questions.length === 1}
-                  className="text-xs font-black text-red-500 disabled:text-gray-300"
-                >
-                  문항 삭제
-                </button>
-              </div>
-              <input
-                value={question.text}
-                onChange={(event) => updateQuestion(questionIndex, { text: event.target.value })}
-                placeholder="문제를 입력하세요."
-                maxLength={500}
-                className="w-full px-4 py-3 rounded-xl border border-gray-100 font-bold outline-none focus:ring-2 focus:ring-teal-400"
-              />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-                {question.options.map((option, optionIndex) => (
-                  <label key={`${question.id}-${optionIndex}`} className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${question.answer === optionIndex ? 'border-emerald-300 bg-emerald-50' : 'border-gray-100 bg-gray-50/70'}`}>
-                    <input
-                      type="radio"
-                      name={`answer-${question.id}`}
-                      checked={question.answer === optionIndex}
-                      onChange={() => updateQuestion(questionIndex, { answer: optionIndex })}
-                      className="accent-emerald-500 shrink-0"
-                    />
-                    <span className="text-xs font-black text-gray-400 shrink-0">{optionIndex + 1}</span>
-                    <input
-                      value={option}
-                      onChange={(event) => updateOption(questionIndex, optionIndex, event.target.value)}
-                      placeholder={`보기 ${optionIndex + 1}`}
-                      maxLength={200}
-                      className="min-w-0 flex-1 bg-transparent font-bold text-gray-700 outline-none"
-                    />
-                  </label>
-                ))}
-              </div>
-              <p className="text-xs font-bold text-emerald-600 mt-2">선택된 정답: {question.answer + 1}번</p>
-            </div>
-          ))}
+          {form.questionIds.length === 0 && <p className="mt-3 text-sm font-bold text-gray-400">아직 선택한 문항이 없습니다.</p>}
         </div>
 
         {error && <p className="mt-4 rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-sm font-bold text-red-600">{error}</p>}
 
         <div className="flex flex-wrap gap-3 mt-5">
-          <button type="button" onClick={addQuestion} className="px-5 py-3 rounded-xl bg-cyan-50 border border-cyan-100 text-teal-700 font-black">
-            + 문항 추가
-          </button>
           <div className="flex-1" />
           <button type="button" onClick={() => save(ASSESSMENT_STATUS.draft)} disabled={isSaving} className="px-5 py-3 rounded-xl bg-white border border-gray-200 text-gray-600 font-black disabled:opacity-50">
             초안 저장
@@ -487,10 +468,12 @@ export default function AssessmentManagementPanel({ classes = [] }) {
         </div>
 
         {statusRows.length > 0 && (
-          <div className="grid grid-cols-3 gap-3 mb-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
             <div className="rounded-2xl bg-gray-50 border border-gray-100 p-3 text-center"><div className="text-2xl font-black text-gray-700">{statusRows.length}</div><div className="text-xs font-bold text-gray-400">전체</div></div>
             <div className="rounded-2xl bg-amber-50 border border-amber-100 p-3 text-center"><div className="text-2xl font-black text-amber-600">{inProgressCount}</div><div className="text-xs font-bold text-amber-500">응시 중</div></div>
             <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-3 text-center"><div className="text-2xl font-black text-emerald-600">{completedCount}</div><div className="text-xs font-bold text-emerald-500">제출 완료</div></div>
+            <div className="rounded-2xl bg-sky-50 border border-sky-100 p-3 text-center"><div className="text-2xl font-black text-sky-600">{classSummary.averageScore}점</div><div className="text-xs font-bold text-sky-500">반 평균 · 제출자 기준</div></div>
+            <div className="rounded-2xl bg-violet-50 border border-violet-100 p-3 text-center"><div className="text-2xl font-black text-violet-600">{classSummary.perfectCount}명</div><div className="text-xs font-bold text-violet-500">100점 달성</div></div>
           </div>
         )}
 

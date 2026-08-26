@@ -264,6 +264,9 @@ describe('practice records', () => {
 
 describe('assessment server boundary', () => {
   test('students cannot read assessment content, answer keys, or submissions directly', async () => {
+    await seed('typing_assessment_questions', 'question-1', {
+      text: '문제은행 문항', options: ['1', '2', '3', '4'], answer: 0,
+    });
     await seed('typing_assessments', 'assessment-1', { title: '평가', status: 'active' });
     await seed('typing_assessment_keys', 'assessment-1', { answers: [{ id: 'q1', answer: 0 }] });
     await seed('typing_assessment_submissions', 'assessment-1_student-1', {
@@ -272,6 +275,7 @@ describe('assessment server boundary', () => {
       latestScore: 100,
     });
     const db = testEnv.authenticatedContext(STUDENT_UID).firestore();
+    await assertFails(getDoc(publicDoc(db, 'typing_assessment_questions', 'question-1')));
     await assertFails(getDoc(publicDoc(db, 'typing_assessments', 'assessment-1')));
     await assertFails(getDoc(publicDoc(db, 'typing_assessment_keys', 'assessment-1')));
     await assertFails(getDoc(publicDoc(db, 'typing_assessment_submissions', 'assessment-1_student-1')));
@@ -279,6 +283,7 @@ describe('assessment server boundary', () => {
 
   test('teacher client also uses the trusted API for assessment data', async () => {
     const db = testEnv.authenticatedContext(TEACHER_UID).firestore();
+    await assertFails(setDoc(publicDoc(db, 'typing_assessment_questions', 'question-1'), { text: '직접 쓰기' }));
     await assertFails(setDoc(publicDoc(db, 'typing_assessments', 'assessment-1'), { title: '직접 쓰기' }));
     await assertFails(getDoc(publicDoc(db, 'typing_assessment_keys', 'assessment-1')));
   });
@@ -352,6 +357,9 @@ describe('duel security boundary', () => {
       wordIndex: 0,
       quizIndex: 0,
       wordCountSinceQuiz: 0,
+      boosterUsed: false,
+      boosterStartedAt: null,
+      boosterEndsAt: null,
     };
     await seed('typing_duel_scores', 'duel-1_student-1', scoreData);
     const studentDb = testEnv.authenticatedContext(STUDENT_UID).firestore();
@@ -370,6 +378,7 @@ describe('duel security boundary', () => {
     }));
     await assertFails(updateDoc(publicDoc(otherDb, 'typing_duel_scores', 'duel-1_student-1'), { score: 9999 }));
     await assertFails(updateDoc(scoreRef, { studentId: 'student-2' }));
+    await assertFails(updateDoc(scoreRef, { boosterUsed: true, boosterEndsAt: new Date() }));
     await assertFails(setDoc(publicDoc(studentDb, 'typing_duel_scores', 'forged'), scoreData));
   });
 });

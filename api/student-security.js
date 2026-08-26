@@ -5,7 +5,7 @@ import { calculateAssessmentResult, createAssessmentSubmissionId } from '../src/
 
 const APP_ID = 'xx-school-typing-app';
 const TEACHER_UID = String(process.env.TEACHER_UID || 'hnjJNGDuydcd4SfQ2Xq5cE6IujD3').trim();
-const SESSION_MINUTES = 30;
+const SESSION_MINUTES = 60;
 
 const PATHS = {
   rooms: 'typing_rooms',
@@ -22,6 +22,7 @@ const PATHS = {
   duels: 'typing_duels',
   duelScores: 'typing_duel_scores',
   settings: 'typing_settings',
+  assessmentQuestions: 'typing_assessment_questions',
   assessments: 'typing_assessments',
   assessmentKeys: 'typing_assessment_keys',
   assessmentSubmissions: 'typing_assessment_submissions',
@@ -36,6 +37,7 @@ export const DUEL_RULES = {
   durationMs: 3 * 60 * 1000,
   stakePoints: 5,
   dailyWinPointLimit: 15,
+  boosterDurationMs: 25 * 1000,
   finalizeGraceMs: 3 * 1000,
 };
 
@@ -153,6 +155,9 @@ function safeAssessment(assessmentId, data = {}, includeQuestions = true) {
     description: data.description || '',
     status: data.status || 'draft',
     targetClassIds: Array.isArray(data.targetClassIds) ? data.targetClassIds : [],
+    questionIds: Array.isArray(data.questionIds)
+      ? data.questionIds
+      : (Array.isArray(data.questions) ? data.questions.map((question) => question.id || '').filter(Boolean) : []),
     questionCount: Array.isArray(data.questions) ? data.questions.length : Number(data.questionCount || 0),
     ...(includeQuestions ? {
       questions: Array.isArray(data.questions)
@@ -163,6 +168,18 @@ function safeAssessment(assessmentId, data = {}, includeQuestions = true) {
         }))
         : [],
     } : {}),
+    createdAt: toMillis(data.createdAt),
+    updatedAt: toMillis(data.updatedAt),
+  };
+}
+
+function safeAssessmentQuestion(questionId, data = {}) {
+  return {
+    id: questionId,
+    text: data.text || '',
+    options: Array.isArray(data.options) ? data.options : [],
+    answer: Number.isInteger(Number(data.answer)) ? Number(data.answer) : 0,
+    active: data.active !== false,
     createdAt: toMillis(data.createdAt),
     updatedAt: toMillis(data.updatedAt),
   };
@@ -1008,6 +1025,9 @@ async function acceptDuelChallenge(uid, body) {
       wordIndex: 0,
       quizIndex: 0,
       wordCountSinceQuiz: 0,
+      boosterUsed: false,
+      boosterStartedAt: null,
+      boosterEndsAt: null,
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     };
@@ -1156,6 +1176,59 @@ async function getTeacherDuelHistory(uid, body) {
     nextCursorMillis: records.length === 10 ? Number(lastRecord?.completedAt || 0) : 0,
     hasMore: records.length === 10,
   };
+}
+
+async function activateDuelBooster(uid, body) {
+  const duelId = requireString(body.duelId, 'duelId');
+  const studentId = requireString(body.studentId, 'studentId');
+  await requireSession(uid, studentId);
+  const duelRef = publicCollection(PATHS.duels).doc(duelId);
+  let boosterState;
+
+  await database().runTransaction(async (transaction) => {
+    const duelSnapshot = await transaction.get(duelRef);
+    if (!duelSnapshot.exists) throw new ApiError(404, 'api/not-found', '결투 기록을 찾을 수 없습니다.');
+    const duel = duelSnapshot.data();
+    const isChallenger = duel.challengerStudentId === studentId && duel.challengerUserId === uid;
+    const isTarget = duel.targetStudentId === studentId && duel.targetUserId === uid;
+    if (!isChallenger && !isTarget) {
+      throw new ApiError(403, 'api/permission-denied', '이 결투의 참가자가 아닙니다.');
+    }
+
+    const now = Date.now();
+    const startsAtMillis = toMillis(duel.startsAt);
+    const duelEndsAtMillis = toMillis(duel.endsAt);
+    if (duel.status !== 'playing' || startsAtMillis > now || duelEndsAtMillis <= now) {
+      throw new ApiError(409, 'api/failed-precondition', '현재 부스터를 사용할 수 없는 결투입니다.');
+    }
+
+    const scoreId = isChallenger ? duel.challengerScoreId : duel.targetScoreId;
+    const scoreRef = publicCollection(PATHS.duelScores).doc(scoreId);
+    const scoreSnapshot = await transaction.get(scoreRef);
+    if (!scoreSnapshot.exists) throw new ApiError(404, 'api/not-found', '결투 점수 기록을 찾을 수 없습니다.');
+    const scoreData = scoreSnapshot.data();
+    if (scoreData.userId !== uid || scoreData.studentId !== studentId) {
+      throw new ApiError(403, 'api/permission-denied', '결투 점수 소유자가 일치하지 않습니다.');
+    }
+    if (scoreData.boosterUsed === true) {
+      throw new ApiError(409, 'api/booster-already-used', '이 결투에서는 이미 부스터를 사용했습니다.');
+    }
+
+    const boosterEndsAtMillis = Math.min(now + DUEL_RULES.boosterDurationMs, duelEndsAtMillis);
+    transaction.update(scoreRef, {
+      boosterUsed: true,
+      boosterStartedAt: Timestamp.fromMillis(now),
+      boosterEndsAt: Timestamp.fromMillis(boosterEndsAtMillis),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    boosterState = {
+      boosterUsed: true,
+      boosterStartedAt: now,
+      boosterEndsAt: boosterEndsAtMillis,
+    };
+  });
+
+  return boosterState;
 }
 
 async function finalizeDuelInternal(uid, body, teacherFinalize = false) {
@@ -1501,6 +1574,68 @@ async function submitAssessment(uid, body) {
   return responseData;
 }
 
+async function listTeacherAssessmentQuestions(uid) {
+  requireTeacher(uid);
+  const snapshot = await publicCollection(PATHS.assessmentQuestions)
+    .orderBy('createdAt', 'desc')
+    .limit(500)
+    .get();
+  return {
+    questions: snapshot.docs.map((item) => safeAssessmentQuestion(item.id, item.data())),
+  };
+}
+
+async function createTeacherAssessmentQuestions(uid, body) {
+  requireTeacher(uid);
+  const source = Array.isArray(body.questions) ? body.questions : [];
+  if (source.length === 0 || source.length > ASSESSMENT_MAX_QUESTIONS) {
+    throw new ApiError(400, 'api/invalid-argument', `한 번에 1개 이상 ${ASSESSMENT_MAX_QUESTIONS}개 이하의 문항을 등록하세요.`);
+  }
+
+  const collectionRef = publicCollection(PATHS.assessmentQuestions);
+  const refs = source.map(() => collectionRef.doc());
+  const questions = sanitizeAssessmentQuestions(source.map((question, index) => ({
+    ...question,
+    id: refs[index].id,
+  })));
+  const batch = database().batch();
+  questions.forEach((question, index) => {
+    batch.set(refs[index], {
+      text: question.text,
+      options: question.options,
+      answer: question.answer,
+      active: true,
+      createdBy: uid,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  });
+  await batch.commit();
+  return { questionIds: refs.map((ref) => ref.id) };
+}
+
+async function updateTeacherAssessmentQuestion(uid, body) {
+  requireTeacher(uid);
+  const source = body.question || {};
+  const questionId = requireString(source.id, 'questionId', 100);
+  const [question] = sanitizeAssessmentQuestions([{ ...source, id: questionId }]);
+  await publicCollection(PATHS.assessmentQuestions).doc(questionId).update({
+    text: question.text,
+    options: question.options,
+    answer: question.answer,
+    updatedBy: uid,
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+  return { questionId };
+}
+
+async function deleteTeacherAssessmentQuestion(uid, body) {
+  requireTeacher(uid);
+  const questionId = requireString(body.questionId, 'questionId', 100);
+  await publicCollection(PATHS.assessmentQuestions).doc(questionId).delete();
+  return { questionId };
+}
+
 async function listTeacherAssessments(uid) {
   requireTeacher(uid);
   const snapshot = await publicCollection(PATHS.assessments)
@@ -1566,6 +1701,7 @@ async function saveTeacherAssessment(uid, body) {
     description,
     status,
     targetClassIds,
+    questionIds: questions.map(({ id }) => id),
     questionCount: questions.length,
     questions: questions.map(({ id, text, options }) => ({ id, text, options })),
     createdBy: uid,
@@ -1670,12 +1806,17 @@ const actions = {
   getActiveDuel,
   getDuelHistory,
   getTeacherDuelHistory,
+  activateDuelBooster,
   finalizeDuel,
   finalizeExpiredDuel,
   cancelAllActiveDuels,
   listActiveAssessments,
   startAssessment,
   submitAssessment,
+  listTeacherAssessmentQuestions,
+  createTeacherAssessmentQuestions,
+  updateTeacherAssessmentQuestion,
+  deleteTeacherAssessmentQuestion,
   listTeacherAssessments,
   getTeacherAssessment,
   saveTeacherAssessment,

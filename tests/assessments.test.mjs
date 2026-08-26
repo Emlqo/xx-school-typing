@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  calculateAssessmentClassSummary,
   calculateAssessmentResult,
   createAssessmentSubmissionId,
   parseBulkAssessmentQuestions,
@@ -64,4 +65,27 @@ test('엑셀 탭 형식의 머리글을 제외하고 잘못된 행을 보고한�
   assert.equal(result.questions.length, 1);
   assert.equal(result.questions[0].answer, 3);
   assert.equal(result.errors.length, 1);
+});
+
+test('제출 완료 학생 기준으로 반 평균과 100점 인원을 계산한다', () => {
+  const summary = calculateAssessmentClassSummary([
+    { submission: { status: 'completed', latestScore: 100 } },
+    { submission: { status: 'completed', latestScore: 80 } },
+    { submission: { status: 'in_progress', latestScore: 100 } },
+    { submission: null },
+  ]);
+  assert.deepEqual(summary, {
+    completedCount: 2,
+    averageScore: 90,
+    perfectCount: 1,
+  });
+});
+
+test('제출 완료 학생이 없으면 평균과 100점 인원은 0이다', () => {
+  const summary = calculateAssessmentClassSummary([
+    { submission: null },
+    { submission: { status: 'in_progress' } },
+  ]);
+  assert.equal(summary.averageScore, 0);
+  assert.equal(summary.perfectCount, 0);
 });

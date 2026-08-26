@@ -54,11 +54,28 @@ export const getTeacherDuelHistory = (cursorMillis = 0) => call(
   { cursorMillis },
 );
 export const finalizeDuel = (duelId, studentId) => call('finalizeDuel', { duelId, studentId });
+export const activateDuelBooster = (duelId, studentId) => call(
+  'activateDuelBooster',
+  { duelId, studentId },
+);
 export const finalizeExpiredDuel = (duelId) => call('finalizeExpiredDuel', { duelId });
 export const cancelAllActiveDuels = () => call('cancelAllActiveDuels');
 export const listActiveAssessments = () => call('listActiveAssessments');
 export const startAssessment = (assessmentId) => call('startAssessment', { assessmentId });
 export const submitAssessment = (assessmentId, answers) => call('submitAssessment', { assessmentId, answers });
+export const listTeacherAssessmentQuestions = () => call('listTeacherAssessmentQuestions');
+export const createTeacherAssessmentQuestions = (questions) => call(
+  'createTeacherAssessmentQuestions',
+  { questions },
+);
+export const updateTeacherAssessmentQuestion = (question) => call(
+  'updateTeacherAssessmentQuestion',
+  { question },
+);
+export const deleteTeacherAssessmentQuestion = (questionId) => call(
+  'deleteTeacherAssessmentQuestion',
+  { questionId },
+);
 export const listTeacherAssessments = () => call('listTeacherAssessments');
 export const getTeacherAssessment = (assessmentId) => call('getTeacherAssessment', { assessmentId });
 export const saveTeacherAssessment = (assessment) => call('saveTeacherAssessment', { assessment });
