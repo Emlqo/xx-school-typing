@@ -6,7 +6,6 @@ import {
   deleteTeacherAssessmentQuestion,
   deleteTeacherAssessment,
   getTeacherAssessment,
-  getTeacherAssessmentStatus,
   listTeacherAssessmentQuestions,
   listTeacherAssessments,
   resetTeacherAssessmentSubmission,
@@ -14,6 +13,7 @@ import {
   updateTeacherAssessmentQuestion,
   updateTeacherAssessmentStatus,
 } from '../../services/studentSecurityApi.js';
+import useTeacherAssessmentStatus from '../../hooks/useTeacherAssessmentStatus.js';
 import AssessmentQuestionBankPanel from './AssessmentQuestionBankPanel.jsx';
 
 function createEmptyForm() {
@@ -59,9 +59,9 @@ export default function AssessmentManagementPanel({ classes = [] }) {
   const [error, setError] = useState('');
   const [statusAssessmentId, setStatusAssessmentId] = useState('');
   const [statusClassId, setStatusClassId] = useState('');
-  const [statusRows, setStatusRows] = useState([]);
-  const [statusLoading, setStatusLoading] = useState(false);
-  const [statusLoadedAt, setStatusLoadedAt] = useState(0);
+  const [statusSortKey, setStatusSortKey] = useState('name');
+  const [statusSortDirection, setStatusSortDirection] = useState('asc');
+  const [showStatusDetails, setShowStatusDetails] = useState(false);
 
   const loadAssessments = useCallback(async () => {
     setIsLoading(true);
@@ -70,7 +70,9 @@ export default function AssessmentManagementPanel({ classes = [] }) {
       const result = await listTeacherAssessments();
       const next = result?.assessments || [];
       setAssessments(next);
-      setStatusAssessmentId((current) => current || next[0]?.id || '');
+      setStatusAssessmentId((current) => (
+        next.some((assessment) => assessment.id === current) ? current : ''
+      ));
     } catch (loadError) {
       console.error(loadError);
       setError(loadError.message || '형성평가 목록을 불러오지 못했습니다.');
@@ -107,12 +109,20 @@ export default function AssessmentManagementPanel({ classes = [] }) {
     [questionBank],
   );
   const statusAssessment = assessments.find((item) => item.id === statusAssessmentId) || null;
+  const {
+    rows: statusRows,
+    isLoading: statusLoading,
+    error: statusError,
+    lastUpdatedAt: statusLoadedAt,
+  } = useTeacherAssessmentStatus({
+    assessmentId: statusAssessmentId,
+    classId: statusClassId,
+  });
 
   useEffect(() => {
     const availableClassIds = statusAssessment?.targetClassIds || [];
     if (!availableClassIds.includes(statusClassId)) {
       setStatusClassId(availableClassIds[0] || '');
-      setStatusRows([]);
     }
   }, [statusAssessment, statusClassId]);
 
@@ -122,6 +132,19 @@ export default function AssessmentManagementPanel({ classes = [] }) {
   );
   const completedCount = classSummary.completedCount;
   const inProgressCount = statusRows.filter((row) => row.submission?.status === 'in_progress').length;
+  const sortedStatusRows = useMemo(() => [...statusRows].sort((a, b) => {
+    if (statusSortKey === 'score') {
+      const aCompleted = a.submission?.status === 'completed';
+      const bCompleted = b.submission?.status === 'completed';
+      if (aCompleted !== bCompleted) return aCompleted ? -1 : 1;
+      if (aCompleted && bCompleted) {
+        const scoreDiff = Number(a.submission.latestScore || 0) - Number(b.submission.latestScore || 0);
+        if (scoreDiff !== 0) return statusSortDirection === 'asc' ? scoreDiff : -scoreDiff;
+      }
+    }
+    const nameDiff = a.name.localeCompare(b.name, 'ko');
+    return statusSortKey === 'name' && statusSortDirection === 'desc' ? -nameDiff : nameDiff;
+  }), [statusRows, statusSortDirection, statusSortKey]);
 
   const resetForm = () => {
     setForm(createEmptyForm());
@@ -263,7 +286,6 @@ export default function AssessmentManagementPanel({ classes = [] }) {
       if (form.id === assessmentId) resetForm();
       if (statusAssessmentId === assessmentId) {
         setStatusAssessmentId('');
-        setStatusRows([]);
       }
       await loadAssessments();
     } catch (deleteError) {
@@ -272,27 +294,10 @@ export default function AssessmentManagementPanel({ classes = [] }) {
     }
   };
 
-  const refreshStatus = async () => {
-    if (!statusAssessmentId || !statusClassId) return;
-    setStatusLoading(true);
-    setError('');
-    try {
-      const result = await getTeacherAssessmentStatus(statusAssessmentId, statusClassId);
-      setStatusRows(result?.rows || []);
-      setStatusLoadedAt(Date.now());
-    } catch (statusError) {
-      console.error(statusError);
-      setError(statusError.message || '응시 현황을 불러오지 못했습니다.');
-    } finally {
-      setStatusLoading(false);
-    }
-  };
-
   const resetSubmission = async (studentId) => {
     if (!window.confirm('이 학생의 형성평가 기록을 초기화할까요?')) return;
     try {
       await resetTeacherAssessmentSubmission(statusAssessmentId, studentId);
-      await refreshStatus();
     } catch (resetError) {
       console.error(resetError);
       setError(resetError.message || '제출 기록을 초기화하지 못했습니다.');
@@ -446,26 +451,46 @@ export default function AssessmentManagementPanel({ classes = [] }) {
         <div className="flex flex-wrap items-start justify-between gap-3 mb-5">
           <div>
             <h2 className="text-xl font-black text-gray-800">학급별 응시 현황</h2>
-            <p className="text-xs font-bold text-gray-400 mt-1">실시간 구독 없이 현황 새로고침을 누를 때만 DB를 읽습니다.</p>
+            <p className="text-xs font-bold text-gray-400 mt-1">선택한 평가와 학급의 변경된 제출 기록만 실시간으로 반영합니다.</p>
           </div>
-          {statusLoadedAt > 0 && <span className="text-xs font-bold text-gray-400">최근 조회 {formatDate(statusLoadedAt)}</span>}
+          {statusAssessmentId && statusClassId && (
+            <span className="live-badge rounded-full px-3 py-1 text-xs font-black">LIVE</span>
+          )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3 mb-5">
-          <select value={statusAssessmentId} onChange={(event) => { setStatusAssessmentId(event.target.value); setStatusClassId(''); setStatusRows([]); }} className="px-4 py-3 rounded-xl border border-cyan-100 bg-white font-bold">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+          <select value={statusAssessmentId} onChange={(event) => { setStatusAssessmentId(event.target.value); setStatusClassId(''); }} className="px-4 py-3 rounded-xl border border-cyan-100 bg-white font-bold">
             <option value="">평가 선택</option>
             {assessments.map((assessment) => <option key={assessment.id} value={assessment.id}>{assessment.title}</option>)}
           </select>
-          <select value={statusClassId} onChange={(event) => { setStatusClassId(event.target.value); setStatusRows([]); }} className="px-4 py-3 rounded-xl border border-cyan-100 bg-white font-bold">
+          <select value={statusClassId} onChange={(event) => setStatusClassId(event.target.value)} className="px-4 py-3 rounded-xl border border-cyan-100 bg-white font-bold">
             <option value="">학급 선택</option>
             {classes
               .filter((classItem) => !statusAssessment || statusAssessment.targetClassIds.includes(classItem.id))
               .map((classItem) => <option key={classItem.id} value={classItem.id}>{classItem.name}</option>)}
           </select>
-          <button type="button" onClick={refreshStatus} disabled={statusLoading || !statusAssessmentId || !statusClassId} className="px-6 py-3 rounded-xl bg-teal-500 text-white font-black disabled:bg-gray-300">
-            {statusLoading ? '조회 중...' : '현황 새로고침'}
-          </button>
         </div>
+
+        <div className="flex flex-wrap items-center gap-3 mb-5 rounded-xl border border-cyan-100 bg-white/70 p-3">
+          <label className="text-sm font-black text-gray-600">
+            정렬 기준
+            <select value={statusSortKey} onChange={(event) => setStatusSortKey(event.target.value)} className="ml-2 rounded-lg border border-cyan-100 bg-white px-3 py-2 font-bold">
+              <option value="name">이름</option>
+              <option value="score">점수</option>
+            </select>
+          </label>
+          <select value={statusSortDirection} onChange={(event) => setStatusSortDirection(event.target.value)} className="rounded-lg border border-cyan-100 bg-white px-3 py-2 text-sm font-bold">
+            <option value="asc">오름차순</option>
+            <option value="desc">내림차순</option>
+          </select>
+          <label className="ml-auto flex cursor-pointer items-center gap-2 text-sm font-black text-gray-600">
+            <input type="checkbox" checked={showStatusDetails} onChange={(event) => setShowStatusDetails(event.target.checked)} className="size-4 accent-teal-500" />
+            응시 횟수·관리 보기
+          </label>
+          {statusLoadedAt > 0 && <span className="w-full text-right text-[11px] font-bold text-gray-400">최근 반영 {formatDate(statusLoadedAt)}</span>}
+        </div>
+
+        {statusError && <p className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-600">실시간 응시 현황을 불러오지 못했습니다. 관리자 권한과 Firestore Rules를 확인해 주세요.</p>}
 
         {statusRows.length > 0 && (
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
@@ -477,29 +502,52 @@ export default function AssessmentManagementPanel({ classes = [] }) {
           </div>
         )}
 
-        <div className="overflow-x-auto rounded-2xl border border-cyan-100 bg-white/90">
-          <table className="w-full min-w-[720px] text-sm">
-            <thead className="bg-cyan-50 text-teal-800">
-              <tr><th className="text-left px-4 py-3">학생</th><th className="px-4 py-3">상태</th><th className="px-4 py-3">최근 점수</th><th className="px-4 py-3">최고 점수</th><th className="px-4 py-3">응시 횟수</th><th className="px-4 py-3">관리</th></tr>
-            </thead>
-            <tbody>
-              {statusRows.map((row) => {
-                const submission = row.submission;
-                const stateText = !submission ? '미응시' : submission.status === 'completed' ? '제출 완료' : '응시 중';
-                return (
-                  <tr key={row.studentId} className="border-t border-cyan-50">
-                    <td className="px-4 py-3 font-black text-gray-700">{row.name}</td>
-                    <td className="px-4 py-3 text-center"><span className={`px-2 py-1 rounded-full text-xs font-black ${!submission ? 'bg-gray-100 text-gray-500' : submission.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{stateText}</span></td>
-                    <td className="px-4 py-3 text-center font-black text-sky-600">{submission?.status === 'completed' ? `${submission.latestScore}점` : '-'}</td>
-                    <td className="px-4 py-3 text-center font-black text-emerald-600">{submission?.attemptCount ? `${submission.bestScore}점` : '-'}</td>
-                    <td className="px-4 py-3 text-center font-bold text-gray-500">{submission?.attemptCount || 0}회</td>
-                    <td className="px-4 py-3 text-center"><button type="button" onClick={() => resetSubmission(row.studentId)} disabled={!submission} className="text-xs font-black text-red-500 disabled:text-gray-300">기록 초기화</button></td>
-                  </tr>
-                );
-              })}
-              {!statusLoading && statusRows.length === 0 && <tr><td colSpan="6" className="text-center py-12 text-gray-400 font-bold">평가와 학급을 선택하고 현황을 새로고침하세요.</td></tr>}
-            </tbody>
-          </table>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {statusLoading && (
+            <div className="md:col-span-2 rounded-2xl border border-cyan-100 bg-white/90 py-14 text-center text-base font-black text-teal-600">
+              응시 현황을 연결하고 있습니다.
+            </div>
+          )}
+          {sortedStatusRows.map((row) => {
+            const submission = row.submission;
+            const isCompleted = submission?.status === 'completed';
+            const stateText = !submission ? '미응시' : isCompleted ? '제출 완료' : '응시 중';
+            return (
+              <article key={row.studentId} className="min-h-40 rounded-2xl border-2 border-cyan-100 bg-white/95 p-5 shadow-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="min-w-0 truncate text-xl font-black text-gray-800">{row.name}</h3>
+                  <span className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-black ${!submission ? 'bg-gray-100 text-gray-500' : isCompleted ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                    {stateText}
+                  </span>
+                </div>
+
+                <div className="mt-5 grid grid-cols-2 border-y border-cyan-100 py-4">
+                  <div className="border-r border-cyan-100 text-center">
+                    <div className="text-sm font-bold text-gray-400">최근 점수</div>
+                    <div className="mt-1 text-2xl font-black text-sky-600">{isCompleted ? `${submission.latestScore}점` : '-'}</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-sm font-bold text-gray-400">최고 점수</div>
+                    <div className="mt-1 text-2xl font-black text-emerald-600">{submission?.attemptCount ? `${submission.bestScore}점` : '-'}</div>
+                  </div>
+                </div>
+
+                {showStatusDetails && (
+                  <div className="mt-4 flex items-center justify-between gap-3">
+                    <span className="text-base font-black text-gray-500">응시 {submission?.attemptCount || 0}회</span>
+                    <button type="button" onClick={() => resetSubmission(row.studentId)} disabled={!submission} className="rounded-lg bg-red-50 px-3 py-2 text-sm font-black text-red-500 disabled:bg-gray-50 disabled:text-gray-300">
+                      기록 초기화
+                    </button>
+                  </div>
+                )}
+              </article>
+            );
+          })}
+          {!statusLoading && statusRows.length === 0 && (
+            <div className="md:col-span-2 rounded-2xl border border-cyan-100 bg-white/90 py-14 text-center text-base font-bold text-gray-400">
+              평가와 학급을 선택하면 응시 현황이 실시간으로 표시됩니다.
+            </div>
+          )}
         </div>
       </section>
     </div>

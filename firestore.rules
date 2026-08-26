@@ -193,7 +193,8 @@ service cloud.firestore {
     }
 
     match /artifacts/{appId}/public/data/typing_assessment_submissions/{submissionId} {
-      allow read, write: if false;
+      allow read: if isSupportedApp(appId) && isTeacher();
+      allow write: if false;
     }
 
     match /artifacts/{appId}/users/{userId}/{document=**} {
