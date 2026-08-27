@@ -79,6 +79,8 @@ export default function AssessmentQuestionBankPanel({
   onUpdateQuestion,
   onDeleteQuestion,
   onToggleQuestion,
+  onSelectAllQuestions,
+  onClearAllQuestions,
 }) {
   const [bulkText, setBulkText] = useState('');
   const [bulkErrors, setBulkErrors] = useState([]);
@@ -95,6 +97,13 @@ export default function AssessmentQuestionBankPanel({
       || question.options.some((option) => option.toLocaleLowerCase('ko-KR').includes(keyword))
     ));
   }, [questions, search]);
+  const selectableQuestionIds = useMemo(
+    () => questions.slice(0, ASSESSMENT_LIMITS.maxQuestions).map((question) => question.id),
+    [questions],
+  );
+  const allQuestionsSelected = selectableQuestionIds.length > 0
+    && selectableQuestionIds.every((questionId) => selectedSet.has(questionId));
+  const hasSelectedBankQuestions = questions.some((question) => selectedSet.has(question.id));
 
   const createQuestions = async () => {
     setBulkErrors([]);
@@ -170,6 +179,22 @@ export default function AssessmentQuestionBankPanel({
           placeholder="문제 또는 보기 검색"
           className="min-w-0 flex-1 rounded-xl border border-teal-100 bg-white px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-teal-400"
         />
+        <button
+          type="button"
+          onClick={() => onSelectAllQuestions(selectableQuestionIds)}
+          disabled={questions.length === 0 || allQuestionsSelected}
+          className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white shadow-sm disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none"
+        >
+          {questions.length > ASSESSMENT_LIMITS.maxQuestions ? `최대 ${ASSESSMENT_LIMITS.maxQuestions}개 선택` : '전체 선택'}
+        </button>
+        <button
+          type="button"
+          onClick={() => onClearAllQuestions(questions.map((question) => question.id))}
+          disabled={!hasSelectedBankQuestions}
+          className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-black text-gray-600 disabled:bg-gray-50 disabled:text-gray-300"
+        >
+          전체 해제
+        </button>
         <span className="rounded-full bg-teal-50 px-3 py-2 text-xs font-black text-teal-700">전체 {questions.length}개 · 평가 선택 {selectedQuestionIds.length}개</span>
       </div>
 

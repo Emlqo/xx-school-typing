@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ASSESSMENT_STATUS } from '../../constants/assessments.js';
+import { ASSESSMENT_LIMITS, ASSESSMENT_STATUS } from '../../constants/assessments.js';
 import { calculateAssessmentClassSummary } from '../../utils/assessments.js';
 import {
   createTeacherAssessmentQuestions,
@@ -176,6 +176,22 @@ export default function AssessmentManagementPanel({ classes = [] }) {
     }));
   };
 
+  const selectAllQuestions = (questionIds) => {
+    setForm((current) => ({
+      ...current,
+      questionIds: [...new Set([...current.questionIds, ...questionIds])]
+        .slice(0, ASSESSMENT_LIMITS.maxQuestions),
+    }));
+  };
+
+  const clearAllQuestions = (questionIds) => {
+    const bankQuestionIds = new Set(questionIds);
+    setForm((current) => ({
+      ...current,
+      questionIds: current.questionIds.filter((questionId) => !bankQuestionIds.has(questionId)),
+    }));
+  };
+
   const createBankQuestions = async (questions) => {
     setError('');
     try {
@@ -322,6 +338,8 @@ export default function AssessmentManagementPanel({ classes = [] }) {
         onUpdateQuestion={updateBankQuestion}
         onDeleteQuestion={deleteBankQuestion}
         onToggleQuestion={toggleQuestion}
+        onSelectAllQuestions={selectAllQuestions}
+        onClearAllQuestions={clearAllQuestions}
       />
 
       <section className="glass-box rounded-3xl p-5 md:p-7 border-2 border-cyan-100 shadow-xl">
