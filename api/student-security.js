@@ -1655,6 +1655,24 @@ async function deleteTeacherAssessmentQuestion(uid, body) {
   return { questionId };
 }
 
+async function deleteTeacherAssessmentQuestions(uid, body) {
+  requireTeacher(uid);
+  const source = Array.isArray(body.questionIds) ? body.questionIds : [];
+  const questionIds = [...new Set(
+    source.map((questionId) => requireString(questionId, 'questionId', 100)),
+  )];
+  if (questionIds.length === 0 || questionIds.length > 500) {
+    throw new ApiError(400, 'api/invalid-argument', '한 번에 1개 이상 500개 이하의 문항을 삭제하세요.');
+  }
+
+  const batch = database().batch();
+  questionIds.forEach((questionId) => {
+    batch.delete(publicCollection(PATHS.assessmentQuestions).doc(questionId));
+  });
+  await batch.commit();
+  return { deletedCount: questionIds.length };
+}
+
 async function listTeacherAssessments(uid) {
   requireTeacher(uid);
   const snapshot = await publicCollection(PATHS.assessments)
@@ -1836,6 +1854,7 @@ const actions = {
   createTeacherAssessmentQuestions,
   updateTeacherAssessmentQuestion,
   deleteTeacherAssessmentQuestion,
+  deleteTeacherAssessmentQuestions,
   listTeacherAssessments,
   getTeacherAssessment,
   saveTeacherAssessment,

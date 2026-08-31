@@ -76,6 +76,10 @@ export const deleteTeacherAssessmentQuestion = (questionId) => call(
   'deleteTeacherAssessmentQuestion',
   { questionId },
 );
+export const deleteTeacherAssessmentQuestions = (questionIds) => call(
+  'deleteTeacherAssessmentQuestions',
+  { questionIds },
+);
 export const listTeacherAssessments = () => call('listTeacherAssessments');
 export const getTeacherAssessment = (assessmentId) => call('getTeacherAssessment', { assessmentId });
 export const saveTeacherAssessment = (assessment) => call('saveTeacherAssessment', { assessment });

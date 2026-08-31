@@ -4,6 +4,7 @@ import { calculateAssessmentClassSummary } from '../../utils/assessments.js';
 import {
   createTeacherAssessmentQuestions,
   deleteTeacherAssessmentQuestion,
+  deleteTeacherAssessmentQuestions,
   deleteTeacherAssessment,
   getTeacherAssessment,
   listTeacherAssessmentQuestions,
@@ -248,6 +249,42 @@ export default function AssessmentManagementPanel({ classes = [] }) {
     }
   };
 
+  const deleteAllBankQuestions = async (questions) => {
+    const deletedQuestions = new Map(questions.map((question) => [question.id, question]));
+    const questionIds = [...deletedQuestions.keys()];
+    if (questionIds.length === 0) return { deletedCount: 0 };
+
+    setError('');
+    try {
+      const result = await deleteTeacherAssessmentQuestions(questionIds);
+      const deletedQuestionIds = new Set(questionIds);
+      setQuestionBank((current) => current.filter((item) => !deletedQuestionIds.has(item.id)));
+      setForm((current) => {
+        if (!current.id) {
+          return {
+            ...current,
+            questionIds: current.questionIds.filter((id) => !deletedQuestionIds.has(id)),
+          };
+        }
+
+        const legacyMap = new Map(current.legacyQuestions.map((question) => [question.id, question]));
+        current.questionIds.forEach((questionId) => {
+          const question = deletedQuestions.get(questionId);
+          if (question) legacyMap.set(questionId, question);
+        });
+        return {
+          ...current,
+          legacyQuestions: [...legacyMap.values()],
+        };
+      });
+      return result;
+    } catch (deleteError) {
+      console.error(deleteError);
+      setError(deleteError.message || '문제은행 문항을 전체 삭제하지 못했습니다.');
+      throw deleteError;
+    }
+  };
+
   const save = async (status) => {
     setIsSaving(true);
     setError('');
@@ -337,6 +374,7 @@ export default function AssessmentManagementPanel({ classes = [] }) {
         onCreateQuestions={createBankQuestions}
         onUpdateQuestion={updateBankQuestion}
         onDeleteQuestion={deleteBankQuestion}
+        onDeleteAllQuestions={deleteAllBankQuestions}
         onToggleQuestion={toggleQuestion}
         onSelectAllQuestions={selectAllQuestions}
         onClearAllQuestions={clearAllQuestions}

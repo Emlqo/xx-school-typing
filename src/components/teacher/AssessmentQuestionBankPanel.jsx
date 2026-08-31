@@ -78,6 +78,7 @@ export default function AssessmentQuestionBankPanel({
   onCreateQuestions,
   onUpdateQuestion,
   onDeleteQuestion,
+  onDeleteAllQuestions,
   onToggleQuestion,
   onSelectAllQuestions,
   onClearAllQuestions,
@@ -86,6 +87,7 @@ export default function AssessmentQuestionBankPanel({
   const [bulkErrors, setBulkErrors] = useState([]);
   const [message, setMessage] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
   const [editingId, setEditingId] = useState('');
   const [search, setSearch] = useState('');
   const selectedSet = useMemo(() => new Set(selectedQuestionIds), [selectedQuestionIds]);
@@ -131,6 +133,28 @@ export default function AssessmentQuestionBankPanel({
       setBulkErrors([error.message || '문항을 등록하지 못했습니다.']);
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const deleteAllQuestions = async () => {
+    if (questions.length === 0) return;
+    const confirmed = window.confirm(
+      `문제은행의 문항 ${questions.length}개를 모두 삭제할까요?\n이미 저장된 형성평가는 기존 문항을 유지하지만, 삭제한 문항은 새 평가에서 다시 선택할 수 없습니다.`,
+    );
+    if (!confirmed) return;
+
+    setBulkErrors([]);
+    setMessage('');
+    setIsDeletingAll(true);
+    try {
+      const result = await onDeleteAllQuestions(questions);
+      setMessage(`${result?.deletedCount || questions.length}개 문항을 문제은행에서 삭제했습니다.`);
+      setSearch('');
+      setEditingId('');
+    } catch (error) {
+      setBulkErrors([error.message || '문제은행 문항을 전체 삭제하지 못했습니다.']);
+    } finally {
+      setIsDeletingAll(false);
     }
   };
 
@@ -194,6 +218,14 @@ export default function AssessmentQuestionBankPanel({
           className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-black text-gray-600 disabled:bg-gray-50 disabled:text-gray-300"
         >
           전체 해제
+        </button>
+        <button
+          type="button"
+          onClick={deleteAllQuestions}
+          disabled={questions.length === 0 || isDeletingAll}
+          className="rounded-xl bg-red-600 px-4 py-3 text-sm font-black text-white shadow-sm disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none"
+        >
+          {isDeletingAll ? '전체 삭제 중...' : '문제은행 전체 삭제'}
         </button>
         <span className="rounded-full bg-teal-50 px-3 py-2 text-xs font-black text-teal-700">전체 {questions.length}개 · 평가 선택 {selectedQuestionIds.length}개</span>
       </div>
