@@ -173,6 +173,7 @@ export default function App() {
   const [hallOfFameMonthKey, setHallOfFameMonthKey] = useState(() => getMonthKey(new Date()));
   const [isHallTitleBatchUpdating, setIsHallTitleBatchUpdating] = useState(false);
   const [lastReward, setLastReward] = useState(() => getDefaultRewardState());
+  const [scoreSaveFailed, setScoreSaveFailed] = useState(false);
   const [duelClassId, setDuelClassId] = useState('');
   const [outgoingDuelTargetId, setOutgoingDuelTargetId] = useState('');
   const [activeDuelId, setActiveDuelId] = useState('');
@@ -726,6 +727,7 @@ export default function App() {
     setBoosterTimeLeft(0);
     setIsPracticeMode(practiceMode);
     setLastReward(getDefaultRewardState());
+    setScoreSaveFailed(false);
     pendingQuizzesRef.current = [];
     wordCountRef.current = 0;
     gameInfoRef.current = { elapsed: 0 };
@@ -1024,19 +1026,33 @@ export default function App() {
 
     if (!currentScoreDocId || !db) return;
 
+    let scoreSaved = false;
     try {
       const elapsedSeconds = gameInfoRef.current.elapsed || gameDuration || 1;
       const finalCpm = calculateCpm({ chars: latestCharsRef.current, seconds: elapsedSeconds });
       const scoreRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.scores, currentScoreDocId);
       const currentScoreInfo = scores.find((item) => item.id === currentScoreDocId) || {};
 
-      await updateDoc(scoreRef, {
-        score: latestScoreRef.current,
-        cpm: finalCpm,
-        correctChars: latestCharsRef.current,
-        quizCorrectCount: latestQuizCorrectCountRef.current,
-        updatedAt: serverTimestamp(),
-      });
+      let lastSaveError = null;
+      for (let attempt = 0; attempt < 3 && !scoreSaved; attempt += 1) {
+        try {
+          await updateDoc(scoreRef, {
+            score: latestScoreRef.current,
+            cpm: finalCpm,
+            correctChars: latestCharsRef.current,
+            quizCorrectCount: latestQuizCorrectCountRef.current,
+            updatedAt: serverTimestamp(),
+          });
+          scoreSaved = true;
+          setScoreSaveFailed(false);
+        } catch (saveError) {
+          lastSaveError = saveError;
+          if (attempt < 2) {
+            await new Promise((resolve) => window.setTimeout(resolve, 700 * (attempt + 1)));
+          }
+        }
+      }
+      if (!scoreSaved) throw lastSaveError || new Error('점수를 저장하지 못했습니다.');
       lastSyncedScoreRef.current = latestScoreRef.current;
 
       if (
@@ -1068,10 +1084,17 @@ export default function App() {
       }
     } catch (error) {
       console.error(error);
+      if (!scoreSaved) {
+        isEndingRef.current = false;
+        setScoreSaveFailed(true);
+        alert('점수 저장에 실패했습니다. 인터넷 연결을 확인한 뒤 결과 화면을 닫지 말고 다시 시도해주세요.');
+      }
     } finally {
-      setSelectedRoomId('');
-      setCurrentScoreDocId(null);
-      setMyRoomData(null);
+      if (scoreSaved) {
+        setSelectedRoomId('');
+        setCurrentScoreDocId(null);
+        setMyRoomData(null);
+      }
     }
   }, [activeDuel?.id, currentScoreDocId, gameDuration, isDuelMode, isPracticeMode, scores, studentProfile?.id, syncDuelScore]);
 
@@ -2599,20 +2622,41 @@ export default function App() {
         ? scores.filter((scoreItem) => scoreItem.roomId === viewingRoomId)
         : [];
 
-    const latestByNickname = new Map();
+    const latestByStudent = new Map();
 
     filteredScores.forEach((scoreItem) => {
-      const nicknameKey = scoreItem.nickname || scoreItem.userId || scoreItem.id;
-      const previous = latestByNickname.get(nicknameKey);
-      const currentCreatedAt = getTimestampMillis(scoreItem.createdAt);
-      const previousCreatedAt = getTimestampMillis(previous?.createdAt);
+      const studentKey = scoreItem.studentId
+        ? `student:${scoreItem.studentId}`
+        : `guest:${scoreItem.nickname || scoreItem.userId || scoreItem.id}`;
+      const previous = latestByStudent.get(studentKey);
+      const currentUpdatedAt = getTimestampMillis(scoreItem.updatedAt)
+        || getTimestampMillis(scoreItem.createdAt);
+      const previousUpdatedAt = getTimestampMillis(previous?.updatedAt)
+        || getTimestampMillis(previous?.createdAt);
+      const currentHasProgress = Number(scoreItem.score || 0) !== 0
+        || Number(scoreItem.correctChars || 0) > 0
+        || Number(scoreItem.quizCorrectCount || 0) > 0;
+      const previousHasProgress = Number(previous?.score || 0) !== 0
+        || Number(previous?.correctChars || 0) > 0
+        || Number(previous?.quizCorrectCount || 0) > 0;
+      const shouldPreferProgress = viewingRoomId !== 'all'
+        && currentHasProgress !== previousHasProgress;
 
-      if (!previous || currentCreatedAt >= previousCreatedAt) {
-        latestByNickname.set(nicknameKey, scoreItem);
+      if (
+        !previous
+        || (shouldPreferProgress && currentHasProgress)
+        || (!shouldPreferProgress && currentUpdatedAt > previousUpdatedAt)
+        || (
+          !shouldPreferProgress
+          && currentUpdatedAt === previousUpdatedAt
+          && Number(scoreItem.score || 0) > Number(previous.score || 0)
+        )
+      ) {
+        latestByStudent.set(studentKey, scoreItem);
       }
     });
 
-    return [...latestByNickname.values()].sort((a, b) => (b.score || 0) - (a.score || 0));
+    return [...latestByStudent.values()].sort((a, b) => (b.score || 0) - (a.score || 0));
   };
 
   const handleBackToLogin = () => {
@@ -2891,6 +2935,8 @@ export default function App() {
         correctChars={correctChars}
         gameDuration={gameDuration}
         lastReward={lastReward}
+        scoreSaveFailed={scoreSaveFailed}
+        onRetryScoreSave={endGame}
         onHome={handleBackToLogin}
         onPracticeAgain={startPractice}
       />

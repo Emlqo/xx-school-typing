@@ -566,37 +566,66 @@ async function joinClassGame(uid, body) {
   const existing = await publicCollection(PATHS.scores)
     .where('roomId', '==', roomId)
     .where('studentId', '==', studentId)
-    .limit(1)
+    .limit(10)
     .get();
   let scoreRef;
   let score;
   if (!existing.empty) {
-    scoreRef = existing.docs[0].ref;
+    const preferredScoreDoc = [...existing.docs].sort((left, right) => {
+      const leftData = left.data();
+      const rightData = right.data();
+      const leftHasProgress = Number(leftData.score || 0) !== 0
+        || Number(leftData.correctChars || 0) > 0
+        || Number(leftData.quizCorrectCount || 0) > 0;
+      const rightHasProgress = Number(rightData.score || 0) !== 0
+        || Number(rightData.correctChars || 0) > 0
+        || Number(rightData.quizCorrectCount || 0) > 0;
+      if (leftHasProgress !== rightHasProgress) return rightHasProgress ? 1 : -1;
+      const updatedDiff = toMillis(rightData.updatedAt) - toMillis(leftData.updatedAt);
+      if (updatedDiff !== 0) return updatedDiff;
+      const createdDiff = toMillis(rightData.createdAt) - toMillis(leftData.createdAt);
+      if (createdDiff !== 0) return createdDiff;
+      return Number(rightData.score || 0) - Number(leftData.score || 0);
+    })[0];
+    scoreRef = preferredScoreDoc.ref;
     await scoreRef.update({ userId: uid, updatedAt: FieldValue.serverTimestamp() });
-    score = { ...existing.docs[0].data(), userId: uid, updatedAt: Timestamp.now() };
+    score = { ...preferredScoreDoc.data(), userId: uid, updatedAt: Timestamp.now() };
   } else {
-    scoreRef = publicCollection(PATHS.scores).doc();
+    scoreRef = publicCollection(PATHS.scores).doc(`class_${roomId}_${studentId}`);
+    await database().runTransaction(async (transaction) => {
+      const scoreSnapshot = await transaction.get(scoreRef);
+      if (scoreSnapshot.exists) {
+        score = { ...scoreSnapshot.data(), userId: uid };
+        transaction.update(scoreRef, { userId: uid, updatedAt: FieldValue.serverTimestamp() });
+        return;
+      }
+
+      score = {
+        roomId,
+        classId: room.classId,
+        className: room.className || room.name || '',
+        studentId,
+        nickname: student.name || '',
+        entryType: 'class',
+        equippedCosmetic: student.equippedCosmetic || null,
+        score: 0,
+        cpm: 0,
+        correctChars: 0,
+        difficulty: 'normal',
+        boosterEnabled: true,
+        pointWeight: 1,
+        userId: uid,
+        quizCorrectCount: 0,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      };
+      transaction.set(scoreRef, score);
+    });
     score = {
-      roomId,
-      classId: room.classId,
-      className: room.className || room.name || '',
-      studentId,
-      nickname: student.name || '',
-      entryType: 'class',
-      equippedCosmetic: student.equippedCosmetic || null,
-      score: 0,
-      cpm: 0,
-      correctChars: 0,
-      difficulty: 'normal',
-      boosterEnabled: true,
-      pointWeight: 1,
-      userId: uid,
-      quizCorrectCount: 0,
-      createdAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
+      ...score,
+      createdAt: toMillis(score.createdAt) ? score.createdAt : Timestamp.now(),
+      updatedAt: Timestamp.now(),
     };
-    await scoreRef.set(score);
-    score = { ...score, createdAt: Timestamp.now(), updatedAt: Timestamp.now() };
   }
   await publicCollection(PATHS.roomPresence).doc(`${roomId}_${studentId}`).set({
     roomId,
