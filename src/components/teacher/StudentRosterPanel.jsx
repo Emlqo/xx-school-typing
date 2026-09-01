@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 function parseStudentNames(value) {
   return value
     .split(/\s+/)
@@ -16,9 +18,12 @@ export default function StudentRosterPanel({
   handleDeleteStudent = () => {},
   handleRegenerateStudentPin = () => {},
   handleResetStudentPin = () => {},
+  handleResetClassStudentPins = () => {},
   handleSyncPublicRoster = () => {},
 }) {
+  const [isResettingClassPins, setIsResettingClassPins] = useState(false);
   const parsedNames = parseStudentNames(studentBulkText);
+  const issuedPinCount = students.filter((student) => Boolean(student.studentPin)).length;
   const scoreByStudentId = new Map(
     classRoomScores
       .filter((score) => score.studentId)
@@ -30,7 +35,22 @@ export default function StudentRosterPanel({
     <div className="glass-box p-6 rounded-3xl border border-teal-100">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h2 className="text-lg font-bold text-teal-800 flex items-center gap-2">🧑‍🎓 학생 명단 관리</h2>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={async () => {
+              setIsResettingClassPins(true);
+              try {
+                await handleResetClassStudentPins();
+              } finally {
+                setIsResettingClassPins(false);
+              }
+            }}
+            disabled={!selectedClass || issuedPinCount === 0 || isResettingClassPins}
+            className="text-xs font-black px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white shadow-sm"
+          >
+            {isResettingClassPins ? '전체 초기화 중...' : `반 전체 PIN 초기화 (${issuedPinCount}명)`}
+          </button>
           <button
             type="button"
             onClick={handleSyncPublicRoster}

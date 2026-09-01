@@ -1938,6 +1938,55 @@ export default function App() {
     }
   };
 
+  const handleResetClassStudentPins = async () => {
+    if (!requireTeacherAccess()) return false;
+    if (!selectedClassId) {
+      alert('PIN을 초기화할 학급을 먼저 선택해주세요.');
+      return false;
+    }
+
+    const studentsWithPin = classStudents.filter((student) => (
+      student.classId === selectedClassId && Boolean(student.studentPin)
+    ));
+    if (studentsWithPin.length === 0) {
+      alert('선택한 학급에 초기화할 PIN이 없습니다.');
+      return false;
+    }
+
+    const selectedClassName = classes.find((classItem) => classItem.id === selectedClassId)?.name
+      || '선택한 학급';
+    const confirmed = window.confirm(
+      `[${selectedClassName}] 학생 ${studentsWithPin.length}명의 개인 PIN을 모두 초기화할까요?\n초기화 후 학생은 다음 로그인에서 새 PIN을 직접 설정해야 합니다.`,
+    );
+    if (!confirmed) return false;
+
+    try {
+      const chunkSize = 200;
+      for (let offset = 0; offset < studentsWithPin.length; offset += chunkSize) {
+        const batch = writeBatch(db);
+        studentsWithPin.slice(offset, offset + chunkSize).forEach((student) => {
+          const studentRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.classStudents, student.id);
+          const rosterRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.classRoster, student.id);
+          batch.update(studentRef, {
+            studentPin: '',
+            updatedAt: serverTimestamp(),
+          });
+          batch.set(rosterRef, {
+            hasPin: false,
+            updatedAt: serverTimestamp(),
+          }, { merge: true });
+        });
+        await batch.commit();
+      }
+      alert(`${selectedClassName} 학생 ${studentsWithPin.length}명의 PIN을 초기화했습니다.`);
+      return true;
+    } catch (error) {
+      console.error(error);
+      alert('학급 전체 PIN 초기화 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+      return false;
+    }
+  };
+
   const handleSetStudentPin = async (studentId, newPin) => {
     if (!studentId || !/^\d{4}$/.test(String(newPin))) return false;
 
@@ -3032,6 +3081,7 @@ export default function App() {
         handleDeleteStudent={handleDeleteStudent}
         handleRegenerateStudentPin={handleRegenerateStudentPin}
         handleResetStudentPin={handleResetStudentPin}
+        handleResetClassStudentPins={handleResetClassStudentPins}
         handleSyncPublicRoster={handleSyncPublicRoster}
         handleSetStudentPoints={handleSetStudentPoints}
         handleAdjustStudentPoints={handleAdjustStudentPoints}
