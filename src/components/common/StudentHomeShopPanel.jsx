@@ -12,6 +12,9 @@ export default function StudentHomeShopPanel({
   if (!student) return null;
   const owned = Array.isArray(student.ownedCosmetics) ? student.ownedCosmetics : [];
   const stockItems = shopItems.filter((item) => item.itemType !== 'cosmetic' && item.active !== false);
+  const visibleCosmetics = COSMETIC_ITEMS.filter((cosmetic) => (
+    cosmetic.category !== 'title' || owned.includes(cosmetic.id)
+  ));
 
   return (
     <section className="glass-box rounded-3xl p-5 md:p-6 shadow-2xl border-2 border-cyan-100">
@@ -69,7 +72,7 @@ export default function StudentHomeShopPanel({
       <div className="border-t border-cyan-100 pt-5">
         <h3 className="font-black text-gray-700 mb-3">장식 아이템</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {COSMETIC_ITEMS.map((cosmetic) => {
+          {visibleCosmetics.map((cosmetic) => {
             const configured = shopItems.find((item) => item.itemType === 'cosmetic' && item.cosmeticId === cosmetic.id);
             const isOwned = owned.includes(cosmetic.id);
             const isEquipped = student.equippedCosmetic === cosmetic.id;
@@ -83,7 +86,9 @@ export default function StudentHomeShopPanel({
                     <div className="font-black text-gray-800">{cosmetic.name}</div>
                     <p className="text-xs text-gray-500 font-bold mt-1">{cosmetic.description}</p>
                   </div>
-                  <span className="text-sm font-black text-emerald-700 bg-white/80 rounded-lg px-2 py-1">{price}P</span>
+                  <span className="text-sm font-black text-emerald-700 bg-white/80 rounded-lg px-2 py-1">
+                    {cosmetic.category === 'title' ? '관리자 지급 칭호' : `${price}P`}
+                  </span>
                 </div>
                 <button
                   type="button"

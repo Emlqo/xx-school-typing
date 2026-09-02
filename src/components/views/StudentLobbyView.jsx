@@ -30,6 +30,9 @@ function StudentShopPanel({
   }
 
   const ownedCosmetics = Array.isArray(student.ownedCosmetics) ? student.ownedCosmetics : [];
+  const visibleCosmetics = COSMETIC_ITEMS.filter((item) => (
+    item.category !== 'title' || ownedCosmetics.includes(item.id)
+  ));
   const hasStudentPin = Boolean(student.hasPin || student.studentPin);
 
   return (
@@ -176,7 +179,7 @@ function StudentShopPanel({
         <div className="border-t border-cyan-100 mt-5 pt-4">
           <div className="text-sm font-black text-gray-700 mb-3">장식 아이템</div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
-          {COSMETIC_ITEMS.map((item) => {
+          {visibleCosmetics.map((item) => {
             const owned = ownedCosmetics.includes(item.id);
             const equipped = student.equippedCosmetic === item.id;
             const shopItem = shopItems.find(
@@ -196,7 +199,7 @@ function StudentShopPanel({
                     <div className="text-xs text-gray-500 font-bold mt-1 leading-relaxed">{item.description}</div>
                   </div>
                   <div className="text-sm font-black text-emerald-700 bg-white/80 border border-white rounded-xl px-2 py-1 shrink-0">
-                    {price}P
+                    {item.category === 'title' ? '관리자 지급 칭호' : `${price}P`}
                   </div>
                 </div>
                 {!owned && (
