@@ -42,3 +42,72 @@
 .metro-memorize-stations li span { color: #077b62; font-weight: 800; }
 .metro-memorize-stations li b { font-size: 24px; overflow-wrap: anywhere; }
 @media (max-width: 600px) { .metro-memorize-overlay { padding: 12px; } .metro-memorize-panel { padding: 20px 14px; } .metro-memorize-panel h1 { font-size: 34px; } .metro-memorize-count strong { font-size: 56px; } }
+
+/* Shared station-board hierarchy for the race and memorization route. */
+.metro-game { background: #f3fafb; }
+.metro-start-signal { position: absolute; inset: 0; z-index: 3; display: grid; place-items: center; color: #fff; background: #075d83d9; font-size: 56px; font-weight: 900; pointer-events: none; }
+.metro-dashboard { text-align: center; max-width: 1100px; padding: 16px 24px; margin-top: 0; }
+.metro-dashboard > div { min-width: 0; border-right: 1px solid #c4dfe4; }
+.metro-dashboard > div:last-child { text-align: center; border-right: 0; }
+.metro-dashboard small { color: #456770; font-size: 13px; }
+.metro-dashboard strong, .metro-clock strong { font-size: 30px; font-variant-numeric: tabular-nums; }
+.metro-scene { height: 190px; }
+.metro-console { max-width: 760px; padding-top: 20px; }
+.metro-announcement { font-size: 15px; min-height: 24px; color: #395c65; }
+.metro-departure-board { margin: 12px 0 18px; padding: 16px 20px; background: #143b3c; border-top: 4px solid #00a4dc; border-radius: 6px; text-align: left; min-height: 134px; }
+.metro-board-label { color: #b0d7d4; font-size: 14px; font-weight: 700; }
+.metro-word { color: #fff; margin: 8px 0 0; display: flex; gap: 18px; align-items: baseline; min-height: 60px; }
+.metro-word small { flex-shrink: 0; font-size: 22px; color: #61e4bd; font-variant-numeric: tabular-nums; }
+.metro-input { font-size: 28px; padding: 16px; }
+.animate-shake .metro-input { border-color: #c13a52; background: #fff5f7; }
+.metro-feedback { font-size: 15px; color: #456770; }
+.metro-hints { min-height: 56px; margin: 8px 0; }
+.metro-hints button { margin: 0; }
+.metro-route-caption { display: flex; justify-content: space-between; gap: 16px; font-size: 14px; margin-bottom: 12px; color: #365d67; }
+.metro-stops { gap: 0; padding: 20px 0; }
+.metro-stops > span { position: relative; width: 136px; font-size: 15px; color: #55747b; padding: 0 8px; font-weight: 700; }
+.metro-stops > span::before { content: ''; position: absolute; top: 15px; left: 0; width: 100%; height: 4px; background: #aacfd8; }
+.metro-stops > span:first-child::before { left: 50%; width: 50%; }
+.metro-stops > span:last-child::before { width: 50%; }
+.metro-stops i { position: relative; display: grid; place-items: center; width: 34px; height: 34px; background: #f3fafb; font-style: normal; border-width: 3px; margin-bottom: 10px; font-size: 13px; color: #365d67; }
+.metro-stops .passed i { background: #067d66; color: white; border-color: #067d66; }
+.metro-stops .passed::before { background: #067d66; }
+.metro-stops .current i { background: #007bac; color: white; border-color: #007bac; box-shadow: 0 0 0 5px #c4edf9; }
+.metro-finish { border-top: 4px solid #069a79; padding-top: 20px; }
+.metro-finish h1 { font-size: 34px; }
+.metro-finish .metro-last-station { font-size: 20px; font-weight: 800; color: #185d52; }
+.metro-time-breakdown { display: flex; justify-content: center; flex-wrap: wrap; gap: 24px; padding: 16px 0; border-block: 1px solid #c4dfe4; margin: 20px 0; color: #456770; }
+.metro-time-breakdown b { display: block; font-size: 24px; color: #174852; font-variant-numeric: tabular-nums; }
+.metro-memorize-panel { padding-top: 0; }
+.metro-memorize-heading { position: sticky; top: -24px; z-index: 2; background: #f4fcff; padding: 24px 0 12px; border-bottom: 1px solid #c4dfe4; }
+.metro-memorize-count { margin: 0; }
+.metro-count-urgent strong { color: #bb3549; }
+.metro-memorize-stations { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; margin-top: 28px; }
+.metro-memorize-stations li { position: relative; display: flex; flex-direction: column; gap: 12px; border: 0; background: transparent; padding: 12px 8px 28px; text-align: center; }
+.metro-memorize-stations li::before { content: ''; position: absolute; left: 0; right: 0; top: 32px; height: 5px; background: #00a4dc; }
+.metro-memorize-stations li::after { content: '›'; position: absolute; top: 11px; right: 2px; color: #007aab; font-size: 30px; background: #f4fcff; line-height: 42px; }
+.metro-memorize-stations li:last-child::after { display: none; }
+.metro-memorize-stations li span { position: relative; display: grid; place-items: center; width: 44px; height: 44px; border: 4px solid #00a4dc; background: white; border-radius: 50%; font-size: 18px; color: #075d83; }
+.metro-memorize-stations li b { font-size: 24px; }
+@media(max-width:600px) {
+  .metro-dashboard { padding: 12px; gap: 8px; }
+  .metro-dashboard strong, .metro-clock strong { font-size: 22px; }
+  .metro-dashboard small { font-size: 11px; }
+  .metro-scene { height: 155px; }
+  .metro-word { font-size: 32px; gap: 12px; }
+  .metro-word small { font-size: 18px; }
+  .metro-input { font-size: 24px; }
+  .metro-departure-board { min-height: 122px; padding: 14px; }
+  .metro-announcement { font-size: 13px; }
+  .metro-memorize-heading { top: -12px; padding-top: 16px; }
+  .metro-memorize-panel h1 { font-size: 30px; }
+  .metro-memorize-panel p { font-size: 16px; }
+  .metro-memorize-count strong { font-size: 46px; }
+  .metro-memorize-stations { grid-template-columns: 1fr; }
+  .metro-memorize-stations li { flex-direction: row; text-align: left; padding: 0 0 24px; gap: 18px; }
+  .metro-memorize-stations li::before { left: 20px; top: 0; width: 4px; height: 100%; }
+  .metro-memorize-stations li:last-child::before { height: 24px; }
+  .metro-memorize-stations li::after { display: none; }
+  .metro-memorize-stations li span { flex-shrink: 0; }
+  .metro-memorize-stations li b { font-size: 22px; }
+}

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { LINE_4, subwayRoute, subwayStart, formatRaceTime, rankSubwayResults, stationInitials, subwayHintPenalty, subwayPreviewMs } from '../src/utils/subway.js';
+import { LINE_4, subwayRoute, subwayStart, formatRaceTime, rankSubwayResults, stationInitials, subwayHintPenalty, subwayPreviewMs, subwayProgressSummary } from '../src/utils/subway.js';
 import { normalizeClassScore } from '../src/utils/hallOfFame.js';
 import { calculateRankRewards } from '../src/utils/rewards.js';
 
@@ -48,6 +48,15 @@ test('ties share rank and incomplete entries follow finishers', () => {
   ]);
   assert.deepEqual(ranked.map((x) => x.subwayRank), [1, 1, 3, null]);
   assert.equal(ranked.at(-1).id, 'a');
+});
+
+test('unfinished results preserve last saved stop, clamp progress and handle no arrivals', () => {
+  const route = subwayRoute();
+  assert.deepEqual(subwayProgressSummary(route, { subwayProgress: 2, subwayStatus: 'timeout' }), { count: 2, total: 6, percent: 33, lastStation: '오남' });
+  assert.equal(subwayProgressSummary(route, {}).lastStation, null);
+  assert.equal(subwayProgressSummary(route, { subwayProgress: -5 }).count, 0);
+  assert.equal(subwayProgressSummary(route, { subwayProgress: 999 }).count, 6);
+  assert.equal(subwayProgressSummary(route, { subwayStatus: 'completed' }).lastStation, '노원');
 });
 
 test('subway records do not award points or enter typing hall of fame', () => {

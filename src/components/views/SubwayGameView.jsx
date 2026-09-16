@@ -37,6 +37,7 @@ export default function SubwayGameView({ room, scoreData, scoreId, nickname, onH
   });
   const hintsRef = useRef(hints);
   const input = useRef(null);
+  const activeStop = useRef(null);
   const progressRef = useRef(progress);
   const inFlight = useRef(false);
   const lastRequest = useRef(0);
@@ -54,6 +55,10 @@ export default function SubwayGameView({ room, scoreData, scoreId, nickname, onH
   const stationLabel = !memory || preview || hintLevel === 2 ? route[progress] : hintLevel === 1 ? stationInitials(route[progress] || '') : '?'.repeat((route[progress] || '').length);
 
   useEffect(() => { if (!preview) input.current?.focus(); }, [preview]);
+  useEffect(() => {
+    const stop = activeStop.current;
+    if (stop) stop.parentElement.scrollTo({ left: stop.offsetLeft - stop.parentElement.offsetLeft - stop.parentElement.clientWidth / 2 + stop.clientWidth / 2, behavior: 'smooth' });
+  }, [progress, preview]);
 
   const revealHint = () => {
     if (!memory || preview || finished || hintLevel >= 2) return;
@@ -115,46 +120,52 @@ export default function SubwayGameView({ room, scoreData, scoreId, nickname, onH
 
   if (!room || !route.length) return <main className="metro-game"><h1>경기가 종료되었거나 노선을 찾을 수 없습니다.</h1><button onClick={onHome}>학생 홈으로</button></main>;
 
-  return <main className={`metro-game ${arriving ? 'metro-accelerating' : ''} ${finished || preview || (memory && !arriving) ? 'metro-stopped' : ''}`}>
+  return <main className={`metro-game ${arriving ? 'metro-accelerating' : ''} ${finished || preview || !arriving ? 'metro-stopped' : ''}`}>
     {preview && !finished && <section className="metro-memorize-overlay" role="dialog" aria-modal="true" aria-labelledby="metro-memorize-title">
       <div className="metro-memorize-panel">
+        <div className="metro-memorize-heading">
         <span className="metro-memorize-badge">4호선 · 암기 시간</span>
         <h1 id="metro-memorize-title">지금 외우세요!</h1>
         <p>정거장 이름과 순서를 기억하세요.</p>
-        <div className="metro-memorize-count" role="timer" aria-label="암기 남은 시간"><strong>{Math.max(0, Math.ceil((start - now) / 1000))}</strong><span>초 후 출발</span></div>
+        <div className={`metro-memorize-count ${start - now <= 5000 ? 'metro-count-urgent' : ''}`} role="timer" aria-label="암기 남은 시간"><strong>{Math.max(0, Math.ceil((start - now) / 1000))}</strong><span>초 후 출발</span></div>
+        </div>
         <ol className="metro-memorize-stations select-none" onCopy={(event) => event.preventDefault()}>{route.map((name, i) => <li key={name}><span>{i + 1}</span><b>{name}</b></li>)}</ol>
       </div>
     </section>}
     <header className="metro-header"><div className="metro-brand"><span className="metro-line">4</span><div><b>지하철 타자 레이스</b><small>LINE 04 · {nickname}</small></div></div><span className="metro-route-label">{route[0]} → {route.at(-1)}</span></header>
     <section className="metro-dashboard">
-      <div><small>운행 구간</small><strong>{route[0]} <span>→</span> {route.at(-1)}</strong></div>
-      <div className="metro-clock"><small>{result?.subwayStatus === 'completed' ? '공식 완주 시간' : '경과 시간'}</small><strong>{formatRaceTime(elapsed)}</strong>{!finished && <small>남은 시간 {Math.max(0, Math.ceil((deadline - now) / 1000))}초</small>}</div>
+      <div className="metro-clock"><small>{result?.subwayStatus === 'completed' ? '최종 기록' : '경과 시간'}</small><strong>{formatRaceTime(result?.subwayElapsedMs ?? Math.max(0, elapsed - penalty))}</strong>{!finished && <small>남은 시간 {Math.max(0, Math.ceil((deadline - Math.max(now, start)) / 1000))}초</small>}</div>
       <div><small>도착한 정거장</small><strong>{progress}<span> / {route.length}</span></strong></div>
+      <div><small>힌트 가산</small><strong>+{(result?.subwayPenaltyMs ?? penalty) / 1000}<span>초</span></strong></div>
     </section>
     <section className="metro-scene" aria-label="움직이는 4호선 열차">
+      {memory && !preview && !finished && now - start < 1200 && <div className="metro-start-signal" role="status">출발!</div>}
       <div className="metro-sun"/><div className="metro-mountains"/><div className="metro-buildings"/>
       <div className="metro-overhead"/><div className="metro-track"/>
-      <div className="metro-station-sign"><span>4호선</span><b>{finished ? route.at(-1) : stationLabel}</b></div>
+      <div className="metro-station-sign"><span>{finished ? '운행 종료' : arriving ? '출발' : '정차 중'} · 4호선</span><b>{finished ? progress ? route[progress - 1] : '출발 전' : stationLabel}</b></div>
       <SubwayTrain />
       <div className="metro-speed-lines"/>
     </section>
     <section className="metro-console">
       {!finished ? <>
-        <div className="metro-announcement"><span className="metro-live-dot"/>{preview ? `노선 기억하기 · ${Math.ceil((start - now) / 1000)}초` : '이번 정거장'} <span className="metro-next">{memory ? `${progress + 1}번째 정거장` : `다음 · ${route[progress + 1] || '종점'}`}</span></div>
-        <h1 className="metro-word select-none" onCopy={(event) => event.preventDefault()}>{stationLabel}</h1>
+        <div className="metro-announcement"><span className="metro-live-dot"/>{progress ? `이전 정거장 · ${route[progress - 1]}` : '출발 정거장'} <span className="metro-next">{progress + 1} / {route.length}</span></div>
+        <div className="metro-departure-board"><span className="metro-board-label">{memory ? '다음 정거장은?' : '이번 정거장'}</span>
+        <h1 className="metro-word select-none" onCopy={(event) => event.preventDefault()}><small>{String(progress + 1).padStart(2, '0')}</small>{stationLabel}</h1></div>
         {preview && <div className="metro-memory-route select-none">{route.map((name, i) => <span key={name}><small>{i + 1}</small>{name}</span>)}</div>}
         <div className={typo ? 'animate-shake' : ''}><input ref={input} disabled={preview} aria-label="정거장 이름 입력" value={value} onChange={(event) => { setValue(event.target.value); setTypo(false); }} onKeyDown={submit} onPaste={(event) => event.preventDefault()} onDrop={(event) => event.preventDefault()} onBeforeInput={(event) => { if (['insertFromPaste', 'insertFromDrop'].includes(event.nativeEvent.inputType)) event.preventDefault(); }} autoComplete="off" autoCorrect="off" spellCheck={false} placeholder="정거장 이름 입력" className="metro-input" /></div>
         {memory && !preview && <div className="metro-hints"><button disabled={hintLevel >= 2} onClick={revealHint}>{hintLevel === 0 ? '초성 힌트 +3초' : hintLevel === 1 ? '정답 보기 +5초' : '정답 공개됨'}</button><span>힌트 가산 {penalty / 1000}초</span></div>}
         <p className={`metro-feedback ${typo ? 'metro-error' : ''}`}>{typo ? '정거장 이름을 다시 확인해주세요.' : `목적지까지 ${route.length - progress}개 정거장`}</p>
       </> : <div className="metro-finish" aria-live="polite">
         <span className="metro-finish-label">{result?.subwayStatus === 'completed' ? 'ARRIVED' : expired && progress < route.length ? 'TIME UP' : 'FINISH'}</span>
-        <h1>{result?.subwayStatus === 'timeout' || (expired && progress < route.length) ? '운행 시간이 종료됐어요' : '목적지 도착!'}</h1>
+        <h1>{result?.subwayStatus === 'timeout' || (expired && progress < route.length) ? '운행 시간이 종료됐어요' : '종점 도착!'}</h1>
         <strong className="metro-finish-time">{result?.subwayStatus === 'completed' ? formatRaceTime(result.subwayElapsedMs) : `${progress} / ${route.length}`}</strong>
+        <p className="metro-last-station">{progress ? `마지막 도착 · ${route[progress - 1]}` : '도착 기록 없음'}</p>
+        {result?.subwayStatus === 'completed' && <div className="metro-time-breakdown"><span>경과 시간 <b>{formatRaceTime(Math.max(0, result.subwayElapsedMs - (result.subwayPenaltyMs ?? penalty)))}</b></span><span>힌트 가산 <b>+{(result.subwayPenaltyMs ?? penalty) / 1000}초</b></span></div>}
         <p>{saving ? '완주 기록 확인 중...' : result ? '기록이 선생님께 제출되었습니다.' : '기록 제출을 확인해주세요.'}</p>
         {result && <button onClick={onHome}>학생 홈으로</button>}
       </div>}
       {error && <div className="metro-error" role="alert">{error}<button disabled={saving} onClick={() => persist(finished)}>기록 저장 다시 시도</button></div>}
     </section>
-    <footer className="metro-route"><div className="metro-progress"><span style={{ width: `${progress / route.length * 100}%` }}/></div><div className="metro-stops">{route.map((name, i) => <span key={name} className={i < progress ? 'passed' : i === progress ? 'current' : ''}><i/>{memory && !preview && !finished && i >= progress ? `${i + 1} · ?` : name}</span>)}</div></footer>
+    <footer className="metro-route"><div className="metro-route-caption"><b>4호선</b><span>{progress} / {route.length}개 정거장 도착</span></div><div className="metro-progress"><span style={{ width: `${progress / route.length * 100}%` }}/></div><div className="metro-stops">{route.map((name, i) => <span key={name} ref={i === Math.min(progress, route.length - 1) ? activeStop : null} className={i < progress ? 'passed' : i === progress ? 'current' : ''}><i>{i + 1}</i>{memory && !preview && !finished && i >= progress ? '?' : name}</span>)}</div></footer>
   </main>;
 }

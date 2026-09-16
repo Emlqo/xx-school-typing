@@ -47,15 +47,20 @@ try {
   await page.locator('.metro-memory-route').waitFor();
   await page.getByRole('button', { name: '초성 힌트 +3초' }).waitFor({ timeout: 20000 });
   assert.equal(await page.getByRole('dialog').count(), 0);
-  assert.equal(await page.locator('.metro-word').textContent(), '??');
+  assert.equal(await page.locator('.metro-word').textContent(), '01??');
   await page.getByRole('button', { name: '초성 힌트 +3초' }).click();
-  assert.equal(await page.locator('.metro-word').textContent(), 'ㅈㅈ');
+  assert.equal(await page.locator('.metro-word').textContent(), '01ㅈㅈ');
   await page.getByRole('button', { name: '정답 보기 +5초' }).click();
-  assert.equal(await page.locator('.metro-word').textContent(), '진접');
+  assert.equal(await page.locator('.metro-word').textContent(), '01진접');
   await page.getByText('힌트 가산 8초').waitFor();
   await input.fill('진접'); await input.press('Enter');
-  assert.equal(await page.locator('.metro-word').textContent(), '??');
+  assert.equal(await page.locator('.metro-word').textContent(), '02??');
   await page.screenshot({ path: 'tests/subway-memory.png', fullPage: true });
+  await page.goto('http://127.0.0.1:5180/tests/subway-preview.html?leaderboard=1');
+  await page.getByText('노원 도착', { exact: true }).waitFor();
+  await page.getByText('6 / 16개 · 38%', { exact: true }).waitFor();
+  await page.getByText('도착 기록 없음', { exact: true }).waitFor();
+  await page.screenshot({ path: 'tests/subway-leaderboard.png', fullPage: true });
   assert.deepEqual(errors, []);
   console.log('Desktop/mobile, typo, paste/drop, select-none, completion, restoration, retry and timeout passed.');
 } finally { await browser.close(); }

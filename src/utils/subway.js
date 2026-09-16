@@ -57,3 +57,9 @@ export function rankSubwayResults(records) {
     return { ...record, subwayRank: rank };
   });
 }
+
+export function subwayProgressSummary(route, record) {
+  const raw = Number(record?.subwayProgress || 0);
+  const count = record?.subwayStatus === 'completed' ? route.length : Math.min(route.length, Math.max(0, Number.isFinite(raw) ? Math.floor(raw) : 0));
+  return { count, total: route.length, percent: route.length ? Math.round(count / route.length * 100) : 0, lastStation: count ? route[count - 1] : null };
+}
