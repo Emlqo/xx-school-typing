@@ -26,7 +26,7 @@
 # Memory mode
 
 - New rooms default to six stops and memory mode; copy mode remains selectable.
-- Shared 15-second preview is excluded from elapsed time. Late arrivals do not restart it.
+- Teacher-selected preview (5-300 seconds, default 15) is excluded from elapsed time. A full-screen memorization panel displays the route and countdown. Late arrivals do not restart it.
 - Initials cost 3 seconds; revealing the answer costs another 5 seconds per stop.
 - Hint history is cached in sessionStorage and submitted with existing checkpoints/final submission, with no extra requests per hint. The server merges saved hint levels and calculates the penalty.
 - This is a classroom UI aid, not cheat-proof memorization: station data and unsaved hints are client-side and can be inspected or altered with developer tools.

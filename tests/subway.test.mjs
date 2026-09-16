@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { LINE_4, subwayRoute, subwayStart, formatRaceTime, rankSubwayResults, stationInitials, subwayHintPenalty } from '../src/utils/subway.js';
+import { LINE_4, subwayRoute, subwayStart, formatRaceTime, rankSubwayResults, stationInitials, subwayHintPenalty, subwayPreviewMs } from '../src/utils/subway.js';
 import { normalizeClassScore } from '../src/utils/hallOfFame.js';
 import { calculateRankRewards } from '../src/utils/rewards.js';
 
@@ -20,6 +20,17 @@ test('memory preview is excluded and hints add time', () => {
   assert.equal(subwayStart({ ...room, startedAt: null }), 25000);
   assert.equal(stationInitials('별내별가람'), 'ㅂㄴㅂㄱㄹ');
   assert.equal(subwayHintPenalty({ 0: 1, 1: 2 }), 11000);
+});
+
+test('custom preview time is shared by client/server with legacy fallback and bounds', () => {
+  const room = { mode: 'subway', subway: { practice: 'memory', previewSeconds: 45 }, startedAt: 10000, duration: 300, expiresAt: 355000 };
+  assert.equal(subwayPreviewMs(room), 45000);
+  assert.equal(subwayStart(room), 55000);
+  assert.equal(subwayStart({ ...room, startedAt: null }), 55000);
+  for (const [value, expected] of [[undefined, 15000], [NaN, 15000], [-1, 5000], [900, 300000]]) {
+    assert.equal(subwayPreviewMs({ ...room, subway: { practice: 'memory', previewSeconds: value } }), expected);
+  }
+  assert.equal(subwayPreviewMs({ ...room, subway: { practice: 'copy', previewSeconds: 45 } }), 0);
 });
 
 test('clock uses shared room start and centiseconds', () => {

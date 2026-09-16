@@ -116,6 +116,15 @@ export default function SubwayGameView({ room, scoreData, scoreId, nickname, onH
   if (!room || !route.length) return <main className="metro-game"><h1>경기가 종료되었거나 노선을 찾을 수 없습니다.</h1><button onClick={onHome}>학생 홈으로</button></main>;
 
   return <main className={`metro-game ${arriving ? 'metro-accelerating' : ''} ${finished || preview || (memory && !arriving) ? 'metro-stopped' : ''}`}>
+    {preview && !finished && <section className="metro-memorize-overlay" role="dialog" aria-modal="true" aria-labelledby="metro-memorize-title">
+      <div className="metro-memorize-panel">
+        <span className="metro-memorize-badge">4호선 · 암기 시간</span>
+        <h1 id="metro-memorize-title">지금 외우세요!</h1>
+        <p>정거장 이름과 순서를 기억하세요.</p>
+        <div className="metro-memorize-count" role="timer" aria-label="암기 남은 시간"><strong>{Math.max(0, Math.ceil((start - now) / 1000))}</strong><span>초 후 출발</span></div>
+        <ol className="metro-memorize-stations select-none" onCopy={(event) => event.preventDefault()}>{route.map((name, i) => <li key={name}><span>{i + 1}</span><b>{name}</b></li>)}</ol>
+      </div>
+    </section>}
     <header className="metro-header"><div className="metro-brand"><span className="metro-line">4</span><div><b>지하철 타자 레이스</b><small>LINE 04 · {nickname}</small></div></div><span className="metro-route-label">{route[0]} → {route.at(-1)}</span></header>
     <section className="metro-dashboard">
       <div><small>운행 구간</small><strong>{route[0]} <span>→</span> {route.at(-1)}</strong></div>

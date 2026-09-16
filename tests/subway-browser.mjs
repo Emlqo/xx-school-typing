@@ -38,9 +38,15 @@ try {
   await page.getByText('기록이 선생님께 제출되었습니다.').waitFor();
   assert.deepEqual(errors, []);
   await page.goto('http://127.0.0.1:5180/tests/subway-preview.html?memory=1');
+  await page.getByRole('dialog', { name: '지금 외우세요!' }).waitFor();
+  await page.screenshot({ path: 'tests/subway-memorize-mobile.png', fullPage: true });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.screenshot({ path: 'tests/subway-memorize-desktop.png', fullPage: true });
   assert.equal(await input.isDisabled(), true);
   await page.locator('.metro-memory-route').waitFor();
   await page.getByRole('button', { name: '초성 힌트 +3초' }).waitFor({ timeout: 20000 });
+  assert.equal(await page.getByRole('dialog').count(), 0);
   assert.equal(await page.locator('.metro-word').textContent(), '??');
   await page.getByRole('button', { name: '초성 힌트 +3초' }).click();
   assert.equal(await page.locator('.metro-word').textContent(), 'ㅈㅈ');
