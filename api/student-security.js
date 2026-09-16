@@ -3,6 +3,7 @@ import { getAuth } from 'firebase-admin/auth';
 import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore';
 import { calculateAssessmentResult, createAssessmentSubmissionId } from '../src/utils/assessments.js';
 import { subwayRoute, subwayStart, subwayMillis, subwayHintPenalty } from '../src/utils/subway.js';
+import { REWARD_RULES } from '../src/constants/rewards.js';
 
 const APP_ID = 'xx-school-typing-app';
 const TEACHER_UID = String(process.env.TEACHER_UID || 'hnjJNGDuydcd4SfQ2Xq5cE6IujD3').trim();
@@ -40,13 +41,6 @@ export const DUEL_RULES = {
   dailyWinPointLimit: 15,
   boosterDurationMs: 25 * 1000,
   finalizeGraceMs: 3 * 1000,
-};
-
-const REWARD_RULES = {
-  quizCorrectPoints: 3,
-  bestScoreBonus: 10,
-  growthBonus: 10,
-  growthRateThreshold: 0.1,
 };
 
 const PRACTICE_RECORD_RULES = {

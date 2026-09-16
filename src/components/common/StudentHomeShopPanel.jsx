@@ -1,4 +1,4 @@
-import { COSMETIC_ITEMS } from '../../constants/cosmetics.js';
+import { COSMETIC_ITEMS, getCosmeticById } from '../../constants/cosmetics.js';
 import { safeToLocaleNumber } from '../../utils/format.js';
 
 export default function StudentHomeShopPanel({
@@ -11,6 +11,7 @@ export default function StudentHomeShopPanel({
 }) {
   if (!student) return null;
   const owned = Array.isArray(student.ownedCosmetics) ? student.ownedCosmetics : [];
+  const equipped = getCosmeticById(student.equippedCosmetic);
   const stockItems = shopItems.filter((item) => item.itemType !== 'cosmetic' && item.active !== false);
   const visibleCosmetics = COSMETIC_ITEMS.filter((cosmetic) => (
     cosmetic.category !== 'title' || owned.includes(cosmetic.id)
@@ -18,10 +19,16 @@ export default function StudentHomeShopPanel({
 
   return (
     <section className="glass-box rounded-3xl p-5 md:p-6 shadow-2xl border-2 border-cyan-100">
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-5">
+      <div className={`student-shop-profile relative isolate mb-5 rounded-lg border p-5 ${equipped?.previewClass || 'border-cyan-100 bg-white/70'}`}>
+        {equipped && <span className={`cosmetic-effect ${equipped.effectClass || 'cosmetic-effect-aura'}`} aria-hidden="true" />}
+        <div className="cosmetic-name-content flex flex-wrap items-center justify-between gap-4">
         <div>
-          <div className="text-xs font-black text-teal-600 tracking-widest">MY SHOP</div>
-          <h2 className="text-2xl font-black text-gray-800">{student.name}의 포인트 상점</h2>
+          <div className="text-xs font-black text-teal-700">MY PROFILE · 포인트 상점</div>
+          <h2 className="mt-1 text-2xl font-black text-gray-800 break-words">{student.name}</h2>
+          <div className="mt-2 flex flex-wrap items-center gap-2" aria-live="polite">
+            <span className="text-xs font-bold text-gray-600">현재 장착</span>
+            {equipped ? <span className={`px-3 py-1 text-sm font-black ${equipped.badgeClass}`}>{equipped.name}</span> : <span className="text-sm font-bold text-gray-500">기본 프로필</span>}
+          </div>
           <p className="text-xs text-gray-500 font-bold mt-1">최고 기록 {safeToLocaleNumber(student.bestScore)}점</p>
           <button
             type="button"
@@ -34,6 +41,7 @@ export default function StudentHomeShopPanel({
         <div className="rounded-2xl bg-emerald-50 border border-emerald-200 px-5 py-3 text-right">
           <div className="text-xs font-black text-emerald-600">보유 포인트</div>
           <div className="text-3xl font-black text-emerald-700">{safeToLocaleNumber(student.totalPoints)}P</div>
+        </div>
         </div>
       </div>
 

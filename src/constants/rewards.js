@@ -1,14 +1,14 @@
 export const REWARD_RULES = {
-  gameCompletePoints: 5,
-  quizCorrectPoints: 3,
-  bestScoreBonus: 10,
-  growthBonus: 10,
+  gameCompletePoints: 3,
+  quizCorrectPoints: 2,
+  bestScoreBonus: 6,
+  growthBonus: 6,
   growthRateThreshold: 0.1,
   rankPoints: {
-    first: 10,
-    second: 7,
-    third: 5,
-    topThirtyPercent: 3,
+    first: 6,
+    second: 5,
+    third: 3,
+    topThirtyPercent: 2,
     completion: 1,
   },
 };
