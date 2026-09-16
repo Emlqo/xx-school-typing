@@ -30,7 +30,7 @@ export default function useStudentRoomWatcher({
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const shouldWatchRoom = view === 'waiting' || view === 'playing';
+    const shouldWatchRoom = view === 'waiting' || view === 'playing' || view === 'subway';
     if (!enabled || !user || !db || !selectedRoomId || !shouldWatchRoom) {
       setRoom(null);
       return undefined;
@@ -52,6 +52,10 @@ export default function useStudentRoomWatcher({
         setError(null);
 
         if (roomData.status !== 'playing' || view !== 'waiting') return;
+        if (roomData.mode === 'subway') {
+          setView('subway');
+          return;
+        }
 
         const myScore = scores.find((score) => score.id === currentScoreDocId) || {};
         const myDifficulty = myScore.difficulty || 'normal';

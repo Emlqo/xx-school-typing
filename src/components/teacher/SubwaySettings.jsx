@@ -1,0 +1,20 @@
+import { LINE_4, subwayRoute } from '../../utils/subway.js';
+
+export default function SubwaySettings({ value, onChange }) {
+  return <div className="space-y-2 rounded-lg border border-sky-200 bg-sky-50 p-3">
+    <label className="block text-xs font-bold text-gray-600">진행 방식
+      <select className="mt-1 w-full rounded-lg border border-sky-200 bg-white p-2" value={value.practice || 'copy'} onChange={(e) => onChange({ ...value, practice: e.target.value })}>
+        <option value="copy">따라 치기</option><option value="memory">순서 외우기 · 미리보기 15초</option>
+      </select>
+    </label>
+    <div className="font-black text-sky-700">4호선 · {subwayRoute(value).length}개 정거장</div>
+    <div className="grid grid-cols-2 gap-2">
+      {['from', 'to'].map((field) => <label key={field} className="text-xs font-bold text-gray-600">
+        {field === 'from' ? '출발' : '도착'}
+        <select className="mt-1 w-full rounded-lg border border-sky-200 bg-white p-2" value={value[field]} onChange={(e) => onChange({ ...value, [field]: e.target.value })}>
+          {LINE_4.map((name) => <option key={name}>{name}</option>)}
+        </select>
+      </label>)}
+    </div>
+  </div>;
+}

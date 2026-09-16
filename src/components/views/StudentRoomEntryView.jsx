@@ -37,6 +37,7 @@ export default function StudentRoomEntryView({
               className="text-left p-5 rounded-2xl bg-white border border-cyan-100 hover:border-teal-300 hover:bg-teal-50 transition-all"
             >
               <div className="font-black text-xl text-gray-800">{room.className || room.name}</div>
+              {room.mode === 'subway' && <div className="mt-2 font-bold text-sky-600">4호선 · {room.subway?.from} → {room.subway?.to}</div>}
               <div className="text-sm font-bold text-gray-500 mt-2">
                 {room.status === 'playing' ? '진행 중 · 재입장 가능' : '입장 대기 중'} · {room.duration || 300}초
               </div>

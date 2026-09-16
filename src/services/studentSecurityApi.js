@@ -1,5 +1,7 @@
 import { auth } from './firebaseClient.js';
 
+export const submitSubwayRun = (scoreId, answers, hints = {}) => call('submitSubwayRun', { scoreId, answers, hints });
+
 async function call(action, payload = {}) {
   const currentUser = auth.currentUser;
   if (!currentUser) throw new Error('로그인이 필요합니다.');

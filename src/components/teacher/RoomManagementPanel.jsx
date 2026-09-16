@@ -1,3 +1,5 @@
+import SubwaySettings from './SubwaySettings.jsx';
+
 function toMillis(value) {
   if (!value) return 0;
   if (typeof value === 'number') return value;
@@ -17,6 +19,7 @@ function getRoomStatusLabel(room, currentTime) {
 }
 
 function formatRoomMeta(room) {
+  if (room.mode === 'subway') return `지하철판 · 4호선 ${room.subway?.from} → ${room.subway?.to}`;
   const modeLabel = room.mode === 'ko' ? '한글' : room.mode === 'en' ? '영어' : '혼합';
   const durationLabel = `${Math.floor((room.duration || 300) / 60)}분`;
   return `${modeLabel} · ${durationLabel}`;
@@ -84,6 +87,8 @@ export default function RoomManagementPanel({
   newRoomName = '',
   setNewRoomName = () => {},
   roomMode = 'ko',
+  subwayConfig,
+  setSubwayConfig,
   setRoomMode = () => {},
   roomDuration = '300',
   setRoomDuration = () => {},
@@ -179,9 +184,10 @@ export default function RoomManagementPanel({
           />
           <div className="grid grid-cols-2 gap-3">
             <select value={roomMode} onChange={(e) => setRoomMode(e.target.value)} className="w-full px-3 py-3 border border-pink-200 rounded-xl outline-none bg-white font-medium text-gray-700">
-              <option value="ko">한글 전용</option>
-              <option value="en">영어 전용</option>
-              <option value="mixed">한영 혼합</option>
+              <option value="ko">일반판 · 한글</option>
+              <option value="en">일반판 · 영어</option>
+              <option value="mixed">일반판 · 혼합</option>
+              <option value="subway">지하철판 · 4호선</option>
             </select>
             <select value={roomDuration} onChange={(e) => setRoomDuration(e.target.value)} className="w-full px-3 py-3 border border-pink-200 rounded-xl outline-none bg-white">
               <option value="60">1분</option>
@@ -191,6 +197,7 @@ export default function RoomManagementPanel({
               <option value="300">5분</option>
             </select>
           </div>
+          {roomMode === 'subway' && <SubwaySettings value={subwayConfig} onChange={setSubwayConfig} />}
           <button type="submit" className="w-full bg-pink-500 hover:bg-pink-600 py-3 rounded-xl font-bold text-white shadow-md">
             게스트 PIN 방 만들기
           </button>

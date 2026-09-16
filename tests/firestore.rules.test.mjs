@@ -126,6 +126,15 @@ describe('private student roster', () => {
 });
 
 describe('score ownership', () => {
+  test('subway results are readable by the owner but writable only through the server', async () => {
+    await seed('typing_scores', 'subway-test', { roomId: 'r', userId: STUDENT_UID, gameType: 'subway', nickname: 'Student', score: 0 });
+    const db = testEnv.authenticatedContext(STUDENT_UID).firestore();
+    const ref = publicDoc(db, 'typing_scores', 'subway-test');
+    await assertSucceeds(getDoc(ref));
+    await assertFails(updateDoc(ref, { score: 999 }));
+    await assertFails(updateDoc(ref, { subwayStatus: 'completed', subwayElapsedMs: 1 }));
+    await assertFails(updateDoc(ref, { gameType: 'typing' }));
+  });
   test('student cannot create scores directly but can update server-created own score fields', async () => {
     const db = testEnv.authenticatedContext(STUDENT_UID).firestore();
     const scoreRef = publicDoc(db, 'typing_scores', 'score-1');

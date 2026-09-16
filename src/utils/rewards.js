@@ -46,7 +46,7 @@ export function calculateRewardPoints({
 
 export function calculateRankRewards(scores = []) {
   const rankedScores = [...scores]
-    .filter((score) => score?.entryType === 'class' && score.studentId)
+    .filter((score) => score?.entryType === 'class' && score.studentId && score.gameType !== 'subway')
     .sort((a, b) => Number(b.score || 0) - Number(a.score || 0));
   const topThirtyCutoff = Math.ceil(rankedScores.length * 0.3);
 

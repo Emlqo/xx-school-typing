@@ -2,6 +2,7 @@ import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore';
 import { calculateAssessmentResult, createAssessmentSubmissionId } from '../src/utils/assessments.js';
+import { subwayRoute, subwayStart, subwayMillis, subwayHintPenalty } from '../src/utils/subway.js';
 
 const APP_ID = 'xx-school-typing-app';
 const TEACHER_UID = String(process.env.TEACHER_UID || 'hnjJNGDuydcd4SfQ2Xq5cE6IujD3').trim();
@@ -607,6 +608,7 @@ async function joinClassGame(uid, body) {
         studentId,
         nickname: student.name || '',
         entryType: 'class',
+        gameType: room.mode === 'subway' ? 'subway' : 'typing',
         equippedCosmetic: student.equippedCosmetic || null,
         score: 0,
         cpm: 0,
@@ -666,6 +668,7 @@ async function joinGuestGame(uid, body) {
     scoreRef = publicCollection(PATHS.scores).doc();
     score = {
       roomId: roomDoc.id,
+      gameType: room.mode === 'subway' ? 'subway' : 'typing',
       nickname,
       score: 0,
       cpm: 0,
@@ -686,6 +689,7 @@ async function joinGuestGame(uid, body) {
       id: roomDoc.id,
       ...room,
       createdAt: toMillis(room.createdAt),
+      startedAt: toMillis(room.startedAt),
       expiresAt: toMillis(room.expiresAt),
     },
     score: safeScore(scoreRef.id, score),
@@ -760,6 +764,7 @@ async function finalizeStudentReward(uid, body) {
   const initialScore = await scoreRef.get();
   if (!initialScore.exists) throw new ApiError(404, 'api/not-found', '점수 기록을 찾을 수 없습니다.');
   const initialData = initialScore.data();
+  if (initialData.gameType === 'subway') throw new ApiError(400, 'api/failed-precondition', '지하철판에는 포인트 보상이 없습니다.');
   if (initialData.userId !== uid || initialData.entryType !== 'class' || !initialData.studentId) {
     throw new ApiError(403, 'api/permission-denied', '보상을 받을 수 없는 기록입니다.');
   }
@@ -1852,7 +1857,64 @@ async function resetTeacherAssessmentSubmission(uid, body) {
   return { assessmentId, studentId };
 }
 
+async function submitSubwayRun(uid, body) {
+  const scoreId = requireString(body.scoreId, 'scoreId', 250);
+  const scoreRef = publicCollection(PATHS.scores).doc(scoreId);
+  let result;
+  await database().runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(scoreRef);
+    if (!snapshot.exists || snapshot.data().userId !== uid) {
+      throw new ApiError(403, 'api/permission-denied', '본인의 경기 기록만 제출할 수 있습니다.');
+    }
+    const data = snapshot.data();
+    const roomSnapshot = await transaction.get(publicCollection(PATHS.rooms).doc(data.roomId));
+    const room = roomSnapshot.data();
+    if (!room || room.mode !== 'subway' || room.status !== 'playing') {
+      throw new ApiError(400, 'api/failed-precondition', '진행 중인 지하철 경기가 아닙니다.');
+    }
+    if (['completed', 'timeout'].includes(data.subwayStatus)) {
+      result = safeScore(snapshot.id, data);
+      return;
+    }
+    const route = subwayRoute(room.subway);
+    const answers = body.answers;
+    if (!route.length || !Array.isArray(answers) || answers.length > route.length
+      || answers.some((answer, i) => answer !== route[i])) {
+      throw new ApiError(400, 'api/invalid-argument', '노선 입력 순서가 올바르지 않습니다.');
+    }
+    const now = Date.now();
+    const start = subwayStart(room);
+    if (now < start) throw new ApiError(400, 'api/failed-precondition', '아직 출발 전입니다.');
+    // The server receipt time is authoritative; client clocks cannot shorten a run.
+    const expired = now > subwayMillis(room.expiresAt);
+    const completed = !expired && answers.length === route.length;
+    const hints = { ...(data.subwayHints || {}) };
+    if (room.subway?.practice === 'memory') {
+      for (const [index, level] of Object.entries(body.hints || {})) {
+        if (!/^\d+$/.test(index) || Number(index) >= route.length || ![1, 2].includes(level)) {
+          throw new ApiError(400, 'api/invalid-argument', '힌트 기록이 올바르지 않습니다.');
+        }
+        hints[index] = Math.max(hints[index] || 0, level);
+      }
+    }
+    const penalty = subwayHintPenalty(hints);
+    const updates = {
+      gameType: 'subway',
+      subwayHints: hints,
+      subwayPenaltyMs: penalty,
+      subwayProgress: Math.max(Number(data.subwayProgress || 0), answers.length),
+      subwayStatus: completed ? 'completed' : expired ? 'timeout' : 'running',
+      ...(completed ? { subwayElapsedMs: Math.floor((now - start) / 10) * 10 + penalty, subwayFinishedAt: FieldValue.serverTimestamp() } : {}),
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    transaction.update(scoreRef, updates);
+    result = safeScore(snapshot.id, { ...data, ...updates, updatedAt: Timestamp.now() });
+  });
+  return { score: result };
+}
+
 const actions = {
+  submitSubwayRun,
   getStudentSession,
   logoutStudentSession,
   verifyStudentLoginPin,

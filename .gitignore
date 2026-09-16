@@ -11,3 +11,5 @@ service-account*.json
 content-backups/
 
 .vercel
+tests/subway-*.png
+tests/subway-*.log

@@ -104,6 +104,8 @@ import StudentRoomEntryView from './components/views/StudentRoomEntryView.jsx';
 import TeacherDashboardView from './components/views/TeacherDashboardView.jsx';
 import TeacherLoginView from './components/views/TeacherLoginView.jsx';
 import WaitingView from './components/views/WaitingView.jsx';
+import SubwayGameView from './components/views/SubwayGameView.jsx';
+import { DEFAULT_SUBWAY_ROUTE, subwayRoute, subwayPreviewMs } from './utils/subway.js';
 import DuelChallengeModal from './components/duel/DuelChallengeModal.jsx';
 import DuelOutgoingModal from './components/duel/DuelOutgoingModal.jsx';
 
@@ -147,6 +149,8 @@ export default function App() {
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [newRoomName, setNewRoomName] = useState('');
   const [roomMode, setRoomMode] = useState('ko');
+  const [subwayConfig, setSubwayConfig] = useState(DEFAULT_SUBWAY_ROUTE);
+  const [classSubwayConfig, setClassSubwayConfig] = useState(DEFAULT_SUBWAY_ROUTE);
   const [roomDuration, setRoomDuration] = useState('300');
   const [viewingRoomId, setViewingRoomId] = useState('');
   const [annTitle, setAnnTitle] = useState('');
@@ -837,6 +841,11 @@ export default function App() {
       restoreScoreState(scoreData);
       createLocalScoreSnapshot(scoreDocId, scoreData);
 
+      if (roomData.mode === 'subway') {
+        setView(roomData.status === 'playing' ? 'subway' : 'waiting');
+        return;
+      }
+
       if (roomData.status === 'playing') {
         setTimeLeft(remainingSeconds);
         gameInfoRef.current.elapsed = Math.max(0, duration - remainingSeconds);
@@ -894,6 +903,11 @@ export default function App() {
       resetPlayingState({ practiceMode: false, duration, mode: nextGameMode });
       restoreScoreState(scoreData);
       createLocalScoreSnapshot(scoreDocId, scoreData);
+
+      if (roomData.mode === 'subway') {
+        setView(roomData.status === 'playing' ? 'subway' : 'waiting');
+        return;
+      }
 
       if (roomData.status === 'playing') {
         setTimeLeft(remainingSeconds);
@@ -1436,6 +1450,7 @@ export default function App() {
 
     const trimmedName = newRoomName.trim();
     if (!trimmedName) return;
+    if (roomMode === 'subway' && !subwayRoute(subwayConfig).length) return alert('출발과 도착을 서로 다르게 선택해주세요.');
 
     try {
       const durationSec = Number(roomDuration);
@@ -1443,6 +1458,7 @@ export default function App() {
       const roomRef = await addDoc(roomsRef, {
         name: trimmedName,
         mode: roomMode,
+        ...(roomMode === 'subway' ? { subway: subwayConfig } : {}),
         duration: durationSec,
         roomCode: createRoomCode(),
         status: 'waiting',
@@ -1467,7 +1483,8 @@ export default function App() {
       const roomRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.rooms, roomId);
       await updateDoc(roomRef, {
         status: 'playing',
-        expiresAt: Date.now() + duration * 1000,
+        startedAt: serverTimestamp(),
+        expiresAt: Date.now() + duration * 1000 + subwayPreviewMs(room),
       });
     } catch (error) {
       console.error(error);
@@ -2630,10 +2647,12 @@ export default function App() {
 
     try {
       const durationSec = Number(classRoomDuration);
+      if (classRoomMode === 'subway' && !subwayRoute(classSubwayConfig).length) return alert('출발과 도착을 서로 다르게 선택해주세요.');
       const roomsRef = getPublicCollection(db, APP_ID, FIRESTORE_PATHS.rooms);
       const roomRef = await addDoc(roomsRef, {
         name: classItem.name || `${classItem.grade || 1}학년 ${classItem.classNumber || ''}반`,
         mode: classRoomMode,
+        ...(classRoomMode === 'subway' ? { subway: classSubwayConfig } : {}),
         duration: durationSec,
         roomCode: createRoomCode(),
         status: 'waiting',
@@ -2977,6 +2996,10 @@ export default function App() {
     );
   }
 
+  if (view === 'subway') {
+    return <SubwayGameView room={myRoomData} scoreData={scores.find((item) => item.id === currentScoreDocId)} scoreId={currentScoreDocId} nickname={nickname} onHome={handleBackToLogin} />;
+  }
+
   if (view === 'result') {
     return (
       <ResultView
@@ -3018,6 +3041,10 @@ export default function App() {
         newRoomName={newRoomName}
         setNewRoomName={setNewRoomName}
         roomMode={roomMode}
+        subwayConfig={subwayConfig}
+        setSubwayConfig={setSubwayConfig}
+        classSubwayConfig={classSubwayConfig}
+        setClassSubwayConfig={setClassSubwayConfig}
         setRoomMode={setRoomMode}
         roomDuration={roomDuration}
         setRoomDuration={setRoomDuration}

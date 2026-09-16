@@ -94,6 +94,7 @@ service cloud.firestore {
           isTeacher()
           || (
             isOwner(resource.data)
+            && resource.data.get('gameType', 'typing') != 'subway'
             && scoreIdentityIsUnchanged()
             && studentScoreUpdateOnly()
           )

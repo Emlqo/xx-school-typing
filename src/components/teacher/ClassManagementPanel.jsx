@@ -1,3 +1,5 @@
+import SubwaySettings from './SubwaySettings.jsx';
+
 function toMillis(value) {
   if (!value) return 0;
   if (typeof value === 'number') return value;
@@ -23,6 +25,8 @@ export default function ClassManagementPanel({
   classNumber = '1',
   setClassNumber = () => {},
   classRoomMode = 'ko',
+  subwayConfig,
+  setSubwayConfig,
   setClassRoomMode = () => {},
   classRoomDuration = '300',
   setClassRoomDuration = () => {},
@@ -113,9 +117,10 @@ export default function ClassManagementPanel({
             onChange={(event) => setClassRoomMode(event.target.value)}
             className="w-full px-3 py-3 border border-sky-200 rounded-xl outline-none bg-white font-medium text-gray-700"
           >
-            <option value="ko">한글 전용</option>
-            <option value="en">영어 전용</option>
-            <option value="mixed">한영 혼합</option>
+            <option value="ko">일반판 · 한글</option>
+            <option value="en">일반판 · 영어</option>
+            <option value="mixed">일반판 · 혼합</option>
+            <option value="subway">지하철판 · 4호선</option>
           </select>
           <select
             value={classRoomDuration}
@@ -129,6 +134,7 @@ export default function ClassManagementPanel({
             <option value="300">5분</option>
           </select>
         </div>
+        {classRoomMode === 'subway' && <SubwaySettings value={subwayConfig} onChange={setSubwayConfig} />}
         <button
           type="button"
           onClick={() => openClassRoom(selectedClass)}
