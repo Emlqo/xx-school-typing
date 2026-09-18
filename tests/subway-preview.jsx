@@ -20,7 +20,7 @@ createRoot(document.getElementById('root')).render(params.has('leaderboard') ? <
     { id: '3', nickname: '미출발 학생', subwayProgress: 0 },
   ]}
 /> : <Game
-  room={{ id: 'preview', mode: 'subway', startedAt: start, expiresAt: start + 300000 + (params.has('memory') ? 15000 : 0), duration: 300, subway: { line: '4', from: '진접', to: '동대문', practice: params.has('recall') ? 'recall' : params.has('memory') ? 'memory' : 'copy' } }}
+  room={{ id: 'preview', mode: 'subway', startedAt: start, expiresAt: start + 300000 + (params.has('study') ? 15000 : params.has('memory') ? 15000 : 0), duration: 300, subway: { line: '4', from: '진접', to: '동대문', previewEnabled: params.has('study'), previewSeconds: 15, practice: params.has('recall') ? 'recall' : params.has('memory') ? 'memory' : 'copy' } }}
   nickname="테스트" scoreId="preview" scoreData={{ subwayProgress: Number(params.get('progress') || 0), subwayAnswers: params.has('recall') ? LINE_4.slice(0, Number(params.get('progress') || 0)) : [] }} onHome={() => {}}
   submitRun={async (_, answers) => {
     if (params.has('fail') && attempts++ === 0) throw new Error('테스트 저장 실패');

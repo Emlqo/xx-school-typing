@@ -14,14 +14,17 @@ export default function SubwayRecallView({ room, scoreData, scoreId, nickname, o
   const [moving, setMoving] = useState(false);
   const input = useRef(null), busy = useRef(false), finalSent = useRef(false), sync = useRef(subwayMillis(room?.syncRequestedAt)), animation = useRef(null);
   const deadline = subwayMillis(room?.expiresAt);
+  const start = subwayStart(room);
+  const preview = now < start && !result;
   const ended = Boolean(result) || now >= deadline || answers.length === LINE_4.length;
   useEffect(() => {
     input.current?.focus();
     const timer = setInterval(() => setNow(Date.now()), 200);
     return () => { clearInterval(timer); clearTimeout(animation.current); };
   }, []);
+  useEffect(() => { if (!preview) input.current?.focus(); }, [preview]);
   async function save() {
-    if (busy.current || result || !room || !scoreId) return;
+    if (busy.current || result || !room || !scoreId || preview) return;
     busy.current = true; setSaving(true); setError('');
     try {
       const response = await submitRun(scoreId, answers);
@@ -32,8 +35,8 @@ export default function SubwayRecallView({ room, scoreData, scoreId, nickname, o
   useEffect(() => {
     if (ended && !result && !finalSent.current && !busy.current) { finalSent.current = true; void save(); }
     const request = subwayMillis(room?.syncRequestedAt);
-    if (!ended && request > sync.current && !busy.current) { sync.current = request; void save(); }
-  }, [ended, result, saving, now, room?.syncRequestedAt]);
+    if (!ended && !preview && request > sync.current && !busy.current) { sync.current = request; void save(); }
+  }, [ended, preview, result, saving, now, room?.syncRequestedAt]);
   function submit(event) {
     if (event.key !== 'Enter' || event.nativeEvent.isComposing || event.keyCode === 229) return;
     event.preventDefault();
@@ -46,11 +49,20 @@ export default function SubwayRecallView({ room, scoreData, scoreId, nickname, o
   }
   const submitted = result?.subwayAnswers || answers;
   if (!room) return <main className="metro-game"><button onClick={onHome}>학생 홈으로</button></main>;
+  if (preview && !ended) return <main className="metro-recall-study">
+    <header className="metro-study-header"><div><span className="metro-memorize-badge">4호선 전체 · 51개 정거장</span><h1>역 이름을 기억하세요!</h1><p>순서는 상관없어요. 기억나는 역부터 입력하면 됩니다.</p></div>
+      <div className={`metro-study-timer ${start - now <= 5000 ? 'metro-count-urgent' : ''}`} role="timer" aria-label="암기 남은 시간"><strong>{Math.ceil((start - now) / 1000)}</strong><span>초 후 시작</span></div>
+    </header>
+    <div className="metro-study-groups select-none" onCopy={e => e.preventDefault()}>{Array.from({ length: Math.ceil(LINE_4.length / 9) }, (_, group) => {
+      const stations = LINE_4.slice(group * 9, group * 9 + 9);
+      return <section key={group}><h2>{stations[0]} ~ {stations.at(-1)}</h2><ol>{stations.map((name, i) => <li key={name}><span>{group * 9 + i + 1}</span><b>{name}</b></li>)}</ol></section>;
+    })}</div>
+  </main>;
   return <main className={`metro-game ${moving ? 'metro-accelerating' : 'metro-stopped'}`}>
     <header className="metro-header"><div className="metro-brand"><span className="metro-line">4</span><div><b>역 이름 많이 맞히기</b><small>{nickname} · 4호선 전체</small></div></div></header>
     <section className="metro-dashboard"><div><small>맞힌 정거장</small><strong>{submitted.length} / {LINE_4.length}</strong></div><div className="metro-clock"><small>남은 시간</small><strong>{formatRaceTime(Math.max(0, deadline - now)).slice(0, 5)}</strong></div><div><small>진행 방식</small><strong>순서 자유</strong></div></section>
     <section className="metro-scene" aria-label="4호선 열차"><div className="metro-mountains"/><div className="metro-buildings"/><div className="metro-track"/><SubwayTrain /></section>
-    <section className="metro-console">{!ended ? <><div className="metro-departure-board"><span className="metro-board-label">기억나는 4호선 정거장은?</span><h1 className="metro-word">다음 역을 입력하세요</h1></div>
+    <section className="metro-console">{!ended ? <><div className="metro-departure-board"><span className="metro-board-label">순서 상관없이 · 중복 없이</span><h1 className="metro-word metro-recall-prompt">기억나는 역 이름을 입력하세요</h1></div>
       <input className="metro-input" ref={input} aria-label="정거장 이름 입력" value={value} onChange={e => setValue(e.target.value)} onKeyDown={submit} onPaste={e => e.preventDefault()} onDrop={e => e.preventDefault()} onBeforeInput={e => { if (['insertFromPaste', 'insertFromDrop'].includes(e.nativeEvent.inputType)) e.preventDefault(); }} autoComplete="off" spellCheck={false} placeholder="역 이름 입력" />
       <p className="metro-feedback" role="status">{message || '4호선 · 중복 없이 도전!'}</p></> : <div className="metro-finish"><h1>{submitted.length === LINE_4.length ? '모든 정거장 정복!' : '도전 종료!'}</h1><strong className="metro-finish-time">{submitted.length}개 정답</strong><p>{result ? '기록이 선생님께 제출되었습니다.' : saving ? '기록 제출 중...' : '기록 제출을 확인해주세요.'}</p>{result && <button onClick={onHome}>학생 홈으로</button>}</div>}
       {error && <div role="alert" className="metro-error">{error}<button disabled={saving} onClick={save}>기록 저장 다시 시도</button></div>}

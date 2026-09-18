@@ -13,6 +13,10 @@ test('recall accepts unique stations in any order and ranks by count with ties',
   assert.equal(validSubwayAnswers(route, ['강남'], 'recall'), false);
   assert.equal(validSubwayAnswers(route, ['오이도', '진접'], 'copy'), false);
   assert.equal(subwayPreviewMs({ mode: 'subway', subway: { practice: 'recall' } }), 0);
+  const room = { mode: 'subway', startedAt: 10000, duration: 180, expiresAt: 220000, subway: { practice: 'recall', previewEnabled: true, previewSeconds: 30 } };
+  assert.equal(subwayPreviewMs(room), 30000);
+  assert.equal(subwayStart(room), 40000);
+  assert.equal(subwayStart({ ...room, startedAt: null }), 40000);
   assert.deepEqual(rankSubwayResults([{ subwayProgress: 2 }, { subwayProgress: 8 }, { subwayProgress: 8 }, { subwayProgress: 0 }], 'recall').map(s => s.subwayRank), [1, 1, 3, 4]);
 });
 

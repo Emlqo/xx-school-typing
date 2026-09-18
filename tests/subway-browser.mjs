@@ -86,4 +86,20 @@ try {
   await page.getByText('기록이 선생님께 제출되었습니다.').waitFor();
   assert.deepEqual(errors, []);
   console.log('Desktop/mobile, typo, paste/drop, select-none, completion, restoration, retry and timeout passed.');
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await page.goto('http://127.0.0.1:5180/tests/subway-preview.html?recall=1&study=1');
+  await page.getByText('역 이름을 기억하세요!', { exact: true }).waitFor();
+  assert.equal(await page.locator('.metro-study-groups li').count(), 51);
+  assert.equal(await input.count(), 0);
+  assert.equal(await page.evaluate(() => window.subwayTestSubmissions || 0), 0);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await page.screenshot({ path: 'tests/subway-study-chromebook.png', fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await page.screenshot({ path: 'tests/subway-study-mobile.png', fullPage: true });
+  await input.waitFor({ timeout: 20000 });
+  await page.getByText('기억나는 역 이름을 입력하세요', { exact: true }).waitFor();
+  assert.equal(await page.locator('.metro-study-groups').count(), 0);
+  assert.equal(await input.evaluate(el => el === document.activeElement), true);
+  assert.deepEqual(errors, []);
 } finally { await browser.close(); }

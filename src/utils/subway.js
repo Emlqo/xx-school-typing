@@ -3,7 +3,7 @@ export const LINE_4 = ['진접', '오남', '별내별가람', '불암산', '상�
 export const DEFAULT_SUBWAY_ROUTE = { line: '4', from: '진접', to: '노원', practice: 'memory', previewSeconds: 15 };
 
 export function subwayPreviewMs(room) {
-  if (room?.mode !== 'subway' || room?.subway?.practice !== 'memory') return 0;
+  if (room?.mode !== 'subway' || !(room?.subway?.practice === 'memory' || (room?.subway?.practice === 'recall' && room.subway.previewEnabled === true))) return 0;
   const seconds = Number(room.subway.previewSeconds ?? 15);
   return (Number.isFinite(seconds) ? Math.min(300, Math.max(5, Math.floor(seconds))) : 15) * 1000;
 }

@@ -28,7 +28,8 @@
 ## Free recall and attendance
 
 - `subway.practice: 'recall'` uses all 51 Line 4 stations, accepts any order, and rejects duplicate or unknown station names on both client and server.
-- No preview, hints, or points. Teacher-selected duration applies; matching all stations ends the run early. Rankings use correct count only, with tied ranks.
+- New recall rooms include teacher-selected memorization time (5-300 seconds), excluded from play duration. All stations appear in readable groups before play. No hints or points. Matching all stations ends the run early. Rankings use correct count only, with tied ranks.
+- `previewEnabled` opts new recall rooms into the preview clock; older recall rooms retain their original timing.
 - `subwayAnswers` stores accepted station names on existing score documents at submission or teacher-requested checkpoints. No per-answer database request is added. Rejoining restores saved answers; unsaved answers may be lost.
 - All subway classroom scoreboards use the existing selected class roster and score data to show entered/missing students. This is entry history, not online presence. PIN guest rooms have no roster attendance.
 

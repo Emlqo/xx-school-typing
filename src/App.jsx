@@ -1459,7 +1459,7 @@ export default function App() {
       const roomRef = await addDoc(roomsRef, {
         name: trimmedName,
         mode: roomMode,
-        ...(roomMode === 'subway' ? { subway: subwayConfig } : {}),
+        ...(roomMode === 'subway' ? { subway: { ...subwayConfig, previewEnabled: subwayConfig.practice === 'recall' } } : {}),
         duration: durationSec,
         roomCode: createRoomCode(),
         status: 'waiting',
@@ -2653,7 +2653,7 @@ export default function App() {
       const roomRef = await addDoc(roomsRef, {
         name: classItem.name || `${classItem.grade || 1}학년 ${classItem.classNumber || ''}반`,
         mode: classRoomMode,
-        ...(classRoomMode === 'subway' ? { subway: classSubwayConfig } : {}),
+        ...(classRoomMode === 'subway' ? { subway: { ...classSubwayConfig, previewEnabled: classSubwayConfig.practice === 'recall' } } : {}),
         duration: durationSec,
         roomCode: createRoomCode(),
         status: 'waiting',
