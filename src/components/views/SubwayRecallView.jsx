@@ -67,6 +67,12 @@ export default function SubwayRecallView({ room, scoreData, scoreId, nickname, o
       <p className="metro-feedback" role="status">{message || '4호선 · 중복 없이 도전!'}</p></> : <div className="metro-finish"><h1>{submitted.length === LINE_4.length ? '모든 정거장 정복!' : '도전 종료!'}</h1><strong className="metro-finish-time">{submitted.length}개 정답</strong><p>{result ? '기록이 선생님께 제출되었습니다.' : saving ? '기록 제출 중...' : '기록 제출을 확인해주세요.'}</p>{result && <button onClick={onHome}>학생 홈으로</button>}</div>}
       {error && <div role="alert" className="metro-error">{error}<button disabled={saving} onClick={save}>기록 저장 다시 시도</button></div>}
     </section>
-    <section className="metro-route"><div className="metro-route-caption"><b>발견한 정거장</b><span>{submitted.length} / {LINE_4.length}</span></div><ol className="metro-recall-map select-none">{LINE_4.map((name, i) => <li key={name} className={submitted.includes(name) ? 'found' : ''}><small>{i + 1}</small><b>{submitted.includes(name) ? name : '?'}</b></li>)}</ol></section>
+    <section className="metro-route"><div className="metro-route-caption"><b>{ended ? '전체 정거장 다시 보기' : '발견한 정거장'}</b><span>{submitted.length} / {LINE_4.length}</span></div>
+      {ended && <div className="metro-review-summary"><span className="metro-review-correct">맞힌 역 {submitted.length}개</span><span className="metro-review-missed">못 맞힌 역 {LINE_4.length - submitted.length}개</span></div>}
+      <ol className={`metro-recall-map select-none ${ended ? 'metro-review-map' : ''}`}>{LINE_4.map((name, i) => {
+        const found = submitted.includes(name);
+        return <li key={name} className={found ? 'found' : ended ? 'missed' : ''}><small>{i + 1}</small><div><b>{ended || found ? name : '?'}</b>{ended && <span className="metro-review-status">{found ? '맞힘' : '못 맞힘'}</span>}</div></li>;
+      })}</ol>
+    </section>
   </main>;
 }

@@ -71,6 +71,7 @@ try {
   await input.fill('강남'); await input.press('Enter');
   await page.getByText('4호선 역 이름을 확인해주세요.', { exact: true }).waitFor();
   assert.equal(await page.locator('.metro-recall-map .found').count(), 1);
+  assert.equal(await page.locator('.metro-recall-map b').filter({ hasText: /^\?$/ }).count(), 50);
   assert.equal(await page.evaluate(() => window.subwayTestSubmissions || 0), 0);
   await page.screenshot({ path: 'tests/subway-recall-desktop.png', fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
@@ -81,9 +82,19 @@ try {
   await input.fill('오이도'); await input.press('Enter');
   await page.getByText('기록이 선생님께 제출되었습니다.').waitFor();
   assert.equal(await page.evaluate(() => window.subwayTestSubmissions), 1);
+  assert.equal(await page.locator('.metro-review-map .found').count(), 51);
+  assert.equal(await page.locator('.metro-review-map .missed').count(), 0);
   await page.goto('http://127.0.0.1:5180/tests/subway-preview.html?recall=1&progress=4&expired=1');
   await page.getByText('4개 정답', { exact: true }).waitFor();
   await page.getByText('기록이 선생님께 제출되었습니다.').waitFor();
+  assert.equal(await page.locator('.metro-review-map .found').count(), 4);
+  assert.equal(await page.locator('.metro-review-map .missed').count(), 47);
+  assert.equal(await page.locator('.metro-review-map b').filter({ hasText: /^\?$/ }).count(), 0);
+  await page.getByText('못 맞힌 역 47개', { exact: true }).waitFor();
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await page.screenshot({ path: 'tests/subway-review-mobile.png', fullPage: true });
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await page.screenshot({ path: 'tests/subway-review-desktop.png', fullPage: true });
   assert.deepEqual(errors, []);
   console.log('Desktop/mobile, typo, paste/drop, select-none, completion, restoration, retry and timeout passed.');
   await page.setViewportSize({ width: 1366, height: 768 });
