@@ -2,7 +2,7 @@ import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore';
 import { calculateAssessmentResult, createAssessmentSubmissionId } from '../src/utils/assessments.js';
-import { subwayRoute, subwayStart, subwayMillis, subwayHintPenalty } from '../src/utils/subway.js';
+import { subwayRoute, subwayStart, subwayMillis, subwayHintPenalty, validSubwayAnswers } from '../src/utils/subway.js';
 import { REWARD_RULES } from '../src/constants/rewards.js';
 
 const APP_ID = 'xx-school-typing-app';
@@ -1871,11 +1871,11 @@ async function submitSubwayRun(uid, body) {
       return;
     }
     const route = subwayRoute(room.subway);
-    const answers = body.answers;
-    if (!route.length || !Array.isArray(answers) || answers.length > route.length
-      || answers.some((answer, i) => answer !== route[i])) {
+    let answers = body.answers;
+    if (!route.length || !validSubwayAnswers(route, answers, room.subway?.practice)) {
       throw new ApiError(400, 'api/invalid-argument', '노선 입력 순서가 올바르지 않습니다.');
     }
+    if (room.subway?.practice === 'recall') answers = [...new Set([...(data.subwayAnswers || []).filter((name) => route.includes(name)), ...answers])];
     const now = Date.now();
     const start = subwayStart(room);
     if (now < start) throw new ApiError(400, 'api/failed-precondition', '아직 출발 전입니다.');
@@ -1894,6 +1894,7 @@ async function submitSubwayRun(uid, body) {
     const penalty = subwayHintPenalty(hints);
     const updates = {
       gameType: 'subway',
+      ...(room.subway?.practice === 'recall' ? { subwayAnswers: answers } : {}),
       subwayHints: hints,
       subwayPenaltyMs: penalty,
       subwayProgress: Math.max(Number(data.subwayProgress || 0), answers.length),

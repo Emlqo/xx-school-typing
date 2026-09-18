@@ -21,6 +21,7 @@ export function subwayHintPenalty(hints = {}) {
 
 export function subwayRoute(config = DEFAULT_SUBWAY_ROUTE) {
   if (config?.line !== '4') return [];
+  if (config.practice === 'recall') return [...LINE_4];
   const start = LINE_4.indexOf(config.from);
   const end = LINE_4.indexOf(config.to);
   if (start < 0 || end < 0 || start === end) return [];
@@ -43,7 +44,15 @@ export function formatRaceTime(ms) {
   return `${String(Math.floor(centiseconds / 6000)).padStart(2, '0')}:${String(Math.floor(centiseconds / 100) % 60).padStart(2, '0')}.${String(centiseconds % 100).padStart(2, '0')}`;
 }
 
-export function rankSubwayResults(records) {
+export function rankSubwayResults(records, practice) {
+  if (practice === 'recall') {
+    const sorted = [...records].sort((a, b) => (b.subwayProgress || 0) - (a.subwayProgress || 0));
+    let rank = 0;
+    return sorted.map((record, index) => {
+      if (!index || (record.subwayProgress || 0) !== (sorted[index - 1].subwayProgress || 0)) rank = index + 1;
+      return { ...record, subwayRank: rank };
+    });
+  }
   const sorted = [...records].sort((a, b) => {
     const ac = a.subwayStatus === 'completed';
     const bc = b.subwayStatus === 'completed';
@@ -56,6 +65,11 @@ export function rankSubwayResults(records) {
     if (index === 0 || record.subwayElapsedMs !== sorted[index - 1].subwayElapsedMs) rank = index + 1;
     return { ...record, subwayRank: rank };
   });
+}
+
+export function validSubwayAnswers(route, answers, practice) {
+  return Array.isArray(answers) && answers.length <= route.length && new Set(answers).size === answers.length
+    && answers.every((answer, i) => practice === 'recall' ? route.includes(answer) : answer === route[i]);
 }
 
 export function subwayProgressSummary(route, record) {

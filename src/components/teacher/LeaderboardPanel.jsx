@@ -18,7 +18,7 @@ export default function LeaderboardPanel({
   toggleDifficulty = () => {},
 }) {
   const selectedRoom = rooms.find((room) => room.id === viewingRoomId);
-  if (selectedRoom?.mode === 'subway') return <SubwayLeaderboard room={selectedRoom} records={leaderboardScores} currentTime={currentTime} startRoomGame={startRoomGame} requestScoreSync={requestScoreSync} />;
+  if (selectedRoom?.mode === 'subway') return <SubwayLeaderboard room={selectedRoom} students={students} records={leaderboardScores} currentTime={currentTime} startRoomGame={startRoomGame} requestScoreSync={requestScoreSync} />;
   const expiresAt = typeof selectedRoom?.expiresAt?.toMillis === 'function'
     ? selectedRoom.expiresAt.toMillis()
     : Number(selectedRoom?.expiresAt || 0);

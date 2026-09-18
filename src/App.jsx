@@ -105,6 +105,7 @@ import TeacherDashboardView from './components/views/TeacherDashboardView.jsx';
 import TeacherLoginView from './components/views/TeacherLoginView.jsx';
 import WaitingView from './components/views/WaitingView.jsx';
 import SubwayGameView from './components/views/SubwayGameView.jsx';
+import SubwayRecallView from './components/views/SubwayRecallView.jsx';
 import { DEFAULT_SUBWAY_ROUTE, subwayRoute, subwayPreviewMs } from './utils/subway.js';
 import DuelChallengeModal from './components/duel/DuelChallengeModal.jsx';
 import DuelOutgoingModal from './components/duel/DuelOutgoingModal.jsx';
@@ -2997,6 +2998,7 @@ export default function App() {
   }
 
   if (view === 'subway') {
+    if (myRoomData?.subway?.practice === 'recall') return <SubwayRecallView room={myRoomData} scoreData={scores.find((item) => item.id === currentScoreDocId)} scoreId={currentScoreDocId} nickname={nickname} onHome={handleBackToLogin} />;
     return <SubwayGameView room={myRoomData} scoreData={scores.find((item) => item.id === currentScoreDocId)} scoreId={currentScoreDocId} nickname={nickname} onHome={handleBackToLogin} />;
   }
 

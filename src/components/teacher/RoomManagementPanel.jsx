@@ -19,7 +19,7 @@ function getRoomStatusLabel(room, currentTime) {
 }
 
 function formatRoomMeta(room) {
-  if (room.mode === 'subway') return `지하철판 · 4호선 ${room.subway?.from} → ${room.subway?.to}`;
+  if (room.mode === 'subway') return room.subway?.practice === 'recall' ? '지하철판 · 4호선 전체 많이 맞히기' : `지하철판 · 4호선 ${room.subway?.from} → ${room.subway?.to}`;
   const modeLabel = room.mode === 'ko' ? '한글' : room.mode === 'en' ? '영어' : '혼합';
   const durationLabel = `${Math.floor((room.duration || 300) / 60)}분`;
   return `${modeLabel} · ${durationLabel}`;

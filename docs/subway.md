@@ -25,6 +25,13 @@
 - https://namu.moe/w/틀:서울_지하철_4호선의_역_목록
 # Memory mode
 
+## Free recall and attendance
+
+- `subway.practice: 'recall'` uses all 51 Line 4 stations, accepts any order, and rejects duplicate or unknown station names on both client and server.
+- No preview, hints, or points. Teacher-selected duration applies; matching all stations ends the run early. Rankings use correct count only, with tied ranks.
+- `subwayAnswers` stores accepted station names on existing score documents at submission or teacher-requested checkpoints. No per-answer database request is added. Rejoining restores saved answers; unsaved answers may be lost.
+- All subway classroom scoreboards use the existing selected class roster and score data to show entered/missing students. This is entry history, not online presence. PIN guest rooms have no roster attendance.
+
 - New rooms default to six stops and memory mode; copy mode remains selectable.
 - Teacher-selected preview (5-300 seconds, default 15) is excluded from elapsed time. A full-screen memorization panel displays the route and countdown. Late arrivals do not restart it.
 - Initials cost 3 seconds; revealing the answer costs another 5 seconds per stop.

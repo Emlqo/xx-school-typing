@@ -11,7 +11,7 @@ export default function WaitingView({
       <div className="glass-box rounded-3xl p-10 text-center max-w-md w-full z-10 relative shadow-xl">
         <div className="text-6xl mb-6 animate-bounce">⏳</div>
         <h1 className="text-2xl font-bold text-gray-800 mb-3">시작 대기 중...</h1>
-        {myRoomData?.mode === 'subway' && <p className="mb-3 font-black text-sky-600">4호선 · {myRoomData.subway?.from} → {myRoomData.subway?.to}<br />지하철판 · 완주 시간 대결</p>}
+        {myRoomData?.mode === 'subway' && <p className="mb-3 font-black text-sky-600">{myRoomData.subway?.practice === 'recall' ? '4호선 전체 · 역 이름 많이 맞히기' : `4호선 · ${myRoomData.subway?.from} → ${myRoomData.subway?.to}`}<br />{myRoomData.subway?.practice === 'recall' ? '순서 자유 · 중복 없이 도전' : '지하철판 · 완주 시간 대결'}</p>}
         <p className="text-pink-500 font-black mb-2">{nickname || '선수'} 님</p>
         <p className="text-gray-500 font-medium mb-6">
           [{myRoomData?.name || '선택한 방'}] 반에 입장했습니다.<br />

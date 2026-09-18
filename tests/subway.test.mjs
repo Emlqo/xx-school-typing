@@ -3,6 +3,18 @@ import assert from 'node:assert/strict';
 import { LINE_4, subwayRoute, subwayStart, formatRaceTime, rankSubwayResults, stationInitials, subwayHintPenalty, subwayPreviewMs, subwayProgressSummary } from '../src/utils/subway.js';
 import { normalizeClassScore } from '../src/utils/hallOfFame.js';
 import { calculateRankRewards } from '../src/utils/rewards.js';
+import { validSubwayAnswers } from '../src/utils/subway.js';
+
+test('recall accepts unique stations in any order and ranks by count with ties', () => {
+  const route = subwayRoute({ line: '4', practice: 'recall' });
+  assert.equal(route.length, 51);
+  assert.equal(validSubwayAnswers(route, ['오이도', '진접'], 'recall'), true);
+  assert.equal(validSubwayAnswers(route, ['오이도', '오이도'], 'recall'), false);
+  assert.equal(validSubwayAnswers(route, ['강남'], 'recall'), false);
+  assert.equal(validSubwayAnswers(route, ['오이도', '진접'], 'copy'), false);
+  assert.equal(subwayPreviewMs({ mode: 'subway', subway: { practice: 'recall' } }), 0);
+  assert.deepEqual(rankSubwayResults([{ subwayProgress: 2 }, { subwayProgress: 8 }, { subwayProgress: 8 }, { subwayProgress: 0 }], 'recall').map(s => s.subwayRank), [1, 1, 3, 4]);
+});
 
 test('line 4 route includes endpoints, reverses direction, rejects invalid segments', () => {
   assert.equal(LINE_4.length, 51);
