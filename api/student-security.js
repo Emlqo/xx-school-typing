@@ -1852,6 +1852,32 @@ async function resetTeacherAssessmentSubmission(uid, body) {
   return { assessmentId, studentId };
 }
 
+async function allowGameReentry(uid, body) {
+  requireTeacher(uid);
+  const scoreId = requireString(body.scoreId, 'scoreId', 250);
+  const scoreRef = publicCollection(PATHS.scores).doc(scoreId);
+  await database().runTransaction(async transaction => {
+    const snapshot = await transaction.get(scoreRef);
+    if (!snapshot.exists) throw new ApiError(404, 'api/not-found', '학생 기록을 찾을 수 없습니다.');
+    const data = snapshot.data();
+    const roomSnapshot = await transaction.get(publicCollection(PATHS.rooms).doc(data.roomId));
+    const room = roomSnapshot.data();
+    if (!room || room.status !== 'playing' || toMillis(room.expiresAt) <= Date.now()) {
+      throw new ApiError(400, 'api/failed-precondition', '진행 중인 경기에서만 재입장을 허용할 수 있습니다.');
+    }
+    if (!data.screenExitDetected) return;
+    transaction.update(scoreRef, {
+      screenExitDetected: false,
+      screenExitReason: '',
+      screenExitRevision: Number(data.screenExitRevision || 0) + 1,
+      screenExitResetAt: FieldValue.serverTimestamp(),
+      screenExitResetBy: uid,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  });
+  return { allowed: true };
+}
+
 async function reportGameScreenExit(uid, body) {
   const scoreId = requireString(body.scoreId, 'scoreId', 250);
   const reason = ['focus', 'hidden', 'fullscreen'].includes(body.reason) ? body.reason : 'focus';
@@ -1861,6 +1887,8 @@ async function reportGameScreenExit(uid, body) {
     if (!snapshot.exists || snapshot.data().userId !== uid) {
       throw new ApiError(403, 'api/permission-denied', '본인의 경기만 중단할 수 있습니다.');
     }
+    // Ignore delayed reports from the attempt a teacher has already unlocked.
+    if (Number(body.revision || 0) !== Number(snapshot.data().screenExitRevision || 0)) return;
     if (snapshot.data().screenExitDetected) return;
     transaction.update(scoreRef, {
       screenExitDetected: true,
@@ -1931,6 +1959,7 @@ async function submitSubwayRun(uid, body) {
 }
 
 const actions = {
+  allowGameReentry,
   reportGameScreenExit,
   submitSubwayRun,
   getStudentSession,

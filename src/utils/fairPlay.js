@@ -10,13 +10,22 @@ export async function enterGameFullscreen() {
   }
 }
 
-export function readScreenExit(scoreId) {
-  try { return localStorage.getItem(`screen-exit:${scoreId}`) || ''; }
+export function readScreenExit(scoreId, revision) {
+  try {
+    const raw = localStorage.getItem(`screen-exit:${scoreId}`);
+    if (!raw) return '';
+    const saved = raw.startsWith('{') ? JSON.parse(raw) : { reason: raw, revision: 0 };
+    if (revision !== undefined && saved.revision !== revision) {
+      localStorage.removeItem(`screen-exit:${scoreId}`);
+      return '';
+    }
+    return saved.reason || '';
+  }
   catch { return ''; }
 }
 
-export function rememberScreenExit(scoreId, reason) {
-  try { localStorage.setItem(`screen-exit:${scoreId}`, reason); }
+export function rememberScreenExit(scoreId, reason, revision = 0) {
+  try { localStorage.setItem(`screen-exit:${scoreId}`, JSON.stringify({ reason, revision })); }
   catch { /* Server persistence remains authoritative when storage is unavailable. */ }
 }
 

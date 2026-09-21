@@ -12,6 +12,8 @@ export default function LeaderboardPanel({
   currentTime = Date.now(),
   startRoomGame = () => {},
   requestScoreSync = () => {},
+  onAllowReentry = () => {},
+  reentryPendingIds = [],
   finalizeRankRewards = () => {},
   toggleBoosterPower = () => {},
   toggleWeight = () => {},
@@ -22,7 +24,7 @@ export default function LeaderboardPanel({
     ...leaderboardScores.filter(score => !score.screenExitDetected),
     ...leaderboardScores.filter(score => score.screenExitDetected),
   ];
-  if (selectedRoom?.mode === 'subway') return <SubwayLeaderboard room={selectedRoom} students={students} records={leaderboardScores} currentTime={currentTime} startRoomGame={startRoomGame} requestScoreSync={requestScoreSync} />;
+  if (selectedRoom?.mode === 'subway') return <SubwayLeaderboard room={selectedRoom} students={students} records={leaderboardScores} currentTime={currentTime} startRoomGame={startRoomGame} requestScoreSync={requestScoreSync} onAllowReentry={onAllowReentry} reentryPendingIds={reentryPendingIds} />;
   const expiresAt = typeof selectedRoom?.expiresAt?.toMillis === 'function'
     ? selectedRoom.expiresAt.toMillis()
     : Number(selectedRoom?.expiresAt || 0);
@@ -157,6 +159,7 @@ export default function LeaderboardPanel({
                     <div className="cosmetic-name-content flex flex-wrap items-center gap-2">
                       <span>{score.nickname}</span>
                       {score.screenExitDetected && <span className="rounded bg-rose-100 px-2 py-1 text-sm font-black text-rose-800">화면 이탈 · 진행 중단</span>}
+                      {score.screenExitDetected && <button type="button" disabled={reentryPendingIds.includes(score.id)} onClick={() => onAllowReentry(score)} className="rounded border border-emerald-600 bg-white px-2 py-1 text-sm font-bold text-emerald-800 disabled:opacity-50">{reentryPendingIds.includes(score.id) ? '처리 중...' : '재입장 허용'}</button>}
                       {cosmetic && (
                         <span className={`text-[11px] px-2 py-1 rounded-full font-black ${cosmetic.badgeClass || 'cosmetic-badge cosmetic-badge-teal'}`}>
                           {cosmetic.name}

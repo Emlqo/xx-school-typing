@@ -36,6 +36,8 @@ export default function TeacherDashboardView({
   handleDeleteRoom = () => {},
   startRoomGame = () => {},
   requestScoreSync = () => {},
+  onAllowReentry = () => {},
+  reentryPendingIds = [],
   finalizeRankRewards = () => {},
   toggleBoosterPower = () => {},
   toggleWeight = () => {},
@@ -223,6 +225,8 @@ export default function TeacherDashboardView({
               currentTime={currentTime}
               startRoomGame={startRoomGame}
               requestScoreSync={requestScoreSync}
+              onAllowReentry={onAllowReentry}
+              reentryPendingIds={reentryPendingIds}
               finalizeRankRewards={finalizeRankRewards}
               toggleBoosterPower={toggleBoosterPower}
               toggleWeight={toggleWeight}

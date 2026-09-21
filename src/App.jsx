@@ -47,6 +47,7 @@ import {
   logoutStudentSession,
   recordPracticeCompletion,
   reportGameScreenExit,
+  allowGameReentry,
   rejectDuelChallenge,
   setInitialStudentLoginPin,
   setInitialStudentPin,
@@ -123,6 +124,8 @@ export default function App() {
   const [view, setView] = useState(getInitialView);
   const [screenExitError, setScreenExitError] = useState('');
   const screenExitRef = useRef('');
+  const screenExitRevisionRef = useRef(0);
+  const [reentryPendingIds, setReentryPendingIds] = useState([]);
   const screenExitReportingRef = useRef(new Set());
   const [pwdError, setPwdError] = useState('');
   const [teacherLoginLoading, setTeacherLoginLoading] = useState(false);
@@ -814,14 +817,15 @@ export default function App() {
 
   const reportScreenExit = useCallback(async (scoreId, reason) => {
     screenExitRef.current = scoreId;
-    rememberScreenExit(scoreId, reason);
+    const revision = screenExitRevisionRef.current;
+    rememberScreenExit(scoreId, reason, revision);
     setView('screenExit');
     setBoosterActive(false);
     if (screenExitReportingRef.current.has(scoreId)) return;
     screenExitReportingRef.current.add(scoreId);
     setScreenExitError('');
     try {
-      await reportGameScreenExit(scoreId, reason);
+      await reportGameScreenExit(scoreId, reason, revision);
     } catch (error) {
       if (screenExitRef.current === scoreId) setScreenExitError('화면 이탈 기록을 전송하지 못했습니다. 연결을 확인하고 다시 전송해주세요.');
     } finally {
@@ -836,9 +840,10 @@ export default function App() {
   useEffect(() => {
     if (!['waiting', 'playing', 'subway'].includes(view) || isPracticeMode || isDuelMode) return;
     const stopped = scores.find(item => item.id === currentScoreDocId && item.screenExitDetected);
-    if (!stopped) return;
+    if (!stopped || Number(stopped.screenExitRevision || 0) < screenExitRevisionRef.current) return;
     screenExitRef.current = currentScoreDocId;
-    rememberScreenExit(currentScoreDocId, stopped.screenExitReason || 'focus');
+    screenExitRevisionRef.current = Number(stopped.screenExitRevision || 0);
+    rememberScreenExit(currentScoreDocId, stopped.screenExitReason || 'focus', screenExitRevisionRef.current);
     setBoosterActive(false);
     setView('screenExit');
   }, [scores, currentScoreDocId, view, isPracticeMode, isDuelMode]);
@@ -881,7 +886,8 @@ export default function App() {
       createLocalScoreSnapshot(scoreDocId, scoreData);
 
       screenExitRef.current = '';
-      const exitReason = scoreData.screenExitReason || readScreenExit(scoreDocId);
+      screenExitRevisionRef.current = Number(scoreData.screenExitRevision || 0);
+      const exitReason = readScreenExit(scoreDocId, screenExitRevisionRef.current);
       if (scoreData.screenExitDetected || exitReason) {
         reportScreenExit(scoreDocId, exitReason || 'focus');
         return;
@@ -952,7 +958,8 @@ export default function App() {
       createLocalScoreSnapshot(scoreDocId, scoreData);
 
       screenExitRef.current = '';
-      const exitReason = scoreData.screenExitReason || readScreenExit(scoreDocId);
+      screenExitRevisionRef.current = Number(scoreData.screenExitRevision || 0);
+      const exitReason = readScreenExit(scoreDocId, screenExitRevisionRef.current);
       if (scoreData.screenExitDetected || exitReason) {
         reportScreenExit(scoreDocId, exitReason || 'focus');
         return;
@@ -1544,6 +1551,20 @@ export default function App() {
     } catch (error) {
       console.error(error);
       alert('게임 시작 중 오류가 발생했습니다.');
+    }
+  };
+
+  const handleAllowReentry = async (studentScore) => {
+    if (!requireTeacherAccess() || !studentScore?.id || reentryPendingIds.includes(studentScore.id)) return;
+    if (!confirm(`${studentScore.nickname} 학생의 재입장을 허용할까요? 남은 시간과 마지막 저장 기록은 유지됩니다.`)) return;
+    setReentryPendingIds(ids => [...ids, studentScore.id]);
+    try {
+      await allowGameReentry(studentScore.id);
+      alert('재입장을 허용했습니다. 학생 홈에서 같은 방에 다시 입장해주세요.');
+    } catch (error) {
+      alert(error.message || '재입장 허용에 실패했습니다.');
+    } finally {
+      setReentryPendingIds(ids => ids.filter(id => id !== studentScore.id));
     }
   };
 
@@ -3121,6 +3142,8 @@ export default function App() {
         handleDeleteRoom={handleDeleteRoom}
         startRoomGame={startRoomGame}
         requestScoreSync={requestScoreSync}
+        onAllowReentry={handleAllowReentry}
+        reentryPendingIds={reentryPendingIds}
         finalizeRankRewards={finalizeRankRewards}
         toggleBoosterPower={toggleBoosterPower}
         toggleWeight={toggleWeight}
