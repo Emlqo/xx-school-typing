@@ -60,6 +60,12 @@ after(async () => {
 });
 
 describe('public content', () => {
+  test('screen-exit lock prevents owner score changes and clearing the flag', async () => {
+    await seed('typing_scores', 'locked-score', { userId: STUDENT_UID, roomId: 'room', nickname: 'Student', score: 10, screenExitDetected: true });
+    const ref = publicDoc(testEnv.authenticatedContext(STUDENT_UID).firestore(), 'typing_scores', 'locked-score');
+    await assertFails(updateDoc(ref, { score: 999 }));
+    await assertFails(updateDoc(ref, { screenExitDetected: false }));
+  });
   test('unauthenticated users cannot read announcements', async () => {
     await seed('typing_announcements', 'notice-1', { title: 'Notice' });
     const db = testEnv.unauthenticatedContext().firestore();

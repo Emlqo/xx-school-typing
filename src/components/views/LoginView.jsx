@@ -172,14 +172,14 @@ export default function LoginView({
       <div className="max-w-6xl w-full z-10 relative space-y-6">
       <div className="grid grid-cols-1 xl:grid-cols-[420px_minmax(0,1fr)] gap-6">
         <div className="glass-box rounded-3xl p-8 md:p-10 text-center shadow-2xl border-2 border-cyan-100">
-          <div className="text-6xl mb-3 animate-bounce">🎮🏔️</div>
+          <div className="text-6xl mb-3" aria-hidden="true">🍁</div>
 
-          <h1 className="text-4xl md:text-5xl font-black mb-3 italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-sky-600 via-teal-500 to-emerald-500 drop-shadow-sm">
+          <h1 className="text-4xl md:text-5xl font-black mb-3 text-rose-800 drop-shadow-sm">
             풍양중학교<br />정보 시스템
           </h1>
 
           <p className="text-teal-900/70 font-bold mb-5 tracking-wide">
-            시원한 여름 숲속 타자 대결
+            단풍 물든 가을, 함께 성장하는 타자 대결
           </p>
 
           <div className="mb-8 bg-white/80 border border-cyan-100 rounded-2xl px-5 py-4 shadow-sm">

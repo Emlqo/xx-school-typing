@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import useGameFocusGuard from './hooks/useGameFocusGuard.js';
+import { enterGameFullscreen, readScreenExit, rememberScreenExit } from './utils/fairPlay.js';
 import {
   addDoc,
   arrayRemove,
@@ -44,6 +46,7 @@ import {
   joinGuestGame,
   logoutStudentSession,
   recordPracticeCompletion,
+  reportGameScreenExit,
   rejectDuelChallenge,
   setInitialStudentLoginPin,
   setInitialStudentPin,
@@ -118,6 +121,9 @@ function getInitialView() {
 
 export default function App() {
   const [view, setView] = useState(getInitialView);
+  const [screenExitError, setScreenExitError] = useState('');
+  const screenExitRef = useRef('');
+  const screenExitReportingRef = useRef(new Set());
   const [pwdError, setPwdError] = useState('');
   const [teacherLoginLoading, setTeacherLoginLoading] = useState(false);
   const [teacherGatePassword, setTeacherGatePassword] = useState('');
@@ -806,6 +812,37 @@ export default function App() {
     setView('playing');
   }, [nickname, pickRandomWord, quizzes, resetPlayingState, studentProfile?.id]);
 
+  const reportScreenExit = useCallback(async (scoreId, reason) => {
+    screenExitRef.current = scoreId;
+    rememberScreenExit(scoreId, reason);
+    setView('screenExit');
+    setBoosterActive(false);
+    if (screenExitReportingRef.current.has(scoreId)) return;
+    screenExitReportingRef.current.add(scoreId);
+    setScreenExitError('');
+    try {
+      await reportGameScreenExit(scoreId, reason);
+    } catch (error) {
+      if (screenExitRef.current === scoreId) setScreenExitError('화면 이탈 기록을 전송하지 못했습니다. 연결을 확인하고 다시 전송해주세요.');
+    } finally {
+      screenExitReportingRef.current.delete(scoreId);
+    }
+  }, []);
+  const handleScreenExit = useCallback((reason) => {
+    if (!currentScoreDocId || screenExitRef.current === currentScoreDocId) return;
+    reportScreenExit(currentScoreDocId, reason);
+  }, [currentScoreDocId, reportScreenExit]);
+  useGameFocusGuard(view === 'playing' && !isPracticeMode && !isDuelMode && timeLeft > 0, handleScreenExit);
+  useEffect(() => {
+    if (!['waiting', 'playing', 'subway'].includes(view) || isPracticeMode || isDuelMode) return;
+    const stopped = scores.find(item => item.id === currentScoreDocId && item.screenExitDetected);
+    if (!stopped) return;
+    screenExitRef.current = currentScoreDocId;
+    rememberScreenExit(currentScoreDocId, stopped.screenExitReason || 'focus');
+    setBoosterActive(false);
+    setView('screenExit');
+  }, [scores, currentScoreDocId, view, isPracticeMode, isDuelMode]);
+
   const handleJoinRoom = useCallback(async () => {
     const studentName = nickname.trim();
 
@@ -825,6 +862,7 @@ export default function App() {
     }
 
     try {
+      if (!await enterGameFullscreen()) return;
       const joined = await joinGuestGame(roomCodeInput, studentName);
       const roomData = joined.room;
       const duration = Number(roomData.duration || 300);
@@ -841,6 +879,13 @@ export default function App() {
       resetPlayingState({ practiceMode: false, duration, mode: nextGameMode });
       restoreScoreState(scoreData);
       createLocalScoreSnapshot(scoreDocId, scoreData);
+
+      screenExitRef.current = '';
+      const exitReason = scoreData.screenExitReason || readScreenExit(scoreDocId);
+      if (scoreData.screenExitDetected || exitReason) {
+        reportScreenExit(scoreDocId, exitReason || 'focus');
+        return;
+      }
 
       if (roomData.mode === 'subway') {
         setView(roomData.status === 'playing' ? 'subway' : 'waiting');
@@ -862,7 +907,7 @@ export default function App() {
       console.error(error);
       alert('방 입장 중 오류가 발생했습니다.');
     }
-  }, [nickname, pickRandomWord, quizzes, resetPlayingState, roomCodeInput, user]);
+  }, [nickname, pickRandomWord, quizzes, resetPlayingState, roomCodeInput, user, reportScreenExit]);
 
   const handleJoinClassStudent = useCallback(async (student, roomOverride = null) => {
     const targetRoom = roomOverride || selectedOpenClassRoom;
@@ -886,6 +931,7 @@ export default function App() {
       }
 
       const duration = Number(roomData.duration || 300);
+      if (!await enterGameFullscreen()) return;
       const joined = await joinClassGame(roomData.id, student.id);
       if (Number(joined.sessionExpiresAt) > Date.now()) {
         setStudentSessionExpiresAt(Number(joined.sessionExpiresAt));
@@ -904,6 +950,13 @@ export default function App() {
       resetPlayingState({ practiceMode: false, duration, mode: nextGameMode });
       restoreScoreState(scoreData);
       createLocalScoreSnapshot(scoreDocId, scoreData);
+
+      screenExitRef.current = '';
+      const exitReason = scoreData.screenExitReason || readScreenExit(scoreDocId);
+      if (scoreData.screenExitDetected || exitReason) {
+        reportScreenExit(scoreDocId, exitReason || 'focus');
+        return;
+      }
 
       if (roomData.mode === 'subway') {
         setView(roomData.status === 'playing' ? 'subway' : 'waiting');
@@ -925,7 +978,7 @@ export default function App() {
       console.error(error);
       alert('학급 입장 중 오류가 발생했습니다.');
     }
-  }, [pickRandomWord, quizzes, resetPlayingState, selectedOpenClassRoom, user]);
+  }, [pickRandomWord, quizzes, resetPlayingState, selectedOpenClassRoom, user, reportScreenExit]);
 
   const syncDuelScore = useCallback(async ({ finished = false } = {}) => {
     if (!isDuelMode || !myDuelScore?.id || !db) return;
@@ -969,6 +1022,7 @@ export default function App() {
   }, [isDuelMode, myDuelScore?.id]);
 
   const endGame = useCallback(async () => {
+    if (currentScoreDocId && screenExitRef.current === currentScoreDocId) return;
     if (isEndingRef.current) return;
     isEndingRef.current = true;
     setBoosterActive(false);
@@ -1527,7 +1581,7 @@ export default function App() {
       const scoresRef = getPublicCollection(db, APP_ID, FIRESTORE_PATHS.scores);
       const scoreSnapshot = await getDocs(query(scoresRef, where('roomId', '==', roomId)));
       const roomScores = scoreSnapshot.docs.map((scoreDoc) => ({ id: scoreDoc.id, ...scoreDoc.data() }));
-      const rankRewards = calculateRankRewards(roomScores);
+      const rankRewards = calculateRankRewards(roomScores.filter(item => !item.screenExitDetected));
 
       if (rankRewards.length === 0) {
         alert('순위 보상을 지급할 학급 학생 기록이 없습니다.');
@@ -2771,6 +2825,17 @@ export default function App() {
     setView('teacherLogin');
   };
 
+  if (view === 'screenExit') {
+    return <main className="min-h-screen spring-bg flex items-center justify-center p-4">
+      <section role="alert" className="glass-box max-w-lg w-full rounded-lg border-2 border-rose-400 p-8 text-center">
+        <h1 className="text-3xl font-black text-rose-700">화면 이탈 · 진행 중단</h1>
+        <p className="my-5 text-lg text-gray-800">다른 화면으로 이동하거나 전체 화면을 해제하여 이번 경기를 더 이상 진행할 수 없습니다. 선생님께 알려주세요.</p>
+        {screenExitError && <p className="my-3 text-rose-700">{screenExitError}<button className="block mx-auto mt-2 underline font-bold" onClick={() => reportScreenExit(currentScoreDocId, readScreenExit(currentScoreDocId) || 'focus')}>기록 다시 전송</button></p>}
+        <button className="rounded-lg bg-emerald-700 px-6 py-3 font-bold text-white" onClick={handleBackToLogin}>학생 홈으로</button>
+      </section>
+    </main>;
+  }
+
   if (!authReady || !studentSessionChecked) {
     return (
       <div className="min-h-screen spring-bg flex items-center justify-center p-4">
@@ -2998,8 +3063,8 @@ export default function App() {
   }
 
   if (view === 'subway') {
-    if (myRoomData?.subway?.practice === 'recall') return <SubwayRecallView room={myRoomData} scoreData={scores.find((item) => item.id === currentScoreDocId)} scoreId={currentScoreDocId} nickname={nickname} onHome={handleBackToLogin} />;
-    return <SubwayGameView room={myRoomData} scoreData={scores.find((item) => item.id === currentScoreDocId)} scoreId={currentScoreDocId} nickname={nickname} onHome={handleBackToLogin} />;
+    if (myRoomData?.subway?.practice === 'recall') return <SubwayRecallView room={myRoomData} scoreData={scores.find((item) => item.id === currentScoreDocId)} scoreId={currentScoreDocId} nickname={nickname} onHome={handleBackToLogin} onViolation={handleScreenExit} />;
+    return <SubwayGameView room={myRoomData} scoreData={scores.find((item) => item.id === currentScoreDocId)} scoreId={currentScoreDocId} nickname={nickname} onHome={handleBackToLogin} onViolation={handleScreenExit} />;
   }
 
   if (view === 'result') {

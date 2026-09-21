@@ -5,6 +5,18 @@ import { normalizeClassScore } from '../src/utils/hallOfFame.js';
 import { calculateRankRewards } from '../src/utils/rewards.js';
 import { validSubwayAnswers } from '../src/utils/subway.js';
 
+test('screen-exit records stay visible but do not occupy a rank in either mode', () => {
+  for (const mode of ['recall', 'copy']) {
+    const ranked = rankSubwayResults([
+      { id: 'stopped', screenExitDetected: true, subwayProgress: 20, subwayStatus: 'completed', subwayElapsedMs: 100 },
+      { id: 'valid', subwayProgress: 10, subwayStatus: 'completed', subwayElapsedMs: 200 },
+    ], mode);
+    assert.deepEqual(ranked.map(record => [record.id, record.subwayRank]), [['valid', 1], ['stopped', null]]);
+    assert.equal(ranked[1].subwayProgress, 20);
+    assert.deepEqual(rankSubwayResults([ranked[1]], mode).map(record => record.subwayRank), [null]);
+  }
+});
+
 test('recall accepts unique stations in any order and ranks by count with ties', () => {
   const route = subwayRoute({ line: '4', practice: 'recall' });
   assert.equal(route.length, 51);

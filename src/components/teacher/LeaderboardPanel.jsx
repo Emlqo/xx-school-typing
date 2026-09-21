@@ -18,6 +18,10 @@ export default function LeaderboardPanel({
   toggleDifficulty = () => {},
 }) {
   const selectedRoom = rooms.find((room) => room.id === viewingRoomId);
+  const displayScores = [
+    ...leaderboardScores.filter(score => !score.screenExitDetected),
+    ...leaderboardScores.filter(score => score.screenExitDetected),
+  ];
   if (selectedRoom?.mode === 'subway') return <SubwayLeaderboard room={selectedRoom} students={students} records={leaderboardScores} currentTime={currentTime} startRoomGame={startRoomGame} requestScoreSync={requestScoreSync} />;
   const expiresAt = typeof selectedRoom?.expiresAt?.toMillis === 'function'
     ? selectedRoom.expiresAt.toMillis()
@@ -136,7 +140,7 @@ export default function LeaderboardPanel({
             </tr>
           </thead>
           <tbody>
-            {leaderboardScores.length > 0 ? leaderboardScores.map((score, index) => {
+            {displayScores.length > 0 ? displayScores.map((score, index) => {
               const isEditable = viewingRoomId !== 'all' && selectedRoom?.status === 'waiting';
               const cosmetic = getCosmeticById(score.equippedCosmetic);
               const rowCosmeticClass = cosmetic?.leaderboardClass || '';
@@ -144,7 +148,7 @@ export default function LeaderboardPanel({
               return (
                 <tr key={score.id} className={`border-b border-gray-100 transition-colors hover:bg-white/50 ${rowCosmeticClass}`}>
                   <td className="py-3 px-4 text-center font-bold">
-                    {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : <span className="text-gray-400">{index + 1}</span>}
+                    {score.screenExitDetected ? '—' : index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : <span className="text-gray-400">{index + 1}</span>}
                   </td>
                   <td className="py-3 px-4 font-bold text-gray-800 relative overflow-hidden">
                     {cosmetic && (
@@ -152,6 +156,7 @@ export default function LeaderboardPanel({
                     )}
                     <div className="cosmetic-name-content flex flex-wrap items-center gap-2">
                       <span>{score.nickname}</span>
+                      {score.screenExitDetected && <span className="rounded bg-rose-100 px-2 py-1 text-sm font-black text-rose-800">화면 이탈 · 진행 중단</span>}
                       {cosmetic && (
                         <span className={`text-[11px] px-2 py-1 rounded-full font-black ${cosmetic.badgeClass || 'cosmetic-badge cosmetic-badge-teal'}`}>
                           {cosmetic.name}

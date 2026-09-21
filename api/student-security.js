@@ -768,6 +768,7 @@ async function finalizeStudentReward(uid, body) {
   await database().runTransaction(async (transaction) => {
     const scoreSnapshot = await transaction.get(scoreRef);
     const score = scoreSnapshot.data();
+    if (score.screenExitDetected) throw new ApiError(403, 'api/permission-denied', '화면 이탈로 중단된 경기는 보상을 받을 수 없습니다.');
     if (score.rewardGranted === true) {
       reward = score.rewardBreakdown || { totalEarned: Number(score.rewardEarned || 0) };
       return;
@@ -1851,6 +1852,26 @@ async function resetTeacherAssessmentSubmission(uid, body) {
   return { assessmentId, studentId };
 }
 
+async function reportGameScreenExit(uid, body) {
+  const scoreId = requireString(body.scoreId, 'scoreId', 250);
+  const reason = ['focus', 'hidden', 'fullscreen'].includes(body.reason) ? body.reason : 'focus';
+  const scoreRef = publicCollection(PATHS.scores).doc(scoreId);
+  await database().runTransaction(async transaction => {
+    const snapshot = await transaction.get(scoreRef);
+    if (!snapshot.exists || snapshot.data().userId !== uid) {
+      throw new ApiError(403, 'api/permission-denied', '본인의 경기만 중단할 수 있습니다.');
+    }
+    if (snapshot.data().screenExitDetected) return;
+    transaction.update(scoreRef, {
+      screenExitDetected: true,
+      screenExitReason: reason,
+      screenExitAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  });
+  return { stopped: true };
+}
+
 async function submitSubwayRun(uid, body) {
   const scoreId = requireString(body.scoreId, 'scoreId', 250);
   const scoreRef = publicCollection(PATHS.scores).doc(scoreId);
@@ -1861,6 +1882,7 @@ async function submitSubwayRun(uid, body) {
       throw new ApiError(403, 'api/permission-denied', '본인의 경기 기록만 제출할 수 있습니다.');
     }
     const data = snapshot.data();
+    if (data.screenExitDetected) throw new ApiError(403, 'api/permission-denied', '화면 이탈로 중단된 경기입니다.');
     const roomSnapshot = await transaction.get(publicCollection(PATHS.rooms).doc(data.roomId));
     const room = roomSnapshot.data();
     if (!room || room.mode !== 'subway' || room.status !== 'playing') {
@@ -1909,6 +1931,7 @@ async function submitSubwayRun(uid, body) {
 }
 
 const actions = {
+  reportGameScreenExit,
   submitSubwayRun,
   getStudentSession,
   logoutStudentSession,

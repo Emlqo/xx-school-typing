@@ -45,6 +45,9 @@
 
 /* Shared station-board hierarchy for the race and memorization route. */
 .metro-game { background: #f3fafb; }
+.metro-scene { background: #d6e6ef url('/images/autumn-forest.webp') center 72% / cover no-repeat; border-bottom-color: #8a9978; }
+.metro-mountains { background: #ba795f; opacity: .6; }
+.metro-buildings { filter: sepia(.35); opacity: .45; }
 .metro-recall-prompt { font-size: 32px; }
 .metro-recall-study { min-height: 100dvh; background: #f3fafb; color: #153d46; }
 .metro-study-header { position: sticky; top: 0; z-index: 5; background: #f3fafbf5; border-bottom: 3px solid #00a4dc; display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 20px 32px; }

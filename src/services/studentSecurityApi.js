@@ -63,6 +63,7 @@ export const activateDuelBooster = (duelId, studentId) => call(
 export const finalizeExpiredDuel = (duelId) => call('finalizeExpiredDuel', { duelId });
 export const cancelAllActiveDuels = () => call('cancelAllActiveDuels');
 export const listActiveAssessments = () => call('listActiveAssessments');
+export const reportGameScreenExit = (scoreId, reason) => call('reportGameScreenExit', { scoreId, reason });
 export const startAssessment = (assessmentId) => call('startAssessment', { assessmentId });
 export const submitAssessment = (assessmentId, answers) => call('submitAssessment', { assessmentId, answers });
 export const listTeacherAssessmentQuestions = () => call('listTeacherAssessmentQuestions');

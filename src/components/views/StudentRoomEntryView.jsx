@@ -28,6 +28,7 @@ export default function StudentRoomEntryView({
           <h1 className="text-3xl font-black text-gray-800">선수 입장</h1>
           <p className="text-sm font-bold text-gray-500 mt-2">{student?.name} 학생의 학급에 개설된 방만 표시됩니다.</p>
         </div>
+        <p className="mb-5 rounded-lg border border-rose-300 bg-rose-50 p-4 text-sm font-bold leading-relaxed text-rose-900">입장하면 전체 화면으로 전환됩니다. 경기 시작 후에는 암기 시간에도 다른 탭·창 이동, Alt+Tab, 전체 화면 해제 시 즉시 중단되고 선생님 점수판에 표시됩니다. 진행 중인 방은 입장 즉시 적용되며, 새로고침·재입장으로 이어 할 수 없습니다.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {rooms.map((room) => (
             <button

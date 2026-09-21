@@ -1,4 +1,5 @@
 import CherryBlossomBackground from '../common/CherryBlossomBackground.jsx';
+import { enterGameFullscreen } from '../../utils/fairPlay.js';
 
 export default function WaitingView({
   nickname = '',
@@ -17,6 +18,11 @@ export default function WaitingView({
           [{myRoomData?.name || '선택한 방'}] 반에 입장했습니다.<br />
           선생님이 시작할 때까지 손가락을 풀어주세요!
         </p>
+        <div className="mb-6 rounded-lg border-2 border-rose-300 bg-rose-50 p-4 text-left text-rose-900">
+          <strong className="block mb-2">화면 이탈 주의</strong>
+          <p className="text-sm leading-relaxed">경기 시작 후에는 전체 화면을 유지해주세요. 암기 시간에도 다른 탭·창 이동, Alt+Tab, 전체 화면 해제 시 경기가 즉시 중단되며 선생님 점수판에 표시됩니다. 새로고침하거나 재입장해도 이어 할 수 없습니다.</p>
+          <button type="button" onClick={enterGameFullscreen} className="mt-3 font-bold underline">전체 화면으로 돌아가기</button>
+        </div>
         <div className="w-full bg-pink-100 h-2 rounded-full overflow-hidden mb-6">
           <div className="bg-pink-500 h-full animate-pulse" style={{ width: '100%' }} />
         </div>

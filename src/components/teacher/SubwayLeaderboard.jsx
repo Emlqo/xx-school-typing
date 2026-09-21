@@ -27,7 +27,7 @@ export default function SubwayLeaderboard({ room, records, students = [], curren
         return <tr key={record.id} className="border-b border-sky-100 even:bg-sky-50/40">
           <td className="p-3 text-xl font-black text-sky-700">{record.subwayRank ? `${record.subwayRank}위` : '—'}</td>
           <td className="p-3 font-bold text-gray-800">{record.nickname}</td>
-          <td className={`p-3 font-bold ${complete ? 'text-emerald-700' : stopped ? 'text-rose-700' : 'text-sky-700'}`}>{complete ? '완주' : stopped ? recall ? '종료' : '미완주' : room.status === 'waiting' ? '출발 대기' : '운행 중'}</td>
+          <td className={`p-3 font-bold ${record.screenExitDetected ? 'text-rose-700' : complete ? 'text-emerald-700' : stopped ? 'text-rose-700' : 'text-sky-700'}`}>{record.screenExitDetected ? '화면 이탈 · 진행 중단' : complete ? '완주' : stopped ? recall ? '종료' : '미완주' : room.status === 'waiting' ? '출발 대기' : '운행 중'}</td>
           <td className="min-w-[220px] p-3">{recall ? <details><summary className="cursor-pointer font-bold text-sky-700">맞힌 역 목록</summary><p className="max-w-md py-2 text-sm text-gray-700">{(record.subwayAnswers || []).join(' · ') || '정답 기록 없음'}</p></details> : <strong className="block text-gray-800">{progress.lastStation ? `${progress.lastStation} 도착` : '도착 기록 없음'}</strong>}
             <div className="my-2 h-2 overflow-hidden rounded-full bg-sky-100" role="progressbar" aria-label={`${record.nickname} 진행률`} aria-valuenow={progress.percent} aria-valuemin={0} aria-valuemax={100}><div className={`h-full ${complete ? 'bg-emerald-500' : 'bg-sky-500'}`} style={{ width: `${progress.percent}%` }} /></div>
             <span className="text-sm font-semibold text-gray-600">{progress.count} / {progress.total}개 · {progress.percent}%</span>

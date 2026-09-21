@@ -13,3 +13,4 @@ content-backups/
 .vercel
 tests/subway-*.png
 tests/subway-*.log
+tests/autumn-*.png

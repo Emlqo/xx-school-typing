@@ -45,6 +45,13 @@ export function formatRaceTime(ms) {
 }
 
 export function rankSubwayResults(records, practice) {
+  const stopped = records.filter(record => record.screenExitDetected);
+  if (stopped.length) {
+    return [
+      ...rankSubwayResults(records.filter(record => !record.screenExitDetected), practice),
+      ...stopped.map(record => ({ ...record, subwayRank: null })),
+    ];
+  }
   if (practice === 'recall') {
     const sorted = [...records].sort((a, b) => (b.subwayProgress || 0) - (a.subwayProgress || 0));
     let rank = 0;

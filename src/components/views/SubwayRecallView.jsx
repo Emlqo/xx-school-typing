@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { SubwayTrain } from './SubwayGameView.jsx';
 import { LINE_4, formatRaceTime, subwayMillis, subwayStart } from '../../utils/subway.js';
 import { submitSubwayRun } from '../../services/studentSecurityApi.js';
+import useGameFocusGuard from '../../hooks/useGameFocusGuard.js';
 
-export default function SubwayRecallView({ room, scoreData, scoreId, nickname, onHome, submitRun = submitSubwayRun }) {
+export default function SubwayRecallView({ room, scoreData, scoreId, nickname, onHome, onViolation, submitRun = submitSubwayRun }) {
   const [answers, setAnswers] = useState(() => [...new Set((scoreData?.subwayAnswers || []).filter(name => LINE_4.includes(name)))]);
   const [value, setValue] = useState('');
   const [now, setNow] = useState(Date.now());
@@ -17,6 +18,7 @@ export default function SubwayRecallView({ room, scoreData, scoreId, nickname, o
   const start = subwayStart(room);
   const preview = now < start && !result;
   const ended = Boolean(result) || now >= deadline || answers.length === LINE_4.length;
+  useGameFocusGuard(!ended && Boolean(onViolation), onViolation);
   useEffect(() => {
     input.current?.focus();
     const timer = setInterval(() => setNow(Date.now()), 200);
