@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import useGameFocusGuard from './hooks/useGameFocusGuard.js';
-import { enterGameFullscreen, readScreenExit, rememberScreenExit } from './utils/fairPlay.js';
+import { enterGameFullscreen, readScreenExit, rememberScreenExit, isFocusGuardEnabled } from './utils/fairPlay.js';
 import {
   addDoc,
   arrayRemove,
@@ -122,6 +122,9 @@ function getInitialView() {
 
 export default function App() {
   const [view, setView] = useState(getInitialView);
+  const [roomFocusGuard, setRoomFocusGuard] = useState(false);
+  const [classFocusGuard, setClassFocusGuard] = useState(false);
+  const [fullscreenEntryRequest, setFullscreenEntryRequest] = useState(null);
   const [screenExitError, setScreenExitError] = useState('');
   const screenExitRef = useRef('');
   const screenExitRevisionRef = useRef(0);
@@ -833,12 +836,13 @@ export default function App() {
     }
   }, []);
   const handleScreenExit = useCallback((reason) => {
+    if (!isFocusGuardEnabled(myRoomData)) return;
     if (!currentScoreDocId || screenExitRef.current === currentScoreDocId) return;
     reportScreenExit(currentScoreDocId, reason);
-  }, [currentScoreDocId, reportScreenExit]);
-  useGameFocusGuard(view === 'playing' && !isPracticeMode && !isDuelMode && timeLeft > 0, handleScreenExit);
+  }, [currentScoreDocId, reportScreenExit, myRoomData]);
+  useGameFocusGuard(view === 'playing' && !isPracticeMode && !isDuelMode && timeLeft > 0 && isFocusGuardEnabled(myRoomData), handleScreenExit);
   useEffect(() => {
-    if (!['waiting', 'playing', 'subway'].includes(view) || isPracticeMode || isDuelMode) return;
+    if (!['waiting', 'playing', 'subway'].includes(view) || isPracticeMode || isDuelMode || !isFocusGuardEnabled(myRoomData)) return;
     const stopped = scores.find(item => item.id === currentScoreDocId && item.screenExitDetected);
     if (!stopped || Number(stopped.screenExitRevision || 0) < screenExitRevisionRef.current) return;
     screenExitRef.current = currentScoreDocId;
@@ -846,7 +850,7 @@ export default function App() {
     rememberScreenExit(currentScoreDocId, stopped.screenExitReason || 'focus', screenExitRevisionRef.current);
     setBoosterActive(false);
     setView('screenExit');
-  }, [scores, currentScoreDocId, view, isPracticeMode, isDuelMode]);
+  }, [scores, currentScoreDocId, view, isPracticeMode, isDuelMode, myRoomData]);
 
   const handleJoinRoom = useCallback(async () => {
     const studentName = nickname.trim();
@@ -867,9 +871,12 @@ export default function App() {
     }
 
     try {
-      if (!await enterGameFullscreen()) return;
       const joined = await joinGuestGame(roomCodeInput, studentName);
       const roomData = joined.room;
+      if (isFocusGuardEnabled(roomData) && !document.fullscreenElement) {
+        const accepted = await new Promise(resolve => setFullscreenEntryRequest({ resolve }));
+        if (!accepted) return;
+      }
       const duration = Number(roomData.duration || 300);
       const remainingSeconds = getRemainingSeconds(roomData);
       const scoreData = joined.score;
@@ -888,7 +895,7 @@ export default function App() {
       screenExitRef.current = '';
       screenExitRevisionRef.current = Number(scoreData.screenExitRevision || 0);
       const exitReason = readScreenExit(scoreDocId, screenExitRevisionRef.current);
-      if (scoreData.screenExitDetected || exitReason) {
+      if (isFocusGuardEnabled(roomData) && (scoreData.screenExitDetected || exitReason)) {
         reportScreenExit(scoreDocId, exitReason || 'focus');
         return;
       }
@@ -937,7 +944,7 @@ export default function App() {
       }
 
       const duration = Number(roomData.duration || 300);
-      if (!await enterGameFullscreen()) return;
+      if (isFocusGuardEnabled(roomData) && !await enterGameFullscreen()) return;
       const joined = await joinClassGame(roomData.id, student.id);
       if (Number(joined.sessionExpiresAt) > Date.now()) {
         setStudentSessionExpiresAt(Number(joined.sessionExpiresAt));
@@ -960,7 +967,7 @@ export default function App() {
       screenExitRef.current = '';
       screenExitRevisionRef.current = Number(scoreData.screenExitRevision || 0);
       const exitReason = readScreenExit(scoreDocId, screenExitRevisionRef.current);
-      if (scoreData.screenExitDetected || exitReason) {
+      if (isFocusGuardEnabled(roomData) && (scoreData.screenExitDetected || exitReason)) {
         reportScreenExit(scoreDocId, exitReason || 'focus');
         return;
       }
@@ -1520,6 +1527,7 @@ export default function App() {
       const roomRef = await addDoc(roomsRef, {
         name: trimmedName,
         mode: roomMode,
+        focusGuardEnabled: roomFocusGuard,
         ...(roomMode === 'subway' ? { subway: { ...subwayConfig, previewEnabled: subwayConfig.practice === 'recall' } } : {}),
         duration: durationSec,
         roomCode: createRoomCode(),
@@ -2729,6 +2737,7 @@ export default function App() {
         name: classItem.name || `${classItem.grade || 1}학년 ${classItem.classNumber || ''}반`,
         mode: classRoomMode,
         ...(classRoomMode === 'subway' ? { subway: { ...classSubwayConfig, previewEnabled: classSubwayConfig.practice === 'recall' } } : {}),
+        focusGuardEnabled: classFocusGuard,
         duration: durationSec,
         roomCode: createRoomCode(),
         status: 'waiting',
@@ -2845,6 +2854,10 @@ export default function App() {
     setPwdError('');
     setView('teacherLogin');
   };
+
+  if (fullscreenEntryRequest) {
+    return <main className="min-h-screen spring-bg flex items-center justify-center p-4"><section className="glass-box max-w-md rounded-lg p-8 text-center"><h1 className="text-2xl font-black">화면 이탈 방지 ON</h1><p className="my-4">이 방은 경기·암기 중 다른 창 이동이나 전체 화면 해제 시 중단됩니다.</p><button className="rounded-lg bg-emerald-700 px-5 py-3 text-white font-bold" onClick={async () => { if (await enterGameFullscreen()) { fullscreenEntryRequest.resolve(true); setFullscreenEntryRequest(null); } }}>전체 화면으로 입장</button><button className="ml-3 p-3" onClick={() => { fullscreenEntryRequest.resolve(false); setFullscreenEntryRequest(null); }}>취소</button></section></main>;
+  }
 
   if (view === 'screenExit') {
     return <main className="min-h-screen spring-bg flex items-center justify-center p-4">
@@ -3126,6 +3139,10 @@ export default function App() {
         currentTime={currentTime}
         onLogout={handleTeacherLogout}
         handleCreateRoom={handleCreateRoom}
+        roomFocusGuard={roomFocusGuard}
+        setRoomFocusGuard={setRoomFocusGuard}
+        classFocusGuard={classFocusGuard}
+        setClassFocusGuard={setClassFocusGuard}
         newRoomName={newRoomName}
         setNewRoomName={setNewRoomName}
         roomMode={roomMode}

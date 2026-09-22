@@ -84,6 +84,8 @@ function RoomChoice({
 
 export default function RoomManagementPanel({
   handleCreateRoom = () => {},
+  focusGuardEnabled = false,
+  setFocusGuardEnabled = () => {},
   newRoomName = '',
   setNewRoomName = () => {},
   roomMode = 'ko',
@@ -198,6 +200,7 @@ export default function RoomManagementPanel({
             </select>
           </div>
           {roomMode === 'subway' && <SubwaySettings value={subwayConfig} onChange={setSubwayConfig} />}
+          <label className="flex items-center gap-3 rounded-lg border border-rose-200 bg-rose-50 p-3 font-bold text-rose-900"><input type="checkbox" checked={focusGuardEnabled} onChange={e => setFocusGuardEnabled(e.target.checked)} />화면 이탈 방지 {focusGuardEnabled ? 'ON' : 'OFF'}</label>
           <button type="submit" className="w-full bg-pink-500 hover:bg-pink-600 py-3 rounded-xl font-bold text-white shadow-md">
             게스트 PIN 방 만들기
           </button>

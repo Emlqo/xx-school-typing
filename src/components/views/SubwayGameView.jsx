@@ -3,6 +3,7 @@ import { submitSubwayRun } from '../../services/studentSecurityApi.js';
 import { formatRaceTime, subwayMillis, subwayRoute, subwayStart, stationInitials, subwayHintPenalty } from '../../utils/subway.js';
 import '../../styles/subway.css';
 import useGameFocusGuard from '../../hooks/useGameFocusGuard.js';
+import { isFocusGuardEnabled } from '../../utils/fairPlay.js';
 
 export function SubwayTrain() {
   return <svg viewBox="0 0 760 155" className="metro-train" role="img" aria-label="4호선 전동차">
@@ -52,7 +53,7 @@ export default function SubwayGameView({ room, scoreData, scoreId, nickname, onH
   const deadline = subwayMillis(room?.expiresAt);
   const expired = deadline > 0 && now >= deadline;
   const finished = Boolean(result) || progress >= route.length || expired;
-  useGameFocusGuard(!finished && Boolean(onViolation), onViolation);
+  useGameFocusGuard(!finished && Boolean(onViolation) && isFocusGuardEnabled(room), onViolation);
   const elapsed = result?.subwayElapsedMs ?? Math.max(0, Math.min(now, deadline || now) - start) + penalty;
   const stationLabel = !memory || preview || hintLevel === 2 ? route[progress] : hintLevel === 1 ? stationInitials(route[progress] || '') : '?'.repeat((route[progress] || '').length);
 

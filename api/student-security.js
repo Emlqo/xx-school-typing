@@ -1888,6 +1888,8 @@ async function reportGameScreenExit(uid, body) {
       throw new ApiError(403, 'api/permission-denied', '본인의 경기만 중단할 수 있습니다.');
     }
     // Ignore delayed reports from the attempt a teacher has already unlocked.
+    const roomSnapshot = await transaction.get(publicCollection(PATHS.rooms).doc(snapshot.data().roomId));
+    if (roomSnapshot.data()?.focusGuardEnabled === false) return;
     if (Number(body.revision || 0) !== Number(snapshot.data().screenExitRevision || 0)) return;
     if (snapshot.data().screenExitDetected) return;
     transaction.update(scoreRef, {

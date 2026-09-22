@@ -1,3 +1,6 @@
+// Missing flags preserve the policy of rooms created before the toggle existed.
+export function isFocusGuardEnabled(room) { return Boolean(room) && room.focusGuardEnabled !== false; }
+
 export async function enterGameFullscreen() {
   if (document.fullscreenElement) return true;
   try {

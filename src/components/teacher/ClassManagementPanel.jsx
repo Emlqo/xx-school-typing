@@ -25,6 +25,8 @@ export default function ClassManagementPanel({
   classNumber = '1',
   setClassNumber = () => {},
   classRoomMode = 'ko',
+  focusGuardEnabled = false,
+  setFocusGuardEnabled = () => {},
   subwayConfig,
   setSubwayConfig,
   setClassRoomMode = () => {},
@@ -135,6 +137,7 @@ export default function ClassManagementPanel({
           </select>
         </div>
         {classRoomMode === 'subway' && <SubwaySettings value={subwayConfig} onChange={setSubwayConfig} />}
+        <label className="flex items-center gap-3 rounded-lg border border-rose-200 bg-rose-50 p-3 font-bold text-rose-900"><input type="checkbox" checked={focusGuardEnabled} onChange={e => setFocusGuardEnabled(e.target.checked)} />화면 이탈 방지 {focusGuardEnabled ? 'ON' : 'OFF'}</label>
         <button
           type="button"
           onClick={() => openClassRoom(selectedClass)}

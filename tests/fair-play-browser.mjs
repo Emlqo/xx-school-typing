@@ -35,5 +35,17 @@ try {
     assert.deepEqual(errors, []);
     await page.close();
   }
-  console.log('Fullscreen entry, waiting, blur/hidden/exit lock, memorization, dedup, reload and normal finish passed.');
+  for (const name of ['일반 게임 시작', '지하철 시작']) {
+    const page = await browser.newPage();
+    await page.goto('http://127.0.0.1:5180/tests/fair-play-preview.html?off=1');
+    await page.getByText('선수 입장', { exact: true }).click();
+    await page.getByText('화면 이탈 방지 OFF · 전체 화면 자유').waitFor();
+    assert.equal(await page.evaluate(() => Boolean(document.fullscreenElement)), false);
+    await page.getByText(name, { exact: true }).click();
+    await page.evaluate(() => { window.dispatchEvent(new Event('blur')); document.dispatchEvent(new Event('fullscreenchange')); Object.defineProperty(document, 'hidden', { configurable: true, value: true }); document.dispatchEvent(new Event('visibilitychange')); });
+    assert.equal(await page.evaluate(() => window.testReports || 0), 0);
+    assert.equal(await page.getByText('화면 이탈 · 진행 중단', { exact: true }).count(), 0);
+    await page.close();
+  }
+  console.log('ON: fullscreen and lock checks passed. OFF: normal/subway ignore blur/hidden/fullscreen and enter without fullscreen.');
 } finally { await browser.close(); }

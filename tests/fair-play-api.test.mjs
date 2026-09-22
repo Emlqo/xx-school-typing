@@ -50,3 +50,12 @@ test('expired rooms cannot be unlocked and other students cannot report', async 
   await assert.rejects(f.context.reportGameScreenExit('other', { scoreId: 's', revision: 0 }), /본인의/);
   assert.equal(f.writes(), 0);
 });
+
+test('disabled room ignores screen-exit reports without writing', async () => {
+  const f = fixture();
+  f.room.focusGuardEnabled = false;
+  f.score.screenExitDetected = false;
+  await f.context.reportGameScreenExit('student', { scoreId: 's', reason: 'focus', revision: 0 });
+  assert.equal(f.writes(), 0);
+  assert.equal(f.score.screenExitDetected, false);
+});

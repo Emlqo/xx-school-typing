@@ -20,6 +20,10 @@ export default function TeacherDashboardView({
   currentTime = Date.now(),
   onLogout = () => {},
   handleCreateRoom = () => {},
+  roomFocusGuard = false,
+  setRoomFocusGuard,
+  classFocusGuard = false,
+  setClassFocusGuard,
   newRoomName = '',
   setNewRoomName = () => {},
   roomMode = 'ko',
@@ -197,6 +201,8 @@ export default function TeacherDashboardView({
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <RoomManagementPanel
               handleCreateRoom={handleCreateRoom}
+              focusGuardEnabled={roomFocusGuard}
+              setFocusGuardEnabled={setRoomFocusGuard}
               newRoomName={newRoomName}
               setNewRoomName={setNewRoomName}
               roomMode={roomMode}
@@ -246,6 +252,8 @@ export default function TeacherDashboardView({
               classNumber={classNumber}
               setClassNumber={setClassNumber}
               classRoomMode={classRoomMode}
+              focusGuardEnabled={classFocusGuard}
+              setFocusGuardEnabled={setClassFocusGuard}
               subwayConfig={classSubwayConfig}
               setSubwayConfig={setClassSubwayConfig}
               setClassRoomMode={setClassRoomMode}

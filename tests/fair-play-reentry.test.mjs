@@ -1,6 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readScreenExit, rememberScreenExit } from '../src/utils/fairPlay.js';
+import { readScreenExit, rememberScreenExit, isFocusGuardEnabled } from '../src/utils/fairPlay.js';
+
+test('new room opt-out and legacy room policy', () => {
+  assert.equal(isFocusGuardEnabled({ focusGuardEnabled: false }), false);
+  assert.equal(isFocusGuardEnabled({ focusGuardEnabled: true }), true);
+  assert.equal(isFocusGuardEnabled({}), true);
+  assert.equal(isFocusGuardEnabled(null), false);
+});
 
 test('teacher revision clears old locks, but a new violation remains locked', () => {
   const values = new Map();

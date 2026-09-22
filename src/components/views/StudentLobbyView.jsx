@@ -128,7 +128,7 @@ function StudentShopPanel({
       >
         이 이름으로 입장하기
       </button>
-      <p className="rounded-lg border border-rose-300 bg-rose-50 p-3 text-sm font-bold text-rose-900">입장 시 전체 화면으로 전환됩니다. 경기·암기 중 다른 탭·창 이동, Alt+Tab, 전체 화면 해제 시 즉시 중단되며 재입장해도 이어 할 수 없습니다. 진행 중인 방은 입장 즉시 적용됩니다.</p>
+      <p className="rounded-lg border border-rose-300 bg-rose-50 p-3 text-sm font-bold text-rose-900">화면 이탈 방지 ON인 방만 전체 화면으로 진행합니다. ON인 방은 경기·암기 중 다른 창 이동 시 중단되며, OFF인 방은 화면 이동으로 중단되지 않습니다.</p>
 
       <details className="group rounded-2xl border border-cyan-100 bg-cyan-50/40 p-4">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
@@ -628,7 +628,7 @@ export default function StudentLobbyView({
               />
             </div>
 
-            <p className="rounded-lg border border-rose-300 bg-rose-50 p-3 text-sm font-bold text-rose-900">입장하면 전체 화면으로 전환됩니다. 경기·암기 중 다른 탭·창 이동, Alt+Tab, 전체 화면 해제 시 즉시 중단되고 선생님 점수판에 표시됩니다. 진행 중인 방은 입장 즉시 적용됩니다. 재입장해도 이어 할 수 없습니다.</p>
+            <p className="rounded-lg border border-rose-300 bg-rose-50 p-3 text-sm font-bold text-rose-900">화면 이탈 방지 ON인 방은 확인 후 전체 화면으로 입장합니다. 경기·암기 중 다른 창 이동 시 중단됩니다. OFF인 방은 화면 이동으로 중단되지 않습니다.</p>
             <button onClick={onJoinRoom} disabled={!nickname || roomCodeInput.length !== 4} className="w-full py-4 mt-2 bg-pink-500 hover:bg-pink-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-2xl font-bold text-lg shadow-md transition-colors">
               게스트 게임 입장하기
             </button>

@@ -1,4 +1,5 @@
 import CherryBlossomBackground from '../common/CherryBlossomBackground.jsx';
+import { isFocusGuardEnabled } from '../../utils/fairPlay.js';
 
 export default function StudentRoomEntryView({
   student,
@@ -28,7 +29,7 @@ export default function StudentRoomEntryView({
           <h1 className="text-3xl font-black text-gray-800">선수 입장</h1>
           <p className="text-sm font-bold text-gray-500 mt-2">{student?.name} 학생의 학급에 개설된 방만 표시됩니다.</p>
         </div>
-        <p className="mb-5 rounded-lg border border-rose-300 bg-rose-50 p-4 text-sm font-bold leading-relaxed text-rose-900">입장하면 전체 화면으로 전환됩니다. 경기 시작 후에는 암기 시간에도 다른 탭·창 이동, Alt+Tab, 전체 화면 해제 시 즉시 중단되고 선생님 점수판에 표시됩니다. 진행 중인 방은 입장 즉시 적용되며, 새로고침·재입장으로 이어 할 수 없습니다.</p>
+        <p className="mb-5 rounded-lg border border-rose-300 bg-rose-50 p-4 text-sm font-bold leading-relaxed text-rose-900">화면 이탈 방지 ON인 방만 전체 화면을 유지해야 합니다. ON인 방은 경기·암기 중 다른 창 이동 시 중단됩니다. OFF인 방은 화면 이동으로 중단되지 않습니다.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {rooms.map((room) => (
             <button
@@ -38,6 +39,7 @@ export default function StudentRoomEntryView({
               className="text-left p-5 rounded-2xl bg-white border border-cyan-100 hover:border-teal-300 hover:bg-teal-50 transition-all"
             >
               <div className="font-black text-xl text-gray-800">{room.className || room.name}</div>
+              <div className="mt-2 text-sm font-bold">화면 이탈 방지 {isFocusGuardEnabled(room) ? 'ON' : 'OFF'}</div>
               {room.mode === 'subway' && <div className="mt-2 font-bold text-sky-600">{room.subway?.practice === 'recall' ? '4호선 전체 · 역 이름 많이 맞히기' : `4호선 · ${room.subway?.from} → ${room.subway?.to}`}</div>}
               <div className="text-sm font-bold text-gray-500 mt-2">
                 {room.status === 'playing' ? '진행 중 · 재입장 가능' : '입장 대기 중'} · {room.duration || 300}초
