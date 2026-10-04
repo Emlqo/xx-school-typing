@@ -23,7 +23,7 @@ export function SubwayTrain() {
   </svg>;
 }
 
-export default function SubwayGameView({ room, scoreData, scoreId, nickname, onHome, onViolation, submitRun = submitSubwayRun }) {
+export default function SubwayGameView({ room, scoreData, scoreId, nickname, onHome, onViolation, isPractice = false, onRestart, submitRun = submitSubwayRun }) {
   const route = useMemo(() => subwayRoute(room?.subway), [room?.subway?.from, room?.subway?.to, room?.subway?.line]);
   const [progress, setProgress] = useState(() => Math.min(route.length, Number(scoreData?.subwayProgress || 0)));
   const [value, setValue] = useState('');
@@ -34,6 +34,7 @@ export default function SubwayGameView({ room, scoreData, scoreId, nickname, onH
   const [typo, setTypo] = useState(false);
   const [arriving, setArriving] = useState(false);
   const [hints, setHints] = useState(() => {
+    if (isPractice) return {};
     try { return { ...JSON.parse(sessionStorage.getItem(`subway-hints:${scoreId}`) || '{}'), ...scoreData?.subwayHints }; }
     catch { return scoreData?.subwayHints || {}; }
   });
@@ -53,7 +54,7 @@ export default function SubwayGameView({ room, scoreData, scoreId, nickname, onH
   const deadline = subwayMillis(room?.expiresAt);
   const expired = deadline > 0 && now >= deadline;
   const finished = Boolean(result) || progress >= route.length || expired;
-  useGameFocusGuard(!finished && Boolean(onViolation) && isFocusGuardEnabled(room), onViolation);
+  useGameFocusGuard(!isPractice && !finished && Boolean(onViolation) && isFocusGuardEnabled(room), onViolation);
   const elapsed = result?.subwayElapsedMs ?? Math.max(0, Math.min(now, deadline || now) - start) + penalty;
   const stationLabel = !memory || preview || hintLevel === 2 ? route[progress] : hintLevel === 1 ? stationInitials(route[progress] || '') : '?'.repeat((route[progress] || '').length);
 
@@ -68,7 +69,7 @@ export default function SubwayGameView({ room, scoreData, scoreId, nickname, onH
     const next = { ...hintsRef.current, [progress]: hintLevel + 1 };
     hintsRef.current = next;
     setHints(next);
-    try { sessionStorage.setItem(`subway-hints:${scoreId}`, JSON.stringify(next)); } catch { /* Storage may be disabled. */ }
+    if (!isPractice) try { sessionStorage.setItem(`subway-hints:${scoreId}`, JSON.stringify(next)); } catch { /* Storage may be disabled. */ }
     input.current?.focus();
   };
 
@@ -79,6 +80,10 @@ export default function SubwayGameView({ room, scoreData, scoreId, nickname, onH
   }, []);
 
   const persist = useCallback(async (final = false) => {
+    if (isPractice) {
+      if (final && !result) setResult({ subwayStatus: progressRef.current >= route.length ? 'completed' : 'timeout', subwayProgress: progressRef.current, subwayPenaltyMs: subwayHintPenalty(hintsRef.current), subwayElapsedMs: Math.max(0, Math.min(Date.now(), deadline) - start) + subwayHintPenalty(hintsRef.current) });
+      return;
+    }
     if (inFlight.current || !scoreId || !room || result) return;
     inFlight.current = true;
     if (final) setSaving(true);
@@ -92,7 +97,7 @@ export default function SubwayGameView({ room, scoreData, scoreId, nickname, onH
       inFlight.current = false;
       setSaving(false);
     }
-  }, [scoreId, room, route, result, submitRun]);
+  }, [scoreId, room, route, result, submitRun, isPractice, deadline, start]);
 
   useEffect(() => {
     if (!room || !finished || result || finalAttempted.current || inFlight.current) return;
@@ -102,10 +107,10 @@ export default function SubwayGameView({ room, scoreData, scoreId, nickname, onH
 
   useEffect(() => {
     const request = subwayMillis(room?.syncRequestedAt);
-    if (!request || request <= lastRequest.current || finished || preview) return;
+    if (isPractice || !request || request <= lastRequest.current || finished || preview) return;
     lastRequest.current = request;
     persist();
-  }, [room?.syncRequestedAt, finished, preview, persist]);
+  }, [room?.syncRequestedAt, finished, preview, persist, isPractice]);
 
   const submit = (event) => {
     if (event.key !== 'Enter' || event.nativeEvent.isComposing || event.keyCode === 229) return;
@@ -124,6 +129,7 @@ export default function SubwayGameView({ room, scoreData, scoreId, nickname, onH
   if (!room || !route.length) return <main className="metro-game"><h1>경기가 종료되었거나 노선을 찾을 수 없습니다.</h1><button onClick={onHome}>학생 홈으로</button></main>;
 
   return <main className={`metro-game ${arriving ? 'metro-accelerating' : ''} ${finished || preview || !arriving ? 'metro-stopped' : ''}`}>
+    {isPractice && <div className="flex justify-between items-center gap-3 mb-3"><strong>자유연습 · 기록 미저장</strong><button onClick={onHome} className="px-4 py-2 bg-white rounded-lg border font-bold">연습 나가기</button></div>}
     {preview && !finished && <section className="metro-memorize-overlay" role="dialog" aria-modal="true" aria-labelledby="metro-memorize-title">
       <div className="metro-memorize-panel">
         <div className="metro-memorize-heading">
@@ -164,7 +170,8 @@ export default function SubwayGameView({ room, scoreData, scoreId, nickname, onH
         <strong className="metro-finish-time">{result?.subwayStatus === 'completed' ? formatRaceTime(result.subwayElapsedMs) : `${progress} / ${route.length}`}</strong>
         <p className="metro-last-station">{progress ? `마지막 도착 · ${route[progress - 1]}` : '도착 기록 없음'}</p>
         {result?.subwayStatus === 'completed' && <div className="metro-time-breakdown"><span>경과 시간 <b>{formatRaceTime(Math.max(0, result.subwayElapsedMs - (result.subwayPenaltyMs ?? penalty)))}</b></span><span>힌트 가산 <b>+{(result.subwayPenaltyMs ?? penalty) / 1000}초</b></span></div>}
-        <p>{saving ? '완주 기록 확인 중...' : result ? '기록이 선생님께 제출되었습니다.' : '기록 제출을 확인해주세요.'}</p>
+        <p>{isPractice ? '자유연습 기록은 저장되지 않습니다.' : saving ? '완주 기록 확인 중...' : result ? '기록이 선생님께 제출되었습니다.' : '기록 제출을 확인해주세요.'}</p>
+        {isPractice && result && <button onClick={onRestart}>다시 연습하기</button>}
         {result && <button onClick={onHome}>학생 홈으로</button>}
       </div>}
       {error && <div className="metro-error" role="alert">{error}<button disabled={saving} onClick={() => persist(finished)}>기록 저장 다시 시도</button></div>}

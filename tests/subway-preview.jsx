@@ -4,13 +4,20 @@ import SubwayGameView from '../src/components/views/SubwayGameView.jsx';
 import SubwayLeaderboard from '../src/components/teacher/SubwayLeaderboard.jsx';
 import SubwayRecallView from '../src/components/views/SubwayRecallView.jsx';
 import { LINE_4 } from '../src/utils/subway.js';
+import { createSubwayPracticeRoom } from '../src/utils/subway.js';
+import PracticeSelectionView from '../src/components/views/PracticeSelectionView.jsx';
 import '../src/styles/global.css';
 
 const params = new URLSearchParams(location.search);
 const start = Date.now() - (params.has('expired') ? 301000 : 0);
 let attempts = 0;
 const Game = params.has('recall') ? SubwayRecallView : SubwayGameView;
-createRoot(document.getElementById('root')).render(params.has('leaderboard') ? <SubwayLeaderboard
+function PracticePreview() {
+  const [room, setRoom] = React.useState(null);
+  const [nickname, setNickname] = React.useState('테스트');
+  return room ? <SubwayGameView key={room.id} room={room} isPractice nickname={nickname} onHome={() => setRoom(null)} onRestart={() => setRoom(createSubwayPracticeRoom())} submitRun={() => { throw new Error('Practice must not submit'); }} /> : <PracticeSelectionView nickname={nickname} setNickname={setNickname} onTyping={() => {}} onSubway={() => setRoom(createSubwayPracticeRoom())} onBack={() => {}} />;
+}
+createRoot(document.getElementById('root')).render(params.has('practice') ? <PracticePreview /> : params.has('leaderboard') ? <SubwayLeaderboard
   room={{ id: 'preview', entryType: 'class', status: 'playing', expiresAt: start - 1, subway: { line: '4', from: '진접', to: '동대문', practice: params.has('recall') ? 'recall' : 'copy' } }}
   students={[{ id: 's1', name: '입장 학생' }, { id: 's2', name: '미입장 학생 이름' }]}
   currentTime={Date.now()} startRoomGame={() => {}} requestScoreSync={() => {}}

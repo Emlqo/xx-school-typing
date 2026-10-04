@@ -2,6 +2,12 @@
 export const LINE_4 = ['진접', '오남', '별내별가람', '불암산', '상계', '노원', '창동', '쌍문', '수유', '미아', '미아사거리', '길음', '성신여대입구', '한성대입구', '혜화', '동대문', '동대문역사문화공원', '충무로', '명동', '회현', '서울', '숙대입구', '삼각지', '신용산', '이촌', '동작', '총신대입구', '사당', '남태령', '선바위', '경마공원', '대공원', '과천', '정부과천청사', '인덕원', '평촌', '범계', '금정', '산본', '수리산', '대야미', '반월', '상록수', '한대앞', '중앙', '고잔', '초지', '안산', '신길온천', '정왕', '오이도'];
 export const DEFAULT_SUBWAY_ROUTE = { line: '4', from: '진접', to: '노원', practice: 'memory', previewSeconds: 15 };
 
+export function createSubwayPracticeRoom(now = Date.now()) {
+  return { id: `local-subway-${now}`, mode: 'subway', duration: 120, status: 'playing', focusGuardEnabled: false,
+    startedAt: now, expiresAt: now + 135000,
+    subway: { line: '4', from: '진접', to: '오이도', practice: 'memory', previewSeconds: 15 } };
+}
+
 export function subwayPreviewMs(room) {
   if (room?.mode !== 'subway' || !(room?.subway?.practice === 'memory' || (room?.subway?.practice === 'recall' && room.subway.previewEnabled === true))) return 0;
   const seconds = Number(room.subway.previewSeconds ?? 15);
