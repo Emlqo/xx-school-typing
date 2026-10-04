@@ -23,10 +23,12 @@ import { KOREAN_WORDS, ENGLISH_WORDS } from './constants/words.js';
 import { LOCAL_QUIZZES } from './constants/quizzes.js';
 import {
   getCosmeticById,
+  getScoreBoosterBonus,
   HALL_OF_FAME_TITLE_IDS,
   HALL_OF_FAME_TITLE_ID_LIST,
 } from './constants/cosmetics.js';
 import { FIRESTORE_PATHS } from './constants/firestorePaths.js';
+import { SHOP_SEASON } from './utils/gacha.js';
 import { db, signInTeacherWithGoogle, signOutFirebaseUser } from './services/firebaseClient.js';
 import {
   activateDuelBooster,
@@ -309,13 +311,13 @@ export default function App() {
   const shopClassId = view === 'teacher'
     ? selectedClassId
     : studentProfile?.classId || selectedOpenClassRoom?.classId || '';
-  const { shopItems, refreshShopItems } = useShopItems({
+  const { shopItems, refreshShopItems, applyShopPurchase } = useShopItems({
     user: scopedUser,
     view,
     classId: shopClassId,
     isPracticeMode,
     enabled: firestoreReadsEnabled
-      && (view === 'login' || (view === 'teacher' && teacherSection === 'shop')),
+      && ((view === 'login' && Boolean(studentProfile?.id)) || (view === 'teacher' && teacherSection === 'shop')),
   });
   const { shopPurchases } = useShopPurchases({
     user: scopedUser,
@@ -1294,8 +1296,9 @@ export default function App() {
 
     setBoosterActive(true);
     setBoosterAvailable(false);
-    setBoosterTimeLeft(GAME_RULES.boosterDuration);
-  }, [activeDuel?.id, boosterActive, boosterAvailable, currentScoreDocId, isDuelMode, myDuelScore, scores, studentProfile?.id]);
+    const bonus = getScoreBoosterBonus(myInfo, isPracticeMode);
+    setBoosterTimeLeft(GAME_RULES.boosterDuration + bonus);
+  }, [activeDuel?.id, boosterActive, boosterAvailable, currentScoreDocId, isDuelMode, isPracticeMode, myDuelScore, scores, studentProfile?.id]);
 
   useStudentRoomWatcher({
     user,
@@ -2428,11 +2431,11 @@ export default function App() {
     }
 
     try {
-      const result = await buyStudentShopItem(normalizedStudent.id, shopItem.id);
+      const result = await buyStudentShopItem(normalizedStudent.id, shopItem.id, shopItem.price);
       if (result?.profile && studentProfile?.id === normalizedStudent.id) {
         setStudentProfile((previous) => normalizeClassStudent({ ...previous, ...result.profile }));
       }
-      await refreshShopItems();
+      applyShopPurchase(result);
       return result;
     } catch (error) {
       console.error(error);
@@ -2449,13 +2452,13 @@ export default function App() {
 
   const handleSaveShopItem = async (itemData, editingItemId = null) => {
     if (!requireTeacherAccess()) return false;
-    if (!selectedClassId) {
-      alert('상품을 등록할 학급을 선택해주세요.');
+    if (itemData.itemType === 'cosmetic' && getCosmeticById(itemData.cosmeticId)?.retired) {
+      alert('판매 종료된 장식입니다. 기존 보유자는 계속 장착할 수 있습니다.');
       return false;
     }
-
     const normalizedItem = {
-      classId: selectedClassId,
+      season: SHOP_SEASON,
+      scope: 'school',
       name: String(itemData.name || '').trim(),
       description: String(itemData.description || '').trim(),
       price: Math.max(0, Math.floor(Number(itemData.price) || 0)),
@@ -2508,14 +2511,14 @@ export default function App() {
 
   const handleBuyStockItem = async (student, item) => {
     const normalizedStudent = normalizeClassStudent(student);
-    if (!normalizedStudent.id || !item?.id || item.classId !== normalizedStudent.classId) return;
+    if (!normalizedStudent.id || !item?.id || item.season !== SHOP_SEASON || item.scope !== 'school') return;
 
     try {
-      const result = await buyStudentShopItem(normalizedStudent.id, item.id);
+      const result = await buyStudentShopItem(normalizedStudent.id, item.id, item.price);
       if (result?.profile && studentProfile?.id === normalizedStudent.id) {
         setStudentProfile((previous) => normalizeClassStudent({ ...previous, ...result.profile }));
       }
-      await refreshShopItems();
+      applyShopPurchase(result);
       alert(`${item.name} 구매가 완료되었습니다.`);
       return result;
     } catch (error) {
@@ -3297,6 +3300,7 @@ export default function App() {
   return (
     <>
       <LoginView
+        onShopProfileChange={(profile) => setStudentProfile(previous => previous?.id === profile.id ? normalizeClassStudent({ ...previous, ...profile, className: profile.className || previous.className }) : previous)}
         announcements={announcements}
         showAnnouncementModal={showAnnouncementModal}
         setShowAnnouncementModal={setShowAnnouncementModal}

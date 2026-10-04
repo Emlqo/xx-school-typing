@@ -1,0 +1,47 @@
+.shop-button,.shop-button-secondary { padding:10px 16px;border-radius:8px;font-weight:800;line-height:1.35; }
+.shop-button { background:#0f766e;color:white;border:1px solid #0f766e; }
+.shop-button-secondary { background:white;color:#155e75;border:1px solid #99c8c5; }
+.shop-button:disabled,.shop-button-secondary:disabled { opacity:.5;cursor:not-allowed; }
+.gacha-shop { max-width:900px;margin:0 auto; }
+.gacha-machine { max-width:520px;margin:0 auto;padding:12px 8px 0; }
+.gacha-marquee { display:flex;align-items:center;flex-wrap:wrap;justify-content:center;gap:10px;color:#174d46;text-align:center; }
+.gacha-marquee>span:first-child { width:100%;font-size:12px;font-weight:900;letter-spacing:0; }
+.gacha-marquee h3 { font-size:28px;font-weight:900; }
+.gacha-price { color:#123f3a;background:#ffe492;padding:5px 10px;border-radius:4px;font-weight:900; }
+.gacha-machine-stage { position:relative;width:100%;aspect-ratio:500/580; }
+.gacha-machine-art { display:block;width:100%;height:100%;overflow:visible; }
+.gacha-crank-button { position:absolute;left:59%;top:74%;width:21%;aspect-ratio:1;border-radius:50%;padding:0;border:3px solid #53736c;background:linear-gradient(135deg,#f3fff5,#b1c3ba 45%,#e3eee6 62%,#87988e);box-shadow:0 4px 0 #8e3939,0 6px 9px #50242133;cursor:pointer;transition:box-shadow .18s ease; }
+.gacha-crank-button:not(:disabled):hover { box-shadow:0 4px 0 #8e3939,0 7px 12px #50242155; }
+.gacha-crank-button:not(:disabled):active { box-shadow:0 2px 0 #8e3939,inset 0 2px 4px #405d4933; }
+.gacha-crank-button:focus-visible { outline:4px solid #167cad;outline-offset:5px; }
+.gacha-crank-button:disabled { cursor:not-allowed; }
+.gacha-machine:not(.is-spinning) .gacha-crank-button:disabled { opacity:.65; }
+.gacha-crank-face { display:block;position:absolute;inset:9%;border-radius:50%;border:2px solid #57776c;background:#cce1d6;box-shadow:inset 0 2px 7px #48675c77; }
+.gacha-crank-grip { position:absolute;inset:34% -9%;border-radius:12px;background:linear-gradient(#568d7a,#164e41 45%,#103e35 55%,#327965);border:2px solid #164536;box-shadow:0 5px 4px #26453455; }
+.gacha-crank-screw { position:absolute;inset:40%;border-radius:50%;background:#e4ecd1;border:2px solid #829b85; }
+.gacha-crank-screw::after { content:'';position:absolute;left:15%;right:15%;top:45%;height:2px;background:#7e8f79;transform:rotate(-30deg); }
+.gacha-turn-caption { position:absolute;left:52%;right:14%;top:92%;text-align:center;color:#fffbe8;font-size:14px;font-weight:900;pointer-events:none; }
+/* Motion ends at its rest pose before the existing 3.2-second reveal gate. */
+.is-spinning .gacha-crank-face { animation:gacha-crank-turn 3.1s linear both; }
+.gacha-chamber-capsule { transform-box:fill-box;transform-origin:center;filter:drop-shadow(0 2px 1px #234b4520); }
+.is-spinning .gacha-chamber-capsule { animation:gacha-capsule-tumble 3.1s ease-in-out both; }
+.gacha-dispensed-capsule { animation:gacha-capsule-drop .95s linear both; }
+.capsule-opening .capsule-top { transform-box:fill-box;transform-origin:15% 100%;animation:gacha-capsule-open .65s 1s cubic-bezier(.2,.7,.2,1) both; }
+.gacha-capsule-shadow { transform-box:fill-box;transform-origin:center;animation:gacha-shadow-land .95s linear both; }
+.gacha-winning-ticket { display:flex;flex-direction:column;gap:6px;animation:gacha-result-reveal .45s 1.3s both; }
+.gacha-winning-ticket>span:first-child { color:#fff1a5;font-weight:900; }
+.gacha-tray { min-height:116px;margin-top:4px;padding:14px;background:#174c43;border:1px solid #699c8d;border-radius:8px;color:#eaffed;display:flex;flex-direction:column;justify-content:center;gap:5px;text-align:center;overflow-wrap:anywhere; }
+.gacha-tray strong { font-size:22px; }
+.gacha-tray span { font-size:14px; }
+.gacha-prize-list { display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:10px;margin:16px 0; }
+.gacha-prize { background:#fff;border:1px solid #a5cbbd;border-radius:8px;padding:14px;display:grid;grid-template-columns:1fr auto;gap:8px;overflow-wrap:anywhere; }
+.gacha-prize small { grid-column:1 / -1;color:#526760; }
+.gacha-admin-field { width:100%;min-width:0;border:1px solid #adc9c1;border-radius:6px;padding:10px;background:white; }
+@keyframes gacha-crank-turn { 0%{transform:rotate(0)} 12%{transform:rotate(25deg)} 30%{transform:rotate(180deg)} 46%{transform:rotate(320deg)} 52%{transform:rotate(360deg)} 68%{transform:rotate(510deg)} 85%{transform:rotate(685deg)} 95%,100%{transform:rotate(720deg)} }
+@keyframes gacha-capsule-tumble { 0%,100%{transform:translate(0,0) rotate(0)} 18%{transform:translate(var(--capsule-sway),var(--capsule-lift)) rotate(var(--capsule-roll))} 35%{transform:translate(calc(var(--capsule-sway) * -.55),2px) rotate(calc(var(--capsule-roll) * -.4))} 53%{transform:translate(calc(var(--capsule-sway) * -.8),var(--capsule-lift)) rotate(calc(var(--capsule-roll) * -.8))} 72%{transform:translate(var(--capsule-sway),-5px) rotate(var(--capsule-roll))} 89%{transform:translate(2px,-3px) rotate(-4deg)} }
+@keyframes gacha-capsule-drop { 0%{transform:translate(-14px,-100px) rotate(-110deg);animation-timing-function:cubic-bezier(.5,0,1,1)} 48%{transform:translate(-6px,1px) rotate(-25deg);animation-timing-function:ease-out} 66%{transform:translate(4px,-13px) rotate(12deg);animation-timing-function:ease-in} 82%{transform:translate(7px,0) rotate(22deg);animation-timing-function:ease-out} 100%{transform:translate(0,0) rotate(0)} }
+@keyframes gacha-capsule-open { to{transform:translate(-5px,-12px) rotate(-30deg)} }
+@keyframes gacha-shadow-land { 0%{opacity:0;transform:scale(.35)} 48%{opacity:.65;transform:scale(1)} 66%{opacity:.35;transform:scale(.8)} 100%{opacity:.65;transform:scale(1)} }
+@keyframes gacha-result-reveal { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+@media(max-width:480px) { .gacha-machine { padding:8px 0 0; } .gacha-turn-caption { font-size:11px; } }
+@media(prefers-reduced-motion:reduce) { .is-spinning .gacha-crank-face,.is-spinning .gacha-chamber-capsule,.gacha-dispensed-capsule,.gacha-capsule-shadow,.capsule-opening .capsule-top,.gacha-winning-ticket { animation:none; } }

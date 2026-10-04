@@ -142,6 +142,7 @@ export default function LoginView({
   onBuyStockItem = async () => null,
   onEquipCosmetic = async () => null,
   onRefreshStudentProfile = async () => null,
+  onShopProfileChange = () => {},
   onOpenAssessment = () => {},
 }) {
   const secondSemesterDay = calculateSecondSemesterDay();
@@ -228,6 +229,8 @@ export default function LoginView({
         </div>
       </div>
       <StudentHomeShopPanel
+        key={studentProfile?.id || 'no-student'}
+        onProfileChange={onShopProfileChange}
         student={studentProfile}
         shopItems={shopItems}
         onBuyCosmetic={onBuyCosmetic}

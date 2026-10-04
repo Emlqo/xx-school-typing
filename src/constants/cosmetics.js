@@ -1,6 +1,20 @@
 export const COSMETIC_ITEMS = [
+  ...[
+    ['neon_glitch', '네온 글리치', 80, '청록과 분홍 잔상이 테두리를 스칩니다.'],
+    ['lightning_core', '번개 코어', 100, '푸른 전류가 테두리를 따라 흐릅니다.'],
+    ['stellar_orbit', '별빛 궤도', 120, '금빛 별들이 이름 주변을 공전합니다.'],
+    ['autumn_vortex', '단풍 회오리', 150, '단풍잎이 가장자리를 따라 흩날립니다.'],
+  ].map(([id, name, price, description]) => ({
+    id, name, price, season: 'autumn', boosterBonusSeconds: 5,
+    description: `${description} 장착 후 새로 참여하는 학급 일반 타자 경기에서 부스터 +5초 (중첩 불가).`,
+    previewClass: `cosmetic-preview cosmetic-season cosmetic-season-${id}`,
+    leaderboardClass: `cosmetic-row cosmetic-season-row cosmetic-season-${id}`,
+    badgeClass: `cosmetic-badge cosmetic-season-badge cosmetic-season-${id}`,
+    effectClass: `cosmetic-effect-season cosmetic-effect-${id}`,
+  })),
   {
     id: 'glow_teal',
+    retired: true,
     name: '청록빛 오라',
     description: '점수판에서 이름 주변에 시원한 청록빛이 은은하게 빛납니다.',
     price: 80,
@@ -11,6 +25,7 @@ export const COSMETIC_ITEMS = [
   },
   {
     id: 'border_forest',
+    retired: true,
     name: '숲속 테두리',
     description: '초록 숲길처럼 차분한 테두리로 기록을 강조합니다.',
     price: 100,
@@ -21,6 +36,7 @@ export const COSMETIC_ITEMS = [
   },
   {
     id: 'badge_summer',
+    retired: true,
     name: '여름 별 배지',
     description: '닉네임 옆에 여름 별처럼 반짝이는 배지 느낌을 더합니다.',
     price: 120,
@@ -31,6 +47,7 @@ export const COSMETIC_ITEMS = [
   },
   {
     id: 'shine_wave',
+    retired: true,
     name: '파도 반짝임',
     description: '파도처럼 푸른빛이 흐르는 시원한 강조 효과입니다.',
     price: 150,
@@ -96,4 +113,18 @@ export const HALL_OF_FAME_TITLE_ID_LIST = Object.values(HALL_OF_FAME_TITLE_IDS);
 
 export function getCosmeticById(cosmeticId) {
   return COSMETIC_ITEMS.find((item) => item.id === cosmeticId) || null;
+}
+
+export function isCosmeticForSale(id) {
+  const item = getCosmeticById(id);
+  return Boolean(item && !item.retired && item.category !== 'title');
+}
+
+export function getEquippedBoosterBonus(student) {
+  if (!Array.isArray(student?.ownedCosmetics) || !student.ownedCosmetics.includes(student.equippedCosmetic)) return 0;
+  return getCosmeticById(student.equippedCosmetic)?.boosterBonusSeconds === 5 ? 5 : 0;
+}
+
+export function getScoreBoosterBonus(score, practice = false) {
+  return !practice && score?.entryType === 'class' && score.gameType === 'typing' && score.boosterBonusSeconds === 5 ? 5 : 0;
 }

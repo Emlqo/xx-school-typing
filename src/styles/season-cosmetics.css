@@ -1,0 +1,83 @@
+/* Animated artwork stays behind readable content and never intercepts input. */
+.cosmetic-season, .cosmetic-season-row { --season-ink:#087e91; --season-accent:#ec4899; --season-art:linear-gradient(90deg,transparent,#ec4899 40%,#12bdd1 60%,transparent); }
+.cosmetic-season { background:#fff!important; border:2px solid var(--season-ink)!important; box-shadow:inset 0 0 18px color-mix(in srgb,var(--season-ink) 13%,transparent),0 2px 9px #16352c14; isolation:isolate; }
+.cosmetic-season > * { position:relative; z-index:2; }
+.cosmetic-season::before, .cosmetic-season::after, .cosmetic-effect-season::before, .cosmetic-effect-season::after { content:''; position:absolute; pointer-events:none; width:auto;height:20px;inset:0 0 auto;z-index:1;background:var(--season-art) repeat-x left center / 150px 20px;opacity:.85;animation:season-stream 7s linear infinite;transform:none; }
+.cosmetic-season::after,.cosmetic-effect-season::after { inset:auto 0 0;animation-direction:reverse; }
+.cosmetic-effect-season { inset:2px!important;border-radius:7px;opacity:1;overflow:hidden;border:1px solid var(--season-ink); }
+.cosmetic-season-row { background:#fff!important;box-shadow:inset 3px 0 var(--season-ink)!important; }
+.cosmetic-season-row td { background:transparent!important; }
+.cosmetic-season-badge { color:var(--season-ink)!important;background:#fff!important;border:1px solid var(--season-ink);border-radius:5px;text-shadow:none; }
+.cosmetic-season-neon_glitch { --season-ink:#087e91;--season-accent:#d52d79;--season-art:repeating-linear-gradient(90deg,transparent 0 18px,#10bfd4 18px 45px,transparent 45px 55px,#e83691 55px 75px,transparent 75px 110px); }
+.cosmetic-season-neon_glitch::before,.cosmetic-season-neon_glitch::after,.cosmetic-effect-neon_glitch::before,.cosmetic-effect-neon_glitch::after { height:7px;animation:season-glitch 5s steps(1,end) infinite; }
+.cosmetic-season-neon_glitch::after,.cosmetic-effect-neon_glitch::after { animation-delay:-2.5s; }
+.cosmetic-season-lightning_core { --season-ink:#176ec0;--season-accent:#bc8315;--season-art:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 20'%3E%3Cpath d='M0 11L18 11 26 3 33 16 46 7 56 11 79 11 88 4 97 17 110 8 124 11 150 11' fill='none' stroke='%237bceff' stroke-width='5' opacity='.45'/%3E%3Cpath d='M0 11L18 11 26 3 33 16 46 7 56 11 79 11 88 4 97 17 110 8 124 11 150 11' fill='none' stroke='%231e87dc' stroke-width='1.5'/%3E%3Cpath d='M28 1L22 9 29 8 24 18' fill='none' stroke='%23dfa522' stroke-width='2'/%3E%3C/svg%3E"); }
+.cosmetic-season-lightning_core::before,.cosmetic-season-lightning_core::after,.cosmetic-effect-lightning_core::before,.cosmetic-effect-lightning_core::after { animation-duration:2.8s; }
+.cosmetic-season-stellar_orbit { --season-ink:#827021;--season-accent:#b68a2e;--season-art:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 20'%3E%3Cpath d='M0 13Q40 0 80 12T150 11' fill='none' stroke='%23cab272' stroke-width='.9'/%3E%3Cpath d='M30 1L32 8 39 10 32 12 30 19 28 12 21 10 28 8Z' fill='%23ba9328'/%3E%3Cpath d='M108 4L110 8 115 10 110 12 108 16 106 12 101 10 106 8Z' fill='%238b9caa'/%3E%3C/svg%3E"); }
+.cosmetic-season-stellar_orbit::before,.cosmetic-season-stellar_orbit::after,.cosmetic-effect-stellar_orbit::before,.cosmetic-effect-stellar_orbit::after { animation-duration:12s; }
+.cosmetic-season-autumn_vortex { --season-ink:#a54839;--season-accent:#c99622;--season-art:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 20'%3E%3Cpath d='M20 1L23 6 28 3 27 8 34 9 28 13 29 17 23 15 21 20 19 14 12 15 14 10 8 6 16 7Z' fill='%23c24639'/%3E%3Cpath d='M96 17Q80 13 86 4Q93 -1 96 8Q100 -2 107 4Q115 12 96 17L96 20' fill='%23dcaa2d'/%3E%3C/svg%3E"); }
+@keyframes season-stream { to { background-position-x:150px; } }
+@keyframes season-glitch { 0%,84%,100%{transform:translateX(0);opacity:.85} 86%{transform:translateX(6px);opacity:1} 90%{transform:translateX(-5px)} 94%{transform:translateX(3px)} }
+/* Compact leaderboard effects are slower; no per-frame JavaScript or DB work. */
+.cosmetic-season-row .cosmetic-effect-season::before,.cosmetic-season-row .cosmetic-effect-season::after { animation-duration:10s;height:12px;background-size:150px 12px; }
+/* Full-surface effects share the same artwork in shop, profile and score rows. */
+.cosmetic-season {
+  background:linear-gradient(115deg,color-mix(in srgb,var(--season-ink) 20%,white),#fff 48%,color-mix(in srgb,var(--season-accent) 24%,white))!important;
+  box-shadow:inset 0 0 25px color-mix(in srgb,var(--season-ink) 24%,transparent),0 0 0 1px var(--season-accent),0 0 16px color-mix(in srgb,var(--season-ink) 35%,transparent);
+}
+.cosmetic-season > :not(.cosmetic-effect) { text-shadow:0 1px 3px white,0 0 7px white; }
+.cosmetic-season button { text-shadow:none; }
+.cosmetic-season::before,.cosmetic-effect-season::before {
+  inset:-30px -80px;height:auto;width:auto;opacity:.65;
+  background-size:240px 64px;background-repeat:repeat;
+  mask-image:linear-gradient(90deg,#000, #0007 25%,#0002 48%,#0007 75%,#000);
+  animation:season-art-drift 8s linear infinite;
+}
+.cosmetic-season::after,.cosmetic-effect-season::after {
+  inset:0;height:auto;width:auto;opacity:.7;
+  background:linear-gradient(115deg,transparent 15%,color-mix(in srgb,var(--season-accent) 45%,transparent) 24%,#fff 26%,transparent 29% 65%,color-mix(in srgb,var(--season-ink) 40%,transparent) 74%,transparent 78%);
+  background-size:240% 100%;animation:season-energy-sweep 4s ease-in-out infinite;
+  box-shadow:inset 0 0 12px var(--season-ink);
+}
+.cosmetic-season > .cosmetic-effect-season { position:absolute;z-index:1; }
+.cosmetic-season:has(> .cosmetic-effect-season)::before,
+.cosmetic-season:has(> .cosmetic-effect-season)::after { display:none; }
+.cosmetic-effect-season { border:2px solid var(--season-ink);background:linear-gradient(110deg,color-mix(in srgb,var(--season-ink) 16%,transparent),transparent 45%,color-mix(in srgb,var(--season-accent) 20%,transparent)); }
+.cosmetic-season-row { background:linear-gradient(100deg,color-mix(in srgb,var(--season-ink) 16%,white),white 55%,color-mix(in srgb,var(--season-accent) 20%,white))!important; }
+.cosmetic-season-badge { box-shadow:0 0 10px color-mix(in srgb,var(--season-accent) 50%,transparent);border-width:2px; }
+.cosmetic-season-neon_glitch::before,.cosmetic-effect-neon_glitch::before {
+  background:repeating-linear-gradient(0deg,transparent 0 20px,#08cadc88 20px 23px,transparent 23px 38px,#f02a9888 38px 43px),var(--season-art);
+  background-size:100% 63px,190px 35px;
+  transform:skewX(-18deg);animation:season-neon-drift 3.4s linear infinite;
+}
+.cosmetic-season-neon_glitch::after,.cosmetic-effect-neon_glitch::after { animation-duration:2.8s;animation-delay:-1s;border-left:4px solid #08cadc;border-right:4px solid #f02a98; }
+.cosmetic-season-lightning_core::before,.cosmetic-effect-lightning_core::before {
+  background-size:300px 105px;opacity:.8;filter:drop-shadow(0 0 4px #159eff);animation:season-electric-flow 2.4s linear infinite;
+}
+.cosmetic-season-lightning_core::after,.cosmetic-effect-lightning_core::after { border:2px solid #80dfff;animation-duration:3s; }
+.cosmetic-season-stellar_orbit::before,.cosmetic-effect-stellar_orbit::before {
+  background-size:200px 70px;filter:drop-shadow(0 0 3px #ffce47);opacity:.8;animation:season-art-drift 10s linear infinite;
+}
+.cosmetic-season-stellar_orbit::after,.cosmetic-effect-stellar_orbit::after {
+  inset:-45% -8%;border:0;box-shadow:none;opacity:.6;
+  background:repeating-radial-gradient(ellipse at center,transparent 0 36px,#bc932c99 37px 39px,transparent 40px 62px,#ffffff 63px 65px,transparent 66px 93px);
+  mask-image:linear-gradient(90deg,#000,transparent 40% 60%,#000);
+  animation:season-orbit-turn 18s linear infinite;
+}
+.cosmetic-season-autumn_vortex::before,.cosmetic-effect-autumn_vortex::before {
+  background-size:220px 54px;opacity:.8;filter:drop-shadow(2px 3px 1px #923c2625);animation:season-leaf-wind 6s linear infinite;
+}
+.cosmetic-season-autumn_vortex::after,.cosmetic-effect-autumn_vortex::after {
+  background:var(--season-art) repeat;background-size:330px 92px;opacity:.35;
+  box-shadow:none;inset:-70px -90px;animation:season-leaf-wind 10s linear infinite reverse;
+  mask-image:linear-gradient(90deg,#000,transparent 38% 62%,#000);
+}
+.cosmetic-season-row .cosmetic-effect-season::before { height:auto;background-size:200px 48px;animation-duration:7s; }
+.cosmetic-season-row .cosmetic-effect-season::after { height:auto;animation-duration:9s; }
+@keyframes season-art-drift { from{transform:translate(-35px,-20px) rotate(-5deg)} to{transform:translate(45px,34px) rotate(-5deg)} }
+@keyframes season-energy-sweep { 0%{background-position:120% 0} 100%{background-position:-120% 0} }
+@keyframes season-neon-drift { 0%{background-position:0 0,0 0} 100%{background-position:0 63px,190px 0} }
+@keyframes season-electric-flow { 0%{background-position:0 0;transform:skewX(-10deg)} 50%{transform:skewX(8deg)} 100%{background-position:300px 0;transform:skewX(-10deg)} }
+@keyframes season-orbit-turn { from{transform:rotate(-15deg) scale(1)} to{transform:rotate(345deg) scale(1)} }
+@keyframes season-leaf-wind { from{transform:translate(-65px,-45px) rotate(-10deg)} to{transform:translate(65px,45px) rotate(8deg)} }
+@media(prefers-reduced-motion:reduce){ .cosmetic-season::before,.cosmetic-season::after,.cosmetic-effect-season::before,.cosmetic-effect-season::after { animation:none!important;transform:none!important; } }

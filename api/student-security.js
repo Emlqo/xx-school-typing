@@ -4,6 +4,9 @@ import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore';
 import { calculateAssessmentResult, createAssessmentSubmissionId } from '../src/utils/assessments.js';
 import { subwayRoute, subwayStart, subwayMillis, subwayHintPenalty, validSubwayAnswers } from '../src/utils/subway.js';
 import { REWARD_RULES } from '../src/constants/rewards.js';
+import { isCosmeticForSale, getEquippedBoosterBonus } from '../src/constants/cosmetics.js';
+import { createShopSeason2Actions } from '../server/shopSeason2.js';
+import { SHOP_SEASON } from '../src/utils/gacha.js';
 
 const APP_ID = 'xx-school-typing-app';
 const TEACHER_UID = String(process.env.TEACHER_UID || 'hnjJNGDuydcd4SfQ2Xq5cE6IujD3').trim();
@@ -604,6 +607,7 @@ async function joinClassGame(uid, body) {
         entryType: 'class',
         gameType: room.mode === 'subway' ? 'subway' : 'typing',
         equippedCosmetic: student.equippedCosmetic || null,
+        boosterBonusSeconds: room.mode === 'subway' ? 0 : getEquippedBoosterBonus(student),
         score: 0,
         cpm: 0,
         correctChars: 0,
@@ -696,18 +700,33 @@ async function buyStudentShopItem(uid, body) {
   await requireSession(uid, studentId);
   const studentRef = publicCollection(PATHS.classStudents).doc(studentId);
   const itemRef = publicCollection(PATHS.shopItems).doc(itemId);
-  const purchaseRef = publicCollection(PATHS.shopPurchases).doc();
+  const requestId = String(body.requestId || '');
+  if (!/^[a-zA-Z0-9_-]{16,80}$/.test(requestId)) throw new ApiError(400, 'api/invalid-argument', '새로고침 후 다시 구매해주세요.');
+  const purchaseRef = publicCollection(PATHS.shopPurchases).doc(`${studentId}_buy_${requestId}`);
   let profile;
+  let itemStock;
   await database().runTransaction(async (transaction) => {
-    const [studentSnapshot, itemSnapshot] = await Promise.all([transaction.get(studentRef), transaction.get(itemRef)]);
+    const [studentSnapshot, itemSnapshot, receipt] = await Promise.all([transaction.get(studentRef), transaction.get(itemRef), transaction.get(purchaseRef)]);
+    if (receipt.exists && studentSnapshot.exists) {
+      if (receipt.data().itemId !== itemId) throw new ApiError(409, 'api/failed-precondition', '구매 요청이 일치하지 않습니다.');
+      profile = safeProfile(studentId, studentSnapshot.data());
+      itemStock = itemSnapshot.exists ? itemSnapshot.data().stock : 0;
+      return;
+    }
     if (!studentSnapshot.exists || !itemSnapshot.exists) throw new ApiError(404, 'api/not-found', '학생 또는 상품을 찾을 수 없습니다.');
     const student = studentSnapshot.data();
     const item = itemSnapshot.data();
+    if (student.active === false) throw new ApiError(403, 'api/permission-denied', '비활성 학생은 상점을 이용할 수 없습니다.');
+    if (item.itemType === 'cosmetic' && !isCosmeticForSale(item.cosmeticId)) {
+      throw new ApiError(409, 'api/failed-precondition', '판매 종료되었거나 구매할 수 없는 장식입니다.');
+    }
     const points = Math.max(0, Number(student.totalPoints || 0));
     const price = Math.max(0, Number(item.price || 0));
     const stock = Math.max(0, Number(item.stock || 0));
+    if (!Number.isSafeInteger(price) || price < 1 || !Number.isSafeInteger(stock) || !Number.isSafeInteger(points)) throw new ApiError(409, 'api/failed-precondition', '상품 또는 포인트 설정을 확인해주세요.');
+    if (Number(body.expectedPrice) !== price) throw new ApiError(409, 'api/failed-precondition', '상품 가격이 변경되었습니다. 상점을 새로고침해주세요.');
     const owned = Array.isArray(student.ownedCosmetics) ? student.ownedCosmetics.filter(Boolean) : [];
-    if (item.classId !== student.classId) throw new ApiError(403, 'api/permission-denied', '다른 학급의 상품입니다.');
+    if (item.season !== SHOP_SEASON || item.scope !== 'school') throw new ApiError(409, 'api/failed-precondition', '시즌1 상품은 판매 종료되었습니다.');
     if (item.active === false) throw new ApiError(409, 'api/failed-precondition', '판매 중인 상품이 아닙니다.');
     if (stock < 1) throw new ApiError(409, 'api/resource-exhausted', '상품이 품절되었습니다.');
     if (points < price) throw new ApiError(409, 'api/failed-precondition', '포인트가 부족합니다.');
@@ -720,6 +739,7 @@ async function buyStudentShopItem(uid, body) {
     transaction.update(studentRef, updates);
     transaction.update(itemRef, { stock: stock - 1, updatedAt: FieldValue.serverTimestamp() });
     transaction.set(purchaseRef, {
+      season: SHOP_SEASON,
       itemId,
       itemName: item.name || '',
       itemType: item.itemType || 'stock',
@@ -730,12 +750,14 @@ async function buyStudentShopItem(uid, body) {
       quantity: 1,
       pointsSpent: price,
       status: 'completed',
+      deliveryStatus: item.itemType === 'cosmetic' ? 'not_required' : 'pending',
       userId: uid,
       createdAt: FieldValue.serverTimestamp(),
     });
     profile = safeProfile(studentId, { ...student, totalPoints: points - price, ownedCosmetics: nextOwned });
+    itemStock = stock - 1;
   });
-  return { profile };
+  return { profile, itemId, itemStock };
 }
 
 async function equipStudentCosmetic(uid, body) {
@@ -1961,6 +1983,7 @@ async function submitSubwayRun(uid, body) {
 }
 
 const actions = {
+  ...createShopSeason2Actions({ database, publicCollection, PATHS, requireTeacher, requireSession, requireString, safeProfile, ApiError, FieldValue, Timestamp }),
   allowGameReentry,
   reportGameScreenExit,
   submitSubwayRun,

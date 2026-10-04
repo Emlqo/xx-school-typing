@@ -1,5 +1,11 @@
 import { auth } from './firebaseClient.js';
 
+export const getGachaShop = (payload) => call('getGachaShop', payload);
+export const saveGachaShop = (payload) => call('saveGachaShop', payload);
+export const drawGacha = (payload) => call('drawGacha', payload);
+export const listShopHistory = (payload) => call('listShopHistory', payload);
+export const fulfillShopPurchase = (purchaseId) => call('fulfillShopPurchase', { purchaseId });
+
 export const submitSubwayRun = (scoreId, answers, hints = {}) => call('submitSubwayRun', { scoreId, answers, hints });
 
 async function call(action, payload = {}) {
@@ -32,7 +38,19 @@ export const verifyStudentLoginPin = (studentId, pin) => call('verifyStudentLogi
 export const setInitialStudentLoginPin = (studentId, pin) => call('setInitialStudentLoginPin', { studentId, pin });
 export const joinClassGame = (roomId, studentId) => call('joinClassGame', { roomId, studentId });
 export const joinGuestGame = (roomCode, nickname) => call('joinGuestGame', { roomCode, nickname });
-export const buyStudentShopItem = (studentId, itemId) => call('buyStudentShopItem', { studentId, itemId });
+export async function buyStudentShopItem(studentId, itemId, expectedPrice) {
+  const key = `shop-season2-buy-${studentId}-${itemId}`;
+  const pending = JSON.parse(localStorage.getItem(key) || 'null') || { studentId, itemId, expectedPrice, requestId: crypto.randomUUID() };
+  localStorage.setItem(key, JSON.stringify(pending));
+  try {
+    const result = await call('buyStudentShopItem', pending);
+    localStorage.removeItem(key);
+    return result;
+  } catch (error) {
+    if (['api/failed-precondition', 'api/invalid-argument', 'api/resource-exhausted', 'api/already-exists', 'api/not-found'].includes(error.code)) localStorage.removeItem(key);
+    throw error;
+  }
+}
 export const equipStudentCosmetic = (studentId, cosmeticId) => call('equipStudentCosmetic', { studentId, cosmeticId });
 export const finalizeStudentReward = (scoreId) => call('finalizeStudentReward', { scoreId });
 export const recordPracticeCompletion = (studentId, practiceRunId, durationSec, correctChars, cpm) => call(

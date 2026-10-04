@@ -31,7 +31,7 @@ function StudentShopPanel({
 
   const ownedCosmetics = Array.isArray(student.ownedCosmetics) ? student.ownedCosmetics : [];
   const visibleCosmetics = COSMETIC_ITEMS.filter((item) => (
-    item.category !== 'title' || ownedCosmetics.includes(item.id)
+    (!item.retired && item.category !== 'title') || ownedCosmetics.includes(item.id)
   ));
   const hasStudentPin = Boolean(student.hasPin || student.studentPin);
 
@@ -200,7 +200,7 @@ function StudentShopPanel({
                     <div className="text-xs text-gray-500 font-bold mt-1 leading-relaxed">{item.description}</div>
                   </div>
                   <div className="text-sm font-black text-emerald-700 bg-white/80 border border-white rounded-xl px-2 py-1 shrink-0">
-                    {item.category === 'title' ? '관리자 지급 칭호' : `${price}P`}
+                    {item.retired ? '판매 종료 · 보유' : item.category === 'title' ? '관리자 지급 칭호' : `${price}P`}
                   </div>
                 </div>
                 {!owned && (

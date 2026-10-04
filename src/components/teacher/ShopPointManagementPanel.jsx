@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { COSMETIC_ITEMS } from '../../constants/cosmetics.js';
 import { safeToLocaleNumber } from '../../utils/format.js';
+import GachaManagementPanel from './GachaManagementPanel.jsx';
 
 export default function ShopPointManagementPanel({
   classes = [],
@@ -60,7 +61,7 @@ export default function ShopPointManagementPanel({
     setItemActive(item.active !== false);
   };
 
-  const cosmeticShopItems = COSMETIC_ITEMS.map((cosmetic) => {
+  const cosmeticShopItems = COSMETIC_ITEMS.filter(cosmetic => !cosmetic.retired && cosmetic.category !== 'title').map((cosmetic) => {
     const savedItem = shopItems.find((item) => item.itemType === 'cosmetic' && item.cosmeticId === cosmetic.id);
     return {
       ...cosmetic,
@@ -103,7 +104,7 @@ export default function ShopPointManagementPanel({
     <div className="glass-box p-6 rounded-3xl border border-teal-100">
       <div className="flex flex-wrap items-start justify-between gap-3 mb-5">
         <div>
-          <h2 className="text-xl font-black text-teal-800 flex items-center gap-2">상점/포인트 관리</h2>
+          <h2 className="text-xl font-black text-teal-800 flex items-center gap-2">상점 시즌2 / 포인트 관리</h2>
           <p className="text-sm text-gray-500 font-bold mt-1">
             학급 학생의 포인트와 보유 장식을 직접 관리합니다.
           </p>
@@ -130,7 +131,7 @@ export default function ShopPointManagementPanel({
       <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-5 mb-8">
         <form onSubmit={submitShopItem} className="bg-white rounded-2xl border border-amber-100 p-5 space-y-3">
           <div>
-            <div className="text-xs font-black text-amber-600 tracking-widest">반별 재고 상품</div>
+            <div className="text-xs font-black text-amber-600">전교 공통 재고 상품</div>
             <h3 className="text-lg font-black text-gray-800">{isEditing ? '상품 수정' : '새 상품 등록'}</h3>
           </div>
           <input
@@ -178,7 +179,6 @@ export default function ShopPointManagementPanel({
           <div className="flex gap-2">
             <button
               type="submit"
-              disabled={!selectedClassId}
               className="flex-1 py-3 bg-amber-400 hover:bg-amber-500 disabled:bg-gray-300 text-amber-950 rounded-xl font-black"
             >
               {isEditing ? '수정 저장' : '상품 등록'}
@@ -212,7 +212,7 @@ export default function ShopPointManagementPanel({
                         재고 {safeToLocaleNumber(item.stock || 0)}개
                       </span>
                       <span className={item.active !== false ? 'text-teal-600' : 'text-gray-400'}>
-                        {item.active !== false ? '판매 중' : '판매 중지'}
+                        {item.isVirtual ? '미등록' : item.active !== false ? '판매 중' : '판매 중지'}
                       </span>
                     </div>
                   </div>
@@ -233,7 +233,8 @@ export default function ShopPointManagementPanel({
         </div>
       </div>
 
-      <h3 className="text-lg font-black text-teal-800 mb-4">학생 포인트 및 장식 관리</h3>
+      <GachaManagementPanel classes={classes} />
+      <h3 className="text-lg font-black text-teal-800 mb-4 mt-8">학생 포인트 및 장식 관리</h3>
       <div className="bg-white rounded-2xl border border-cyan-100 p-5 mb-8">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div>
@@ -241,7 +242,7 @@ export default function ShopPointManagementPanel({
             <h3 className="text-lg font-black text-gray-800">선택 학급 최근 구매 기록</h3>
           </div>
           <span className="text-xs font-black px-3 py-1 rounded-full bg-cyan-50 border border-cyan-100 text-cyan-700">
-            최근 {safeToLocaleNumber(shopPurchases.length)}건 (최대 100건)
+            최근 {safeToLocaleNumber(shopPurchases.length)}건 (최대 20건)
           </span>
         </div>
         {recentPurchases.length > 0 ? (
