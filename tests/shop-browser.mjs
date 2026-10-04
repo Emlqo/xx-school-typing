@@ -22,8 +22,9 @@ try {
   await page.getByRole('button', { name: '가챠샵 들어가기' }).click();
   await page.getByRole('button', { name: '100P로 뽑기' }).waitFor();
   assert.equal(await page.locator('.gacha-prize').count(), 3);
-  assert.match(await page.locator('.gacha-prize').filter({ hasText: '바삭바삭' }).textContent(), /0%.*품절 · 추첨 제외/);
-  assert.match(await page.locator('.gacha-prize').filter({ hasText: '다음 기회에' }).textContent(), /70%.*수량 제한 없음/);
+  assert.match(await page.locator('.gacha-prize').filter({ hasText: '바삭바삭' }).textContent(), /품절 · 추첨 제외/);
+  assert.match(await page.locator('.gacha-prize').filter({ hasText: '다음 기회에' }).textContent(), /수량 제한 없음/);
+  assert.doesNotMatch(await page.locator('.gacha-shop').textContent(), /확률|\d+%/);
   assert.equal(await page.getByRole('checkbox', { name: '효과음' }).isChecked(), true);
   await page.getByRole('button', { name: '100P로 뽑기' }).click();
   assert.equal(await page.getByRole('button', { name: '추첨 중...' }).isDisabled(), true);
