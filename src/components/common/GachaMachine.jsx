@@ -63,7 +63,7 @@ export default function GachaMachine({ busy, result, enabled, price, disabled, p
       <div className="gacha-turn-caption" aria-hidden="true">{busy ? '끼릭... 끼릭...' : '돌려서 뽑기'}</div>
     </div>
     <div className="gacha-tray" aria-live="polite">
-      {busy ? <><strong>캡슐을 고르고 있어요</strong><span>끼릭, 끼릭... 잠시만 기다려주세요.</span></> : result ? <div className="gacha-winning-ticket"><span>{result.outcome === 'won' ? '당첨!' : result.outcome === 'sold_out' ? '품절로 미당첨' : '지급 없는 결과'}</span><strong>{result.itemName}</strong><span>{result.pointsSpent}P 사용 · {result.outcome === 'won' ? '선생님께 상품을 받아주세요.' : '지급할 상품이 없습니다.'}</span></div> : <><strong>{enabled ? label : '지금은 준비 중입니다'}</strong><span>전교 공통 재고</span></>}
+      {busy ? <><strong>캡슐을 고르고 있어요</strong><span>끼릭, 끼릭... 잠시만 기다려주세요.</span></> : result ? <div className="gacha-winning-ticket"><span>{result.outcome === 'won' ? '당첨!' : result.outcome === 'sold_out' ? '품절로 미당첨' : '꽝 · 상품 미지급'}</span><strong>{result.itemName}</strong><span>{result.pointsSpent}P 사용 · {result.outcome === 'won' ? '선생님께 상품을 받아주세요.' : '지급할 상품이 없습니다.'}</span></div> : <><strong>{enabled ? label : '지금은 준비 중입니다'}</strong><span>전교 공통 재고</span></>}
     </div>
   </div>;
 }

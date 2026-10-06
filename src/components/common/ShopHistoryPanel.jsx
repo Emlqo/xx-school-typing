@@ -47,7 +47,7 @@ export default function ShopHistoryPanel({ studentId, teacher = false, classId =
         <div className="min-w-0 break-words">
           <div className="font-black">{teacher && `${item.className || classes.find(c => c.id === item.classId)?.name || '학급 미확인'} ${item.studentName} · `}{item.itemName}</div>
           <div className="text-sm text-gray-600">{new Date(item.createdAt).toLocaleString('ko-KR')} · {item.pointsSpent}P</div>
-          <div className="text-sm font-bold text-teal-700">{item.outcome === 'sold_out' ? '품절로 미당첨' : item.outcome === 'no_reward' ? '지급 없는 결과' : item.deliveryStatus === 'delivered' ? '지급 완료' : item.deliveryStatus === 'pending' ? '지급 대기' : '구매 완료'}</div>
+          <div className="text-sm font-bold text-teal-700">{item.outcome === 'sold_out' ? '품절로 미당첨' : item.outcome === 'no_reward' ? '꽝 · 상품 미지급' : item.deliveryStatus === 'delivered' ? '지급 완료' : item.deliveryStatus === 'pending' ? '지급 대기' : '구매 완료'}</div>
         </div>
         {teacher && item.deliveryStatus === 'pending' && <button type="button" disabled={busy} onClick={() => fulfill(item)} className="shop-button">지급 완료</button>}
       </article>)}
