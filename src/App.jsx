@@ -192,6 +192,8 @@ export default function App() {
   const [studentSessionChecked, setStudentSessionChecked] = useState(false);
   const [hallOfFameMonthKey, setHallOfFameMonthKey] = useState(() => getMonthKey(new Date()));
   const [isHallTitleBatchUpdating, setIsHallTitleBatchUpdating] = useState(false);
+  const [isClassPointsGranting, setIsClassPointsGranting] = useState(false);
+  const classPointsGrantLock = useRef(false);
   const [lastReward, setLastReward] = useState(() => getDefaultRewardState());
   const [scoreSaveFailed, setScoreSaveFailed] = useState(false);
   const [duelClassId, setDuelClassId] = useState('');
@@ -2575,6 +2577,46 @@ export default function App() {
 
   const normalizePoints = (value) => Math.max(0, Math.floor(Number(value) || 0));
 
+  const handleGrantClassPoints = async (amountInput) => {
+    if (!requireTeacherAccess() || classPointsGrantLock.current) return false;
+    const selectedClass = classes.find(item => item.id === selectedClassId);
+    const amount = Number(amountInput);
+    const recipients = classStudents.filter(student => student.classId === selectedClassId && student.active !== false);
+    if (!selectedClass || !recipients.length) {
+      alert('학급을 선택하고 학생 명단이 표시된 후 다시 시도해주세요.');
+      return false;
+    }
+    if (!Number.isSafeInteger(amount) || amount < 1 || amount > 1000000) {
+      alert('지급 포인트는 1~1,000,000 사이의 정수로 입력해주세요.');
+      return false;
+    }
+    if (recipients.length > 450) {
+      alert('한 번에 지급할 수 있는 학생 수는 450명입니다.');
+      return false;
+    }
+    if (!window.confirm(`${selectedClass.name} 학생 ${recipients.length}명에게 각각 ${amount.toLocaleString()}P를 지급할까요?\n총 ${(amount * recipients.length).toLocaleString()}P가 추가됩니다.`)) return false;
+    classPointsGrantLock.current = true;
+    setIsClassPointsGranting(true);
+    try {
+      // Increment preserves purchases/rewards committed concurrently with this grant.
+      const batch = writeBatch(db);
+      recipients.forEach(student => batch.update(getPublicDoc(db, APP_ID, FIRESTORE_PATHS.classStudents, student.id), {
+        totalPoints: increment(amount),
+        updatedAt: serverTimestamp(),
+      }));
+      await batch.commit();
+      alert(`${selectedClass.name} 학생 ${recipients.length}명에게 각각 ${amount.toLocaleString()}P 지급했습니다.`);
+      return true;
+    } catch (error) {
+      console.error(error);
+      alert('학급 포인트 지급을 완료하지 못했습니다. 학생 잔액을 확인한 후 다시 시도해주세요.');
+      return false;
+    } finally {
+      classPointsGrantLock.current = false;
+      setIsClassPointsGranting(false);
+    }
+  };
+
   const handleSetStudentPoints = async (studentId, nextPoints) => {
     if (!requireTeacherAccess()) return;
     if (!studentId) return;
@@ -3240,6 +3282,8 @@ export default function App() {
         handleResetClassStudentPins={handleResetClassStudentPins}
         handleSyncPublicRoster={handleSyncPublicRoster}
         handleSetStudentPoints={handleSetStudentPoints}
+        handleGrantClassPoints={handleGrantClassPoints}
+        isClassPointsGranting={isClassPointsGranting}
         handleAdjustStudentPoints={handleAdjustStudentPoints}
         handleGrantStudentCosmetic={handleGrantStudentCosmetic}
         handleRemoveStudentCosmetic={handleRemoveStudentCosmetic}

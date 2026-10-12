@@ -99,6 +99,8 @@ export default function TeacherDashboardView({
   handleResetClassStudentPins = () => {},
   handleSyncPublicRoster = () => {},
   handleSetStudentPoints = () => {},
+  handleGrantClassPoints = async () => false,
+  isClassPointsGranting = false,
   handleAdjustStudentPoints = () => {},
   handleGrantStudentCosmetic = () => {},
   handleRemoveStudentCosmetic = () => {},
@@ -329,6 +331,8 @@ export default function TeacherDashboardView({
             students={students}
             shopPurchases={shopPurchases}
             handleSetStudentPoints={handleSetStudentPoints}
+            handleGrantClassPoints={handleGrantClassPoints}
+            isClassPointsGranting={isClassPointsGranting}
             handleAdjustStudentPoints={handleAdjustStudentPoints}
             handleGrantStudentCosmetic={handleGrantStudentCosmetic}
             handleRemoveStudentCosmetic={handleRemoveStudentCosmetic}

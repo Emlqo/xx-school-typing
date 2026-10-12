@@ -9,6 +9,8 @@ export default function ShopPointManagementPanel({
   setSelectedClassId = () => {},
   students = [],
   handleSetStudentPoints = () => {},
+  handleGrantClassPoints = async () => false,
+  isClassPointsGranting = false,
   handleAdjustStudentPoints = () => {},
   handleGrantStudentCosmetic = () => {},
   handleRemoveStudentCosmetic = () => {},
@@ -19,6 +21,8 @@ export default function ShopPointManagementPanel({
   handleDeleteShopItem = () => {},
 }) {
   const selectedClass = classes.find((classItem) => classItem.id === selectedClassId) || null;
+  const [classGrantAmount, setClassGrantAmount] = useState('');
+  const classGrantCount = students.filter(student => student.classId === selectedClassId && student.active !== false).length;
   const [editingItemId, setEditingItemId] = useState(null);
   const [editingCosmeticId, setEditingCosmeticId] = useState('');
   const [itemName, setItemName] = useState('');
@@ -118,6 +122,7 @@ export default function ShopPointManagementPanel({
         <label className="text-xs text-gray-400 font-black block mb-2">관리할 학급</label>
         <select
           value={selectedClassId}
+          disabled={isClassPointsGranting}
           onChange={(event) => setSelectedClassId(event.target.value)}
           className="w-full px-4 py-3 border border-teal-200 rounded-xl outline-none focus:ring-2 focus:ring-teal-400 bg-white font-bold text-gray-700"
         >
@@ -272,6 +277,20 @@ export default function ShopPointManagementPanel({
       </div>
 
       <h3 className="text-lg font-black text-teal-800 mb-4">학생별 포인트 관리</h3>
+      <form className="mb-6 border-y border-teal-200 py-4" onSubmit={async event => {
+        event.preventDefault();
+        if (isClassPointsGranting) return;
+        if (await handleGrantClassPoints(classGrantAmount)) setClassGrantAmount('');
+      }}>
+        <h4 className="font-black text-teal-900">학급 전체 포인트 지급</h4>
+        <p className="mt-1 text-sm text-gray-600">{selectedClass?.name || '학급 미선택'} · 지급 대상 {classGrantCount}명</p>
+        <div className="mt-3 flex flex-wrap items-end gap-3">
+          <label className="font-bold text-sm text-gray-700">1인당 지급 포인트
+            <input type="number" min="1" max="1000000" step="1" required value={classGrantAmount} onChange={event => setClassGrantAmount(event.target.value)} disabled={isClassPointsGranting} className="block mt-1 w-48 max-w-full px-3 py-2 border border-teal-200 rounded-lg" />
+          </label>
+          <button type="submit" disabled={isClassPointsGranting || !selectedClass || !classGrantCount} className="px-4 py-2 rounded-lg bg-teal-700 text-white font-bold disabled:opacity-50">{isClassPointsGranting ? '지급 중...' : '학급 전체 지급'}</button>
+        </div>
+      </form>
       <div className="space-y-4">
         {students.map((student) => {
           const ownedCosmetics = Array.isArray(student.ownedCosmetics) ? student.ownedCosmetics : [];
