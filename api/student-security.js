@@ -1968,6 +1968,9 @@ async function submitSubwayRun(uid, body) {
     const penalty = subwayHintPenalty(hints);
     const updates = {
       gameType: 'subway',
+      subwayPractice: room.subway?.practice || 'copy',
+      subwayLine: String(room.subway?.line || '4'),
+      subwayRouteCount: route.length,
       ...(room.subway?.practice === 'recall' ? { subwayAnswers: answers } : {}),
       subwayHints: hints,
       subwayPenaltyMs: penalty,

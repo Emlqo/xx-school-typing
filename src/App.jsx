@@ -2731,7 +2731,7 @@ export default function App() {
 
   const handleRevokeHallOfFameTitles = async () => {
     if (!requireTeacherAccess() || isHallTitleBatchUpdating) return;
-    if (!window.confirm('현재 모든 학생이 보유한 MVP·퀴즈왕·스피드왕·꾸준왕 칭호를 회수할까요?\n일반 상점 장식은 유지됩니다.')) return;
+    if (!window.confirm('현재 모든 학생이 보유한 MVP·퀴즈왕·스피드왕·꾸준왕·암기왕 칭호를 회수할까요?\n일반 상점 장식은 유지됩니다.')) return;
 
     setIsHallTitleBatchUpdating(true);
     try {

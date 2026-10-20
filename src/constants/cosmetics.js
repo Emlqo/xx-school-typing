@@ -90,6 +90,17 @@ export const COSMETIC_ITEMS = [
     effectClass: 'cosmetic-effect-title-practice',
   },
   {
+    id: 'title_memory_king',
+    name: '암기왕',
+    description: '4호선의 역을 가장 많이 기억한 학생에게 주는 빛나는 노선 왕관입니다.',
+    price: 9999,
+    category: 'title',
+    previewClass: 'cosmetic-preview cosmetic-preview-title-memory',
+    leaderboardClass: 'cosmetic-row cosmetic-row-title-memory',
+    badgeClass: 'cosmetic-badge cosmetic-badge-title-memory',
+    effectClass: 'cosmetic-effect-title-memory',
+  },
+  {
     id: 'title_speed_king',
     name: '속도왕',
     description: '가장 빠른 CPM을 보여준 학생에게 주는 전광석화 칭호입니다.',
@@ -107,6 +118,7 @@ export const HALL_OF_FAME_TITLE_IDS = {
   quizKing: 'title_quiz_king',
   participationKing: 'title_practice_king',
   speedKing: 'title_speed_king',
+  memoryKing: 'title_memory_king',
 };
 
 export const HALL_OF_FAME_TITLE_ID_LIST = Object.values(HALL_OF_FAME_TITLE_IDS);

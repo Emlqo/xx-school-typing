@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import GachaShop from './GachaShop.jsx';
 import ShopHistoryPanel from './ShopHistoryPanel.jsx';
 import { SHOP_SEASON } from '../../utils/gacha.js';
+import MemoryKingEffect from './MemoryKingEffect.jsx';
 
 export default function StudentHomeShopPanel({
   student,
@@ -35,7 +36,7 @@ export default function StudentHomeShopPanel({
   return (
     <section className="glass-box rounded-3xl p-5 md:p-6 shadow-2xl border-2 border-cyan-100">
       <div className={`student-shop-profile relative isolate mb-5 rounded-lg border p-5 ${equipped?.previewClass || 'border-cyan-100 bg-white/70'}`}>
-        {equipped && <span className={`cosmetic-effect ${equipped.effectClass || 'cosmetic-effect-aura'}`} aria-hidden="true" />}
+        {equipped && (equipped.id === 'title_memory_king' ? <MemoryKingEffect /> : <span className={`cosmetic-effect ${equipped.effectClass || 'cosmetic-effect-aura'}`} aria-hidden="true" />)}
         <div className="cosmetic-name-content flex flex-wrap items-center justify-between gap-4">
         <div>
           <div className="text-xs font-black text-teal-700">MY PROFILE · 포인트 상점</div>

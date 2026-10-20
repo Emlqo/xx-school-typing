@@ -56,6 +56,10 @@ function compactRankingItem(item = {}) {
     firstScore: Number(item.firstScore || 0),
     lastScore: Number(item.lastScore || 0),
     growth: Number(item.growth || 0),
+    ...(typeof item.memoryCompleted === 'boolean' ? {
+      memoryCompleted: item.memoryCompleted,
+      memoryElapsedMs: Number(item.memoryElapsedMs || 0),
+    } : {}),
   };
 }
 
@@ -66,6 +70,7 @@ function compactHallOfFame(hallOfFame = {}) {
     classMvp: compactList(hallOfFame.classMvp),
     quizKing: compactList(hallOfFame.quizKing),
     speedKing: compactList(hallOfFame.speedKing),
+    memoryKing: compactList(hallOfFame.memoryKing),
     participationKing: compactList(hallOfFame.participationKing),
     growthKing: compactList(hallOfFame.growthKing),
   };

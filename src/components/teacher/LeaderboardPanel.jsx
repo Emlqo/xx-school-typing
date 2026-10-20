@@ -1,6 +1,7 @@
 import { safeToLocaleNumber } from '../../utils/format.js';
 import { getCosmeticById } from '../../constants/cosmetics.js';
 import SubwayLeaderboard from './SubwayLeaderboard.jsx';
+import MemoryKingEffect from '../common/MemoryKingEffect.jsx';
 
 export default function LeaderboardPanel({
   leaderboardScores = [],
@@ -154,7 +155,7 @@ export default function LeaderboardPanel({
                   </td>
                   <td className="py-3 px-4 font-bold text-gray-800 relative overflow-hidden">
                     {cosmetic && (
-                      <span className={`cosmetic-effect ${cosmetic.effectClass || 'cosmetic-effect-aura'}`} aria-hidden="true" />
+                      cosmetic.id === 'title_memory_king' ? <MemoryKingEffect /> : <span className={`cosmetic-effect ${cosmetic.effectClass || 'cosmetic-effect-aura'}`} aria-hidden="true" />
                     )}
                     <div className="cosmetic-name-content flex flex-wrap items-center gap-2">
                       <span>{score.nickname}</span>

@@ -1,9 +1,11 @@
 import { safeToLocaleNumber } from '../../utils/format.js';
+import { formatRaceTime } from '../../utils/subway.js';
 
 const defaultHallOfFame = {
   classMvp: [],
   quizKing: [],
   speedKing: [],
+  memoryKing: [],
   participationKing: [],
   growthKing: [],
 };
@@ -42,6 +44,7 @@ function RankingRow({
       <div className="text-right shrink-0">
         <div className="font-black text-pink-500 text-lg">{safeToLocaleNumber(value)}</div>
         <div className="text-xs text-gray-400 font-bold">{valueLabel}</div>
+        {typeof item.memoryCompleted === 'boolean' && <div className="text-xs font-bold text-sky-700 mt-1">{item.memoryCompleted ? `완주 ${formatRaceTime(item.memoryElapsedMs)}` : '미완주'}</div>}
       </div>
     </div>
   );
@@ -283,6 +286,12 @@ export default function HallOfFamePanel({
             description="월간 최고 CPM 기준"
             items={data.speedKing}
             valueLabel="CPM"
+          />
+          <RankingList
+            title="암기왕 TOP 10"
+            description="4호선 진접~오이도 순서 없이 맞히기 · 개수순, 완주 동점은 시간순, 미완주 동점은 이름순"
+            items={data.memoryKing}
+            valueLabel="개 / 51개"
           />
           <RankingList
             title="꾸준왕 TOP 10"
