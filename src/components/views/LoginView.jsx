@@ -5,20 +5,20 @@ import { REWARD_RULES } from '../../constants/rewards.js';
 import StudentHomeShopPanel from '../common/StudentHomeShopPanel.jsx';
 import StudentAssessmentBoard from '../common/StudentAssessmentBoard.jsx';
 
-const SECOND_SEMESTER_START = { year: 2026, monthIndex: 7, day: 18 };
+const EXAM_DATE = { year: 2026, monthIndex: 11, day: 7 };
 
-function calculateSecondSemesterDay() {
-  const today = new Date();
+function calculateExamDday(today = new Date()) {
   const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const semesterStart = new Date(
-    SECOND_SEMESTER_START.year,
-    SECOND_SEMESTER_START.monthIndex,
-    SECOND_SEMESTER_START.day,
+  const examStart = new Date(
+    EXAM_DATE.year,
+    EXAM_DATE.monthIndex,
+    EXAM_DATE.day,
   );
-  const diffDays = Math.round((todayStart.getTime() - semesterStart.getTime()) / 86400000);
+  const diffDays = Math.round((examStart.getTime() - todayStart.getTime()) / 86400000);
 
-  if (diffDays < 0) return `D-${Math.abs(diffDays)}`;
-  return `${diffDays + 1}일째`;
+  if (diffDays > 0) return `D-${diffDays}`;
+  if (diffDays === 0) return 'D-DAY';
+  return '시험 종료';
 }
 
 function formatAnnouncementDate(announcement) {
@@ -145,7 +145,7 @@ export default function LoginView({
   onShopProfileChange = () => {},
   onOpenAssessment = () => {},
 }) {
-  const secondSemesterDay = calculateSecondSemesterDay();
+  const examDday = calculateExamDday();
 
   return (
     <div className="min-h-screen spring-bg flex items-center justify-center p-4">
@@ -184,11 +184,11 @@ export default function LoginView({
           </p>
 
           <div className="mb-8 bg-white/80 border border-cyan-100 rounded-2xl px-5 py-4 shadow-sm">
-            <div className="text-xs font-black text-teal-600 tracking-widest mb-1">2학기 시작!</div>
+            <div className="text-xs font-black text-teal-600 tracking-widest mb-1">시험까지 남은 시간!</div>
             <div className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-sky-500 to-emerald-500">
-              {secondSemesterDay}
+              {examDday}
             </div>
-            <div className="text-xs font-bold text-gray-400 mt-1">개학일 2026년 8월 18일</div>
+            <div className="text-xs font-bold text-gray-400 mt-1">시험일 2026년 12월 7일</div>
           </div>
 
           <div className="space-y-4">
