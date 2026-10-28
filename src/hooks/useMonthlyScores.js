@@ -59,6 +59,7 @@ function compactRankingItem(item = {}) {
     ...(typeof item.memoryCompleted === 'boolean' ? {
       memoryCompleted: item.memoryCompleted,
       memoryElapsedMs: Number(item.memoryElapsedMs || 0),
+      ...(item.memoryTotal ? { memoryTotal: Number(item.memoryTotal), elementFromNumber: Number(item.elementFromNumber), elementToNumber: Number(item.elementToNumber) } : {}),
     } : {}),
   };
 }
@@ -71,6 +72,7 @@ function compactHallOfFame(hallOfFame = {}) {
     quizKing: compactList(hallOfFame.quizKing),
     speedKing: compactList(hallOfFame.speedKing),
     memoryKing: compactList(hallOfFame.memoryKing),
+    elementMemoryKing: compactList(hallOfFame.elementMemoryKing),
     participationKing: compactList(hallOfFame.participationKing),
     growthKing: compactList(hallOfFame.growthKing),
   };

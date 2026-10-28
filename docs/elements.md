@@ -1,0 +1,33 @@
+# 원소 암기
+
+- 교사 점수판의 게스트 방 생성 또는 학급 방 열기에서 `원소 암기`를 선택합니다.
+- 원자번호 1~118 안에서 시작/끝 번호, 암기 시간(5~300초), 기존 게임 제한시간을 설정합니다. 기본 범위는 1~20이며 21~40, 57~71 등 원하는 구간을 선택할 수 있습니다.
+- 순서대로 외우기는 원자번호 순서로 한글 이름을 입력합니다. 첫 힌트는 원소기호(+3초), 다음 힌트는 정답 이름(+5초 추가)를 공개합니다. 힌트 가산은 완주 기록에 포함되며 실제 제한시간을 줄이지 않습니다.
+- 순서 없이 많이 맞히기는 선택 범위 안의 한글 이름을 중복 없이 입력합니다. 기호와 번호는 답으로 인정하지 않습니다.
+- 종료 후 전체 원소 목록에 맞힘/못 맞힘을 표시합니다. 재입장은 마지막으로 서버에 저장된 진행과 힌트를 복원합니다.
+- 우주 연구소 화면은 로컬 `element-cosmos.webp` 배경(약 131KB), SVG 전자 궤도, CSS 정답 반응을 사용합니다. 배경과 효과는 Firebase 조회를 추가하지 않으며 동작 줄이기 설정을 따릅니다.
+- 원소 암기왕은 월간 학급 게임 중 순서 없이 모드의 학생별 최고 기록을 사용합니다. 정답 개수 내림차순, 완주 동점은 시간 오름차순, 미완주 동점은 이름순입니다. 각 기록의 원자번호 범위를 함께 표시합니다. 지하철 암기왕과 별도로 집계하고 같은 암기왕 칭호를 지급합니다.
+
+## 저장 및 트래픽
+
+기존 `typing_rooms` / `typing_scores`와 지하철 제출 API를 재사용합니다. 방의 `mode: subway`에 `subway.subject: elements`를 넣고 `fromNumber`, `toNumber`, `practice`, `previewSeconds`로 구분합니다. 기존 보상 제외·권한·재입장·방 감시 경로를 그대로 사용하기 위한 저장 형식입니다.
+
+최종 점수 문서에는 `memorySubject: elements`, `elementFromNumber`, `elementToNumber`를 추가하며 진행/정답/힌트/상태는 기존 `subway*` 필드를 사용합니다. 원소 데이터는 내장 상수입니다. 매 정답/힌트/타이머에는 DB 요청이 없으며 종료 또는 교사의 현황 가져오기 요청에만 기존 제출 API가 호출됩니다. 정상 제출은 기존처럼 점수/방 문서 2회 읽기와 점수 문서 1회 업데이트를 수행합니다. 구독 중인 학생/교사 화면은 해당 업데이트에 따른 읽기가 발생할 수 있습니다.
+
+명예의 전당은 기존 월간 조회 때 함께 계산하고 저장 문서에 `elementMemoryKing`을 추가합니다. 별도 조회나 상시 구독은 추가하지 않습니다. 기존에 저장된 월은 다음 기록 갱신 때 반영됩니다. 실제 Firestore Rules 및 인덱스 변경은 필요하지 않습니다.
+
+## 데이터 기준
+
+원자번호 1~118의 이름과 기호는 [비상교육 통합과학 주기율표](https://www.visang.com/upload/contents/23hswan/data/통합과학/통합과학_완자쌤의_비밀노트.pdf)와 [대한화학회 명명법](https://kchem.org/media?key=kcs%2Fhomepage%2Fiupacname1.pdf)을 기준으로 확인했습니다. 기존 학교 표기인 나트륨·칼륨은 유지합니다. 105번 Db는 대한화학회 표기인 두브늄을 사용합니다.
+
+## 로컬 미리보기
+
+- `/tests/elements-preview.html?study=1` 순서대로 모드 암기 화면
+- `/tests/elements-preview.html` 순서대로 모드 입력 화면
+- `/tests/elements-preview.html?recall=1&study=1` 순서 없이 모드
+- `/tests/elements-preview.html?teacher=1` 원소 설정
+- `/tests/elements-preview.html?leaderboard=1` 출석/순위 화면
+- `/tests/elements-preview.html?recall=1&study=1&from=21&to=40` 21~40번 구간
+- `/tests/elements-preview.html?recall=1&study=1&from=1&to=118` 전체 118개 구간
+
+미리보기는 모의 제출만 사용하며 실제 학생 기록을 변경하지 않습니다.

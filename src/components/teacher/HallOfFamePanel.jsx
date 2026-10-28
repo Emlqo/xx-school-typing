@@ -6,6 +6,7 @@ const defaultHallOfFame = {
   quizKing: [],
   speedKing: [],
   memoryKing: [],
+  elementMemoryKing: [],
   participationKing: [],
   growthKing: [],
 };
@@ -45,6 +46,7 @@ function RankingRow({
         <div className="font-black text-pink-500 text-lg">{safeToLocaleNumber(value)}</div>
         <div className="text-xs text-gray-400 font-bold">{valueLabel}</div>
         {typeof item.memoryCompleted === 'boolean' && <div className="text-xs font-bold text-sky-700 mt-1">{item.memoryCompleted ? `완주 ${formatRaceTime(item.memoryElapsedMs)}` : '미완주'}</div>}
+        {item.memoryTotal && <div className="text-xs text-gray-500 mt-1">{item.elementFromNumber}~{item.elementToNumber}번 · {item.memoryTotal}개 범위</div>}
       </div>
     </div>
   );
@@ -288,10 +290,16 @@ export default function HallOfFamePanel({
             valueLabel="CPM"
           />
           <RankingList
-            title="암기왕 TOP 10"
+            title="지하철 암기왕 TOP 10"
             description="4호선 진접~오이도 순서 없이 맞히기 · 개수순, 완주 동점은 시간순, 미완주 동점은 이름순"
             items={data.memoryKing}
             valueLabel="개 / 51개"
+          />
+          <RankingList
+            title="원소 암기왕 TOP 10"
+            description="순서 없이 많이 맞히기 · 정답 개수순, 완주 동점은 시간순, 미완주 동점은 이름순"
+            items={data.elementMemoryKing}
+            valueLabel="개"
           />
           <RankingList
             title="꾸준왕 TOP 10"

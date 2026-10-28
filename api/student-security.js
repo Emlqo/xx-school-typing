@@ -2,7 +2,8 @@ import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore';
 import { calculateAssessmentResult, createAssessmentSubmissionId } from '../src/utils/assessments.js';
-import { subwayRoute, subwayStart, subwayMillis, subwayHintPenalty, validSubwayAnswers } from '../src/utils/subway.js';
+import { subwayMillis, subwayHintPenalty, validSubwayAnswers } from '../src/utils/subway.js';
+import { isElementRoom, isValidElementConfig, memoryAnswers, memoryStart } from '../src/utils/memoryGame.js';
 import { REWARD_RULES } from '../src/constants/rewards.js';
 import { isCosmeticForSale, getEquippedBoosterBonus } from '../src/constants/cosmetics.js';
 import { createShopSeason2Actions } from '../server/shopSeason2.js';
@@ -1938,20 +1939,21 @@ async function submitSubwayRun(uid, body) {
     const roomSnapshot = await transaction.get(publicCollection(PATHS.rooms).doc(data.roomId));
     const room = roomSnapshot.data();
     if (!room || room.mode !== 'subway' || room.status !== 'playing') {
-      throw new ApiError(400, 'api/failed-precondition', '진행 중인 지하철 경기가 아닙니다.');
+      throw new ApiError(400, 'api/failed-precondition', '진행 중인 암기 경기가 아닙니다.');
     }
     if (['completed', 'timeout'].includes(data.subwayStatus)) {
       result = safeScore(snapshot.id, data);
       return;
     }
-    const route = subwayRoute(room.subway);
+    if (isElementRoom(room) && !isValidElementConfig(room.subway)) throw new ApiError(400, 'api/invalid-argument', '원소 범위 설정을 확인해주세요.');
+    const route = memoryAnswers(room);
     let answers = body.answers;
     if (!route.length || !validSubwayAnswers(route, answers, room.subway?.practice)) {
       throw new ApiError(400, 'api/invalid-argument', '노선 입력 순서가 올바르지 않습니다.');
     }
     if (room.subway?.practice === 'recall') answers = [...new Set([...(data.subwayAnswers || []).filter((name) => route.includes(name)), ...answers])];
     const now = Date.now();
-    const start = subwayStart(room);
+    const start = memoryStart(room);
     if (now < start) throw new ApiError(400, 'api/failed-precondition', '아직 출발 전입니다.');
     // The server receipt time is authoritative; client clocks cannot shorten a run.
     const expired = now > subwayMillis(room.expiresAt);
@@ -1968,6 +1970,8 @@ async function submitSubwayRun(uid, body) {
     const penalty = subwayHintPenalty(hints);
     const updates = {
       gameType: 'subway',
+      memorySubject: isElementRoom(room) ? 'elements' : 'subway',
+      ...(isElementRoom(room) ? { elementFromNumber: Number(room.subway.fromNumber), elementToNumber: Number(room.subway.toNumber) } : {}),
       subwayPractice: room.subway?.practice || 'copy',
       subwayLine: String(room.subway?.line || '4'),
       subwayRouteCount: route.length,

@@ -1,4 +1,5 @@
 import { LINE_4 } from './subway.js';
+import { elementRange } from './memoryGame.js';
 
 const TOP_LIMIT = 10;
 
@@ -266,7 +267,7 @@ export function calculateMemoryKing(monthlyScores = []) {
 
   for (const record of monthlyScores) {
     if (record.entryType !== 'class' || !record.classId || !record.studentId
-      || record.gameType !== 'subway' || record.screenExitDetected
+      || record.gameType !== 'subway' || record.memorySubject === 'elements' || record.screenExitDetected
       || record.excludedFromHallOfFame === true || record.roomDeleted === true
       || !['completed', 'timeout'].includes(record.subwayStatus)) continue;
     // Legacy recall records uniquely contain subwayAnswers; ordered modes do not.
@@ -292,12 +293,38 @@ export function calculateMemoryKing(monthlyScores = []) {
   return [...bestByStudent.values()].sort(compare).slice(0, TOP_LIMIT);
 }
 
+export function calculateElementMemoryKing(monthlyScores = []) {
+  const bestByStudent = new Map();
+  const compare = (a, b) => b.value - a.value
+    || (a.memoryCompleted && b.memoryCompleted ? a.memoryElapsedMs - b.memoryElapsedMs : 0)
+    || a.nickname.localeCompare(b.nickname, 'ko') || a.studentId.localeCompare(b.studentId);
+  for (const record of monthlyScores) {
+    if (record.entryType !== 'class' || !record.classId || !record.studentId || record.gameType !== 'subway'
+      || record.memorySubject !== 'elements' || record.subwayPractice !== 'recall' || record.screenExitDetected
+      || record.excludedFromHallOfFame || record.roomDeleted || !['completed', 'timeout'].includes(record.subwayStatus)
+      || !Array.isArray(record.subwayAnswers)) continue;
+    const items = elementRange({ fromNumber: record.elementFromNumber, toNumber: record.elementToNumber });
+    if (!items.length || record.subwayAnswers.some(name => !items.some(item => item.name === name))) continue;
+    const count = new Set(record.subwayAnswers).size;
+    if (!count) continue;
+    const completed = count === items.length, elapsed = Number(record.subwayElapsedMs);
+    if (completed && (record.subwayStatus !== 'completed' || !Number.isFinite(elapsed) || elapsed <= 0)) continue;
+    const item = { classId: String(record.classId), className: record.className || '', studentId: String(record.studentId), nickname: String(record.nickname || ''), value: count,
+      memoryCompleted: completed, memoryElapsedMs: completed ? elapsed : 0, memoryTotal: items.length,
+      elementFromNumber: Number(record.elementFromNumber), elementToNumber: Number(record.elementToNumber), achievedAt: getScoreCreatedMillis(record) };
+    const key = getStudentKey(item);
+    if (!bestByStudent.has(key) || compare(item, bestByStudent.get(key)) < 0) bestByStudent.set(key, item);
+  }
+  return [...bestByStudent.values()].sort(compare).slice(0, TOP_LIMIT);
+}
+
 export function calculateHallOfFame(monthlyScores = [], monthlyPracticeRecords = []) {
   return {
     classMvp: calculateClassMvp(monthlyScores),
     quizKing: calculateQuizKing(monthlyScores),
     speedKing: calculateSpeedKing(monthlyScores),
     memoryKing: calculateMemoryKing(monthlyScores),
+    elementMemoryKing: calculateElementMemoryKing(monthlyScores),
     participationKing: calculateParticipationKing(monthlyPracticeRecords),
     growthKing: calculateGrowthKing(monthlyScores),
   };
@@ -313,6 +340,7 @@ export function getHallOfFameTitleWinners(hallOfFame = {}) {
     { category: 'quizKing', winner: hallOfFame.quizKing?.[0] || null },
     { category: 'speedKing', winner: hallOfFame.speedKing?.[0] || null },
     { category: 'memoryKing', winner: hallOfFame.memoryKing?.[0] || null },
+    { category: 'elementMemoryKing', winner: hallOfFame.elementMemoryKing?.[0] || null },
     { category: 'participationKing', winner: hallOfFame.participationKing?.[0] || null },
   ].filter(({ winner }) => winner?.studentId);
 }

@@ -1,4 +1,6 @@
 import SubwaySettings from './SubwaySettings.jsx';
+import ElementSettings from './ElementSettings.jsx';
+import { memoryRoomLabel } from '../../utils/memoryGame.js';
 
 function toMillis(value) {
   if (!value) return 0;
@@ -25,6 +27,8 @@ export default function ClassManagementPanel({
   classNumber = '1',
   setClassNumber = () => {},
   classRoomMode = 'ko',
+  elementConfig,
+  setElementConfig,
   focusGuardEnabled = false,
   setFocusGuardEnabled = () => {},
   subwayConfig,
@@ -123,6 +127,7 @@ export default function ClassManagementPanel({
             <option value="en">일반판 · 영어</option>
             <option value="mixed">일반판 · 혼합</option>
             <option value="subway">지하철판 · 4호선</option>
+            <option value="elements">원소 암기 · 1~118번 범위 선택</option>
           </select>
           <select
             value={classRoomDuration}
@@ -137,6 +142,7 @@ export default function ClassManagementPanel({
           </select>
         </div>
         {classRoomMode === 'subway' && <SubwaySettings value={subwayConfig} onChange={setSubwayConfig} />}
+        {classRoomMode === 'elements' && <ElementSettings value={elementConfig} onChange={setElementConfig} />}
         <label className="flex items-center gap-3 rounded-lg border border-rose-200 bg-rose-50 p-3 font-bold text-rose-900"><input type="checkbox" checked={focusGuardEnabled} onChange={e => setFocusGuardEnabled(e.target.checked)} />화면 이탈 방지 {focusGuardEnabled ? 'ON' : 'OFF'}</label>
         <button
           type="button"
@@ -155,6 +161,7 @@ export default function ClassManagementPanel({
             >
               <div className="min-w-0">
                 <div className="text-sm font-black text-sky-800 truncate">{room.name}</div>
+                {room.mode === 'subway' && <div className="text-xs font-bold text-teal-700">{memoryRoomLabel(room)}</div>}
                 <div className="text-[11px] font-black text-teal-600 mt-0.5">
                   {formatRoomCreatedAt(room.createdAt)}
                 </div>

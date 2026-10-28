@@ -29,7 +29,7 @@ try {
         React.createElement(Hall,{hallOfFame,monthKey:'2026-10',readOnly:true})));
     </script></html>` }));
   await page.goto('http://127.0.0.1:5180/tests/memory-preview.html');
-  await page.getByRole('heading', { name: '암기왕 TOP 10' }).waitFor();
+  await page.getByRole('heading', { name: '지하철 암기왕 TOP 10' }).waitFor();
   await page.getByText('미완주', { exact: true }).waitFor();
   assert.equal(await page.locator('.cosmetic-effect-title-memory').count(), 1);
   const train = page.locator('.memory-master-train');

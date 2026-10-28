@@ -113,7 +113,10 @@ import WaitingView from './components/views/WaitingView.jsx';
 import SubwayGameView from './components/views/SubwayGameView.jsx';
 import PracticeSelectionView from './components/views/PracticeSelectionView.jsx';
 import SubwayRecallView from './components/views/SubwayRecallView.jsx';
-import { DEFAULT_SUBWAY_ROUTE, subwayRoute, subwayPreviewMs, createSubwayPracticeRoom } from './utils/subway.js';
+import { DEFAULT_SUBWAY_ROUTE, subwayRoute, createSubwayPracticeRoom } from './utils/subway.js';
+import { DEFAULT_ELEMENT_CONFIG } from './constants/elements.js';
+import { isElementRoom, isValidElementConfig, memoryPreviewMs } from './utils/memoryGame.js';
+import ElementGameView from './components/views/ElementGameView.jsx';
 import DuelChallengeModal from './components/duel/DuelChallengeModal.jsx';
 import DuelOutgoingModal from './components/duel/DuelOutgoingModal.jsx';
 
@@ -166,6 +169,8 @@ export default function App() {
   const [newRoomName, setNewRoomName] = useState('');
   const [roomMode, setRoomMode] = useState('ko');
   const [subwayConfig, setSubwayConfig] = useState(DEFAULT_SUBWAY_ROUTE);
+  const [elementConfig, setElementConfig] = useState(DEFAULT_ELEMENT_CONFIG);
+  const [classElementConfig, setClassElementConfig] = useState(DEFAULT_ELEMENT_CONFIG);
   const [classSubwayConfig, setClassSubwayConfig] = useState(DEFAULT_SUBWAY_ROUTE);
   const [roomDuration, setRoomDuration] = useState('300');
   const [viewingRoomId, setViewingRoomId] = useState('');
@@ -1544,15 +1549,17 @@ export default function App() {
     const trimmedName = newRoomName.trim();
     if (!trimmedName) return;
     if (roomMode === 'subway' && !subwayRoute(subwayConfig).length) return alert('출발과 도착을 서로 다르게 선택해주세요.');
+    if (roomMode === 'elements' && !isValidElementConfig(elementConfig)) return alert('원소 범위와 암기 시간(5~300초)을 확인해주세요.');
 
     try {
       const durationSec = Number(roomDuration);
       const roomsRef = getPublicCollection(db, APP_ID, FIRESTORE_PATHS.rooms);
       const roomRef = await addDoc(roomsRef, {
         name: trimmedName,
-        mode: roomMode,
+        mode: roomMode === 'elements' ? 'subway' : roomMode,
         focusGuardEnabled: roomFocusGuard,
         ...(roomMode === 'subway' ? { subway: { ...subwayConfig, previewEnabled: subwayConfig.practice === 'recall' } } : {}),
+        ...(roomMode === 'elements' ? { subway: { ...elementConfig, subject: 'elements' } } : {}),
         duration: durationSec,
         roomCode: createRoomCode(),
         status: 'waiting',
@@ -1578,7 +1585,7 @@ export default function App() {
       await updateDoc(roomRef, {
         status: 'playing',
         startedAt: serverTimestamp(),
-        expiresAt: Date.now() + duration * 1000 + subwayPreviewMs(room),
+        expiresAt: Date.now() + duration * 1000 + memoryPreviewMs(room),
       });
     } catch (error) {
       console.error(error);
@@ -2796,11 +2803,13 @@ export default function App() {
     try {
       const durationSec = Number(classRoomDuration);
       if (classRoomMode === 'subway' && !subwayRoute(classSubwayConfig).length) return alert('출발과 도착을 서로 다르게 선택해주세요.');
+      if (classRoomMode === 'elements' && !isValidElementConfig(classElementConfig)) return alert('원소 범위와 암기 시간(5~300초)을 확인해주세요.');
       const roomsRef = getPublicCollection(db, APP_ID, FIRESTORE_PATHS.rooms);
       const roomRef = await addDoc(roomsRef, {
         name: classItem.name || `${classItem.grade || 1}학년 ${classItem.classNumber || ''}반`,
-        mode: classRoomMode,
+        mode: classRoomMode === 'elements' ? 'subway' : classRoomMode,
         ...(classRoomMode === 'subway' ? { subway: { ...classSubwayConfig, previewEnabled: classSubwayConfig.practice === 'recall' } } : {}),
+        ...(classRoomMode === 'elements' ? { subway: { ...classElementConfig, subject: 'elements' } } : {}),
         focusGuardEnabled: classFocusGuard,
         duration: durationSec,
         roomCode: createRoomCode(),
@@ -3161,6 +3170,7 @@ export default function App() {
   }
 
   if (view === 'subway') {
+    if (isElementRoom(myRoomData)) return <ElementGameView key={`${myRoomData.id}:${currentScoreDocId}`} room={myRoomData} scoreData={scores.find(item => item.id === currentScoreDocId)} scoreId={currentScoreDocId} nickname={nickname} onHome={handleBackToLogin} onViolation={handleScreenExit} />;
     if (myRoomData?.subway?.practice === 'recall') return <SubwayRecallView room={myRoomData} scoreData={scores.find((item) => item.id === currentScoreDocId)} scoreId={currentScoreDocId} nickname={nickname} onHome={handleBackToLogin} onViolation={handleScreenExit} />;
     return <SubwayGameView key={myRoomData?.id} isPractice={isPracticeMode} onRestart={startSubwayPractice} room={myRoomData} scoreData={scores.find((item) => item.id === currentScoreDocId)} scoreId={currentScoreDocId} nickname={nickname} onHome={handleBackToLogin} onViolation={handleScreenExit} />;
   }
@@ -3210,6 +3220,10 @@ export default function App() {
         newRoomName={newRoomName}
         setNewRoomName={setNewRoomName}
         roomMode={roomMode}
+        elementConfig={elementConfig}
+        setElementConfig={setElementConfig}
+        classElementConfig={classElementConfig}
+        setClassElementConfig={setClassElementConfig}
         subwayConfig={subwayConfig}
         setSubwayConfig={setSubwayConfig}
         classSubwayConfig={classSubwayConfig}

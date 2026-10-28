@@ -27,6 +27,10 @@ export default function TeacherDashboardView({
   newRoomName = '',
   setNewRoomName = () => {},
   roomMode = 'ko',
+  elementConfig,
+  setElementConfig,
+  classElementConfig,
+  setClassElementConfig,
   subwayConfig,
   setSubwayConfig,
   classSubwayConfig,
@@ -208,6 +212,8 @@ export default function TeacherDashboardView({
               newRoomName={newRoomName}
               setNewRoomName={setNewRoomName}
               roomMode={roomMode}
+              elementConfig={elementConfig}
+              setElementConfig={setElementConfig}
               subwayConfig={subwayConfig}
               setSubwayConfig={setSubwayConfig}
               setRoomMode={setRoomMode}
@@ -254,6 +260,8 @@ export default function TeacherDashboardView({
               classNumber={classNumber}
               setClassNumber={setClassNumber}
               classRoomMode={classRoomMode}
+              elementConfig={classElementConfig}
+              setElementConfig={setClassElementConfig}
               focusGuardEnabled={classFocusGuard}
               setFocusGuardEnabled={setClassFocusGuard}
               subwayConfig={classSubwayConfig}

@@ -92,7 +92,7 @@ export const COSMETIC_ITEMS = [
   {
     id: 'title_memory_king',
     name: '암기왕',
-    description: '4호선의 역을 가장 많이 기억한 학생에게 주는 빛나는 노선 왕관입니다.',
+    description: '지하철·원소 암기 부문 우승자에게 주는 빛나는 기억의 왕관입니다.',
     price: 9999,
     category: 'title',
     previewClass: 'cosmetic-preview cosmetic-preview-title-memory',
@@ -119,9 +119,10 @@ export const HALL_OF_FAME_TITLE_IDS = {
   participationKing: 'title_practice_king',
   speedKing: 'title_speed_king',
   memoryKing: 'title_memory_king',
+  elementMemoryKing: 'title_memory_king',
 };
 
-export const HALL_OF_FAME_TITLE_ID_LIST = Object.values(HALL_OF_FAME_TITLE_IDS);
+export const HALL_OF_FAME_TITLE_ID_LIST = [...new Set(Object.values(HALL_OF_FAME_TITLE_IDS))];
 
 export function getCosmeticById(cosmeticId) {
   return COSMETIC_ITEMS.find((item) => item.id === cosmeticId) || null;

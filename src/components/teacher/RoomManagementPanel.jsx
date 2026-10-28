@@ -1,4 +1,6 @@
 import SubwaySettings from './SubwaySettings.jsx';
+import ElementSettings from './ElementSettings.jsx';
+import { isElementRoom, memoryRoomLabel } from '../../utils/memoryGame.js';
 
 function toMillis(value) {
   if (!value) return 0;
@@ -19,7 +21,7 @@ function getRoomStatusLabel(room, currentTime) {
 }
 
 function formatRoomMeta(room) {
-  if (room.mode === 'subway') return room.subway?.practice === 'recall' ? '지하철판 · 4호선 전체 많이 맞히기' : `지하철판 · 4호선 ${room.subway?.from} → ${room.subway?.to}`;
+  if (room.mode === 'subway') return isElementRoom(room) ? memoryRoomLabel(room) : room.subway?.practice === 'recall' ? '지하철판 · 4호선 전체 많이 맞히기' : `지하철판 · 4호선 ${room.subway?.from} → ${room.subway?.to}`;
   const modeLabel = room.mode === 'ko' ? '한글' : room.mode === 'en' ? '영어' : '혼합';
   const durationLabel = `${Math.floor((room.duration || 300) / 60)}분`;
   return `${modeLabel} · ${durationLabel}`;
@@ -89,6 +91,8 @@ export default function RoomManagementPanel({
   newRoomName = '',
   setNewRoomName = () => {},
   roomMode = 'ko',
+  elementConfig,
+  setElementConfig,
   subwayConfig,
   setSubwayConfig,
   setRoomMode = () => {},
@@ -190,6 +194,7 @@ export default function RoomManagementPanel({
               <option value="en">일반판 · 영어</option>
               <option value="mixed">일반판 · 혼합</option>
               <option value="subway">지하철판 · 4호선</option>
+              <option value="elements">원소 암기 · 1~118번 범위 선택</option>
             </select>
             <select value={roomDuration} onChange={(e) => setRoomDuration(e.target.value)} className="w-full px-3 py-3 border border-pink-200 rounded-xl outline-none bg-white">
               <option value="60">1분</option>
@@ -200,6 +205,7 @@ export default function RoomManagementPanel({
             </select>
           </div>
           {roomMode === 'subway' && <SubwaySettings value={subwayConfig} onChange={setSubwayConfig} />}
+          {roomMode === 'elements' && <ElementSettings value={elementConfig} onChange={setElementConfig} />}
           <label className="flex items-center gap-3 rounded-lg border border-rose-200 bg-rose-50 p-3 font-bold text-rose-900"><input type="checkbox" checked={focusGuardEnabled} onChange={e => setFocusGuardEnabled(e.target.checked)} />화면 이탈 방지 {focusGuardEnabled ? 'ON' : 'OFF'}</label>
           <button type="submit" className="w-full bg-pink-500 hover:bg-pink-600 py-3 rounded-xl font-bold text-white shadow-md">
             게스트 PIN 방 만들기

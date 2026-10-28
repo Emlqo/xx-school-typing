@@ -1,5 +1,6 @@
 import CherryBlossomBackground from '../common/CherryBlossomBackground.jsx';
 import { isFocusGuardEnabled } from '../../utils/fairPlay.js';
+import { memoryRoomLabel } from '../../utils/memoryGame.js';
 
 export default function StudentRoomEntryView({
   student,
@@ -40,7 +41,7 @@ export default function StudentRoomEntryView({
             >
               <div className="font-black text-xl text-gray-800">{room.className || room.name}</div>
               <div className="mt-2 text-sm font-bold">화면 이탈 방지 {isFocusGuardEnabled(room) ? 'ON' : 'OFF'}</div>
-              {room.mode === 'subway' && <div className="mt-2 font-bold text-sky-600">{room.subway?.practice === 'recall' ? '4호선 전체 · 역 이름 많이 맞히기' : `4호선 · ${room.subway?.from} → ${room.subway?.to}`}</div>}
+              {room.mode === 'subway' && <div className="mt-2 font-bold text-sky-600">{memoryRoomLabel(room)}</div>}
               <div className="text-sm font-bold text-gray-500 mt-2">
                 {room.status === 'playing' ? '진행 중 · 재입장 가능' : '입장 대기 중'} · {room.duration || 300}초
               </div>
