@@ -12,6 +12,7 @@ import TeacherHeader from '../teacher/TeacherHeader.jsx';
 import TeacherDuelHistoryPanel from '../teacher/TeacherDuelHistoryPanel.jsx';
 import TeacherDuelLivePanel from '../teacher/TeacherDuelLivePanel.jsx';
 import WordManagementPanel from '../teacher/WordManagementPanel.jsx';
+import TypingGrowthPanel from '../teacher/TypingGrowthPanel.jsx';
 
 export default function TeacherDashboardView({
   activeSection = 'overview',
@@ -19,6 +20,7 @@ export default function TeacherDashboardView({
   getLeaderboard = () => [],
   currentTime = Date.now(),
   onLogout = () => {},
+  authorizeGrowth = () => false,
   handleCreateRoom = () => {},
   roomFocusGuard = false,
   setRoomFocusGuard,
@@ -330,6 +332,8 @@ export default function TeacherDashboardView({
             />
           </>
         )}
+
+        {activeSection === 'growth' && <TypingGrowthPanel classes={classes} authorize={authorizeGrowth} />}
 
         {activeSection === 'shop' && (
           <ShopPointManagementPanel

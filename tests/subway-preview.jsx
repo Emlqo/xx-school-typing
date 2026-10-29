@@ -6,16 +6,21 @@ import SubwayRecallView from '../src/components/views/SubwayRecallView.jsx';
 import { LINE_4 } from '../src/utils/subway.js';
 import { createSubwayPracticeRoom } from '../src/utils/subway.js';
 import PracticeSelectionView from '../src/components/views/PracticeSelectionView.jsx';
+import ElementGameView from '../src/components/views/ElementGameView.jsx';
+import { createElementPracticeRoom, isElementRoom } from '../src/utils/memoryGame.js';
 import '../src/styles/global.css';
 
 const params = new URLSearchParams(location.search);
 const start = Date.now() - (params.has('expired') ? 301000 : 0);
 let attempts = 0;
+window.practiceApiCalls = 0;
 const Game = params.has('recall') ? SubwayRecallView : SubwayGameView;
 function PracticePreview() {
   const [room, setRoom] = React.useState(null);
   const [nickname, setNickname] = React.useState('테스트');
-  return room ? <SubwayGameView key={room.id} room={room} isPractice nickname={nickname} onHome={() => setRoom(null)} onRestart={() => setRoom(createSubwayPracticeRoom())} submitRun={() => { throw new Error('Practice must not submit'); }} /> : <PracticeSelectionView nickname={nickname} setNickname={setNickname} onTyping={() => {}} onSubway={() => setRoom(createSubwayPracticeRoom())} onBack={() => {}} />;
+  window.requestPracticeSync = () => setRoom(previous => previous ? { ...previous, syncRequestedAt: Date.now() } : previous);
+  const PracticeGame = isElementRoom(room) ? ElementGameView : SubwayGameView;
+  return room ? <PracticeGame key={room.id} room={room} isPractice nickname={nickname} onHome={() => setRoom(null)} onRestart={() => setRoom(isElementRoom(room) ? createElementPracticeRoom() : createSubwayPracticeRoom())} submitRun={() => { window.practiceApiCalls++; throw new Error('Practice must not submit'); }} /> : <PracticeSelectionView nickname={nickname} setNickname={setNickname} onTyping={() => {}} onSubway={() => setRoom(createSubwayPracticeRoom())} onElements={() => setRoom(createElementPracticeRoom())} onBack={() => {}} />;
 }
 createRoot(document.getElementById('root')).render(params.has('practice') ? <PracticePreview /> : params.has('leaderboard') ? <SubwayLeaderboard
   room={{ id: 'preview', entryType: 'class', status: 'playing', expiresAt: start - 1, subway: { line: '4', from: '진접', to: '동대문', practice: params.has('recall') ? 'recall' : 'copy' } }}

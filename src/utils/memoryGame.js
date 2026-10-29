@@ -5,6 +5,12 @@ export function isElementRoom(room) {
   return room?.mode === 'subway' && room.subway?.subject === 'elements';
 }
 
+export function createElementPracticeRoom(now = Date.now()) {
+  return { id: `local-elements-${now}`, mode: 'subway', duration: 120, status: 'playing', focusGuardEnabled: false,
+    startedAt: now, expiresAt: now + 135000,
+    subway: { subject: 'elements', fromNumber: 1, toNumber: 40, practice: 'memory', previewSeconds: 15 } };
+}
+
 export function elementRange(config = {}) {
   const from = Number(config.fromNumber);
   const to = Number(config.toNumber);

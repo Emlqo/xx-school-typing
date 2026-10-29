@@ -115,7 +115,7 @@ import PracticeSelectionView from './components/views/PracticeSelectionView.jsx'
 import SubwayRecallView from './components/views/SubwayRecallView.jsx';
 import { DEFAULT_SUBWAY_ROUTE, subwayRoute, createSubwayPracticeRoom } from './utils/subway.js';
 import { DEFAULT_ELEMENT_CONFIG } from './constants/elements.js';
-import { isElementRoom, isValidElementConfig, memoryPreviewMs } from './utils/memoryGame.js';
+import { isElementRoom, isValidElementConfig, memoryPreviewMs, createElementPracticeRoom } from './utils/memoryGame.js';
 import ElementGameView from './components/views/ElementGameView.jsx';
 import DuelChallengeModal from './components/duel/DuelChallengeModal.jsx';
 import DuelOutgoingModal from './components/duel/DuelOutgoingModal.jsx';
@@ -285,7 +285,7 @@ export default function App() {
     user: scopedUser,
     view,
     isPracticeMode,
-    enabled: firestoreReadsEnabled && teacherClassDataActive,
+    enabled: firestoreReadsEnabled && (teacherClassDataActive || (view === 'teacher' && teacherSection === 'growth')),
   });
   const {
     openClassRooms,
@@ -843,6 +843,16 @@ export default function App() {
     practiceRunIdRef.current = '';
     resetPlayingState({ practiceMode: true, duration: 120, mode: 'mixed' });
     setMyRoomData(createSubwayPracticeRoom());
+    setView('subway');
+  };
+
+  const startElementPractice = () => {
+    if (!nickname.trim()) return alert('닉네임을 입력해주세요.');
+    setSelectedRoomId('');
+    setCurrentScoreDocId(null);
+    practiceRunIdRef.current = '';
+    resetPlayingState({ practiceMode: true, duration: 120, mode: 'mixed' });
+    setMyRoomData(createElementPracticeRoom());
     setView('subway');
   };
 
@@ -3170,7 +3180,7 @@ export default function App() {
   }
 
   if (view === 'subway') {
-    if (isElementRoom(myRoomData)) return <ElementGameView key={`${myRoomData.id}:${currentScoreDocId}`} room={myRoomData} scoreData={scores.find(item => item.id === currentScoreDocId)} scoreId={currentScoreDocId} nickname={nickname} onHome={handleBackToLogin} onViolation={handleScreenExit} />;
+    if (isElementRoom(myRoomData)) return <ElementGameView key={`${myRoomData.id}:${currentScoreDocId}`} isPractice={isPracticeMode} onRestart={startElementPractice} room={myRoomData} scoreData={scores.find(item => item.id === currentScoreDocId)} scoreId={currentScoreDocId} nickname={nickname} onHome={handleBackToLogin} onViolation={handleScreenExit} />;
     if (myRoomData?.subway?.practice === 'recall') return <SubwayRecallView room={myRoomData} scoreData={scores.find((item) => item.id === currentScoreDocId)} scoreId={currentScoreDocId} nickname={nickname} onHome={handleBackToLogin} onViolation={handleScreenExit} />;
     return <SubwayGameView key={myRoomData?.id} isPractice={isPracticeMode} onRestart={startSubwayPractice} room={myRoomData} scoreData={scores.find((item) => item.id === currentScoreDocId)} scoreId={currentScoreDocId} nickname={nickname} onHome={handleBackToLogin} onViolation={handleScreenExit} />;
   }
@@ -3208,6 +3218,7 @@ export default function App() {
     return (
       <TeacherDashboardView
         activeSection={teacherSection}
+        authorizeGrowth={requireTeacherAccess}
         setActiveSection={setTeacherSection}
         getLeaderboard={getLeaderboard}
         currentTime={currentTime}
@@ -3353,7 +3364,7 @@ export default function App() {
     );
   }
 
-  if (view === 'practiceSelection') return <PracticeSelectionView nickname={nickname} setNickname={setNickname} onTyping={startPractice} onSubway={startSubwayPractice} onBack={handleBackToLogin} />;
+  if (view === 'practiceSelection') return <PracticeSelectionView nickname={nickname} setNickname={setNickname} onTyping={startPractice} onSubway={startSubwayPractice} onElements={startElementPractice} onBack={handleBackToLogin} />;
 
   if (view === 'entry' || !studentProfile) {
     return (

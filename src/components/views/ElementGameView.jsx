@@ -20,13 +20,14 @@ function AtomScene({ active, symbol, number }) {
   </div>;
 }
 
-export default function ElementGameView({ room, scoreData, scoreId, nickname, onHome, onViolation, submitRun = submitSubwayRun }) {
+export default function ElementGameView({ room, scoreData, scoreId, nickname, onHome, onViolation, isPractice = false, onRestart, submitRun = submitSubwayRun }) {
   const items = useMemo(() => elementRange(room?.subway), [room?.subway?.fromNumber, room?.subway?.toNumber]);
   const recall = room?.subway?.practice === 'recall';
   const [answers, setAnswers] = useState(() => recall
     ? [...new Set((scoreData?.subwayAnswers || []).filter(name => items.some(item => item.name === name)))]
     : items.slice(0, Math.max(0, Math.min(items.length, Number(scoreData?.subwayProgress || 0)))).map(item => item.name));
   const [hints, setHints] = useState(() => {
+    if (isPractice) return {};
     let local = {};
     try { if (scoreId) local = JSON.parse(sessionStorage.getItem(`element-hints:${scoreId}`) || '{}'); } catch { /* Storage may be disabled. */ }
     return Object.fromEntries(items.map((_, i) => [i, Math.max(Number(local?.[i]) || 0, Number(scoreData?.subwayHints?.[i]) || 0)]).filter(([, level]) => level === 1 || level === 2));
@@ -47,7 +48,7 @@ export default function ElementGameView({ room, scoreData, scoreId, nickname, on
   const current = items[answers.length];
   const level = hints[answers.length] || 0;
   const penalty = subwayHintPenalty(hints);
-  useGameFocusGuard(!ended && Boolean(onViolation) && isFocusGuardEnabled(room), onViolation);
+  useGameFocusGuard(!isPractice && !ended && Boolean(onViolation) && isFocusGuardEnabled(room), onViolation);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 200);
@@ -56,6 +57,16 @@ export default function ElementGameView({ room, scoreData, scoreId, nickname, on
   useEffect(() => { if (!preview && !ended) input.current?.focus(); }, [preview, ended]);
 
   const save = useCallback(async () => {
+    if (isPractice) {
+      if (!result && (answersRef.current.length >= items.length || Date.now() >= deadline)) setResult({
+        subwayStatus: answersRef.current.length >= items.length ? 'completed' : 'timeout',
+        subwayProgress: answersRef.current.length,
+        subwayAnswers: [...answersRef.current],
+        subwayPenaltyMs: subwayHintPenalty(hintsRef.current),
+        subwayElapsedMs: Math.max(0, Math.min(Date.now(), deadline) - start) + subwayHintPenalty(hintsRef.current),
+      });
+      return;
+    }
     if (busy.current || result || !scoreId || !room || Date.now() < start) return;
     const finalRequest = answersRef.current.length >= items.length || Date.now() >= deadline;
     busy.current = true; setSaving(true); setError('');
@@ -65,21 +76,21 @@ export default function ElementGameView({ room, scoreData, scoreId, nickname, on
       else if (finalRequest) setError('서버에서 종료 시간을 확인 중입니다. 잠시 후 다시 제출해주세요.');
     } catch (failure) { setError(failure.message || '기록을 저장하지 못했습니다. 다시 시도해주세요.'); }
     finally { busy.current = false; setSaving(false); }
-  }, [room, scoreId, result, start, submitRun, items.length, deadline]);
+  }, [room, scoreId, result, start, submitRun, items.length, deadline, isPractice]);
 
   useEffect(() => {
     if (ended && !result && !finalSent.current && !busy.current) { finalSent.current = true; void save(); }
   }, [ended, result, saving, save]);
   useEffect(() => {
     const request = subwayMillis(room?.syncRequestedAt);
-    if (!preview && !ended && request > lastSync.current && !busy.current) { lastSync.current = request; void save(); }
-  }, [room?.syncRequestedAt, preview, ended, saving, save]);
+    if (!isPractice && !preview && !ended && request > lastSync.current && !busy.current) { lastSync.current = request; void save(); }
+  }, [room?.syncRequestedAt, preview, ended, saving, save, isPractice]);
 
   function revealHint() {
     if (recall || preview || ended || level >= 2) return;
     const next = { ...hintsRef.current, [answersRef.current.length]: level + 1 };
     hintsRef.current = next; setHints(next);
-    try { sessionStorage.setItem(`element-hints:${scoreId}`, JSON.stringify(next)); } catch { /* Storage may be disabled. */ }
+    if (!isPractice) try { sessionStorage.setItem(`element-hints:${scoreId}`, JSON.stringify(next)); } catch { /* Storage may be disabled. */ }
     input.current?.focus();
   }
 
@@ -103,6 +114,7 @@ export default function ElementGameView({ room, scoreData, scoreId, nickname, on
   const isComplete = result ? result.subwayStatus === 'completed' : submitted.length === items.length;
   return <main className={`element-game ${reaction ? 'element-reaction' : ''} ${!preview && !ended && deadline - now <= 15000 ? 'element-urgent' : ''}`}>
     <div className="element-shell">
+      {isPractice && <div className="element-practice-toolbar"><strong>자유연습 · 기록 미저장</strong><button onClick={onHome}>연습 나가기</button></div>}
       <header className="element-header"><div className="element-brand"><div className="element-brand-mark" aria-hidden="true"><small>01</small><b>H</b></div><div><span className="element-eyebrow">ELEMENT LAB / SPACE MISSION</span><h1>원소 암기 연구소</h1><p>{nickname} · 원자번호 {items[0].number}~{items.at(-1).number} · {recall ? '순서 없이 많이 맞히기' : '순서대로 외우기'}</p></div></div><span className="element-lab-status">{preview ? '암기 준비' : ended ? '실험 종료' : '실험 진행 중'}</span></header>
       <section className="element-status-bar" aria-label="게임 현황"><div><small>{preview ? '암기 남은 시간' : '남은 시간'}</small><strong>{formatRaceTime(Math.max(0, (preview ? start : deadline) - now)).slice(0, 5)}</strong></div><div><small>맞힌 원소</small><strong>{submitted.length}<em> / {items.length}</em></strong></div><div><small>{recall ? '진행 방식' : '힌트 가산'}</small><strong>{recall ? '순서 자유' : `+${(result?.subwayPenaltyMs ?? penalty) / 1000}초`}</strong></div></section>
       {preview ? <section className="element-study" role="dialog" aria-modal="true" aria-labelledby="element-study-title">
@@ -110,7 +122,7 @@ export default function ElementGameView({ room, scoreData, scoreId, nickname, on
         <div className="element-table select-none" onCopy={event => event.preventDefault()}>{items.map(item => <div className={`element-tile element-family-${item.family}`} key={item.number}><small>{item.number}</small><strong>{item.symbol}</strong><b>{item.name}</b></div>)}</div>
       </section> : <>
         <section className="element-lab-bench"><div className="element-atom-stage"><span className="element-stage-label">{ended ? 'MISSION COMPLETE' : 'ATOMIC REACTOR'}</span><AtomScene active={reaction} symbol={ended ? '✓' : recall ? '?' : level >= 1 ? current?.symbol : '?'} number={recall || ended ? null : current?.number} /><div className="element-reaction-status">{reaction ? '원소 확인 완료!' : ended ? '실험 데이터 확인' : '기억을 깨워 원소를 발견하세요'}</div><div className="element-discovery-meter" role="progressbar" aria-label="원소 발견률" aria-valuenow={Math.round(submitted.length / items.length * 100)} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${submitted.length / items.length * 100}%` }} /></div></div>
-          <div className="element-console">{ended ? <div className="element-results" aria-live="polite"><span className="element-eyebrow">EXPERIMENT COMPLETE</span><h2>{isComplete ? '모든 원소 발견!' : '도전 종료!'}</h2><strong>{submitted.length}<small> / {items.length}개</small></strong>{result?.subwayStatus === 'completed' && <p>완주 기록 {formatRaceTime(result.subwayElapsedMs)}{Number(result.subwayPenaltyMs) > 0 && ` · 힌트 +${result.subwayPenaltyMs / 1000}초 포함`}</p>}<p>{result ? '기록이 선생님께 제출되었습니다.' : saving ? '기록 제출 중...' : '기록 제출을 확인해주세요.'}</p>{result && <button className="element-primary" onClick={onHome}>학생 홈으로</button>}</div> : <>
+          <div className="element-console">{ended ? <div className="element-results" aria-live="polite"><span className="element-eyebrow">EXPERIMENT COMPLETE</span><h2>{isComplete ? '모든 원소 발견!' : '도전 종료!'}</h2><strong>{submitted.length}<small> / {items.length}개</small></strong>{result?.subwayStatus === 'completed' && <p>완주 기록 {formatRaceTime(result.subwayElapsedMs)}{Number(result.subwayPenaltyMs) > 0 && ` · 힌트 +${result.subwayPenaltyMs / 1000}초 포함`}</p>}<p>{isPractice ? '자유연습 기록은 저장되지 않습니다.' : result ? '기록이 선생님께 제출되었습니다.' : saving ? '기록 제출 중...' : '기록 제출을 확인해주세요.'}</p>{result && <div className="element-result-actions">{isPractice && onRestart && <button className="element-primary" onClick={onRestart}>다시 연습하기</button>}<button className="element-primary" onClick={onHome}>학생 홈으로</button></div>}</div> : <>
             <span className="element-eyebrow">{recall ? 'FREE RECALL' : `ATOMIC NUMBER ${current?.number}`}</span><h2>{recall ? '기억나는 원소 이름은?' : `원자번호 ${current?.number}번 원소는?`}</h2>
             {!recall && <div className="element-answer select-none" onCopy={event => event.preventDefault()}>{level === 2 ? current?.name : level === 1 ? current?.symbol : '?'}<small>{level === 2 ? '정답 이름' : level === 1 ? '원소기호 힌트' : '한글 이름 입력'}</small></div>}
             <div className={wrong ? 'animate-shake' : ''}><input ref={input} className="element-input" aria-label="원소 이름 입력" value={value} onChange={event => { setValue(event.target.value); setWrong(false); }} onKeyDown={submit} onPaste={event => event.preventDefault()} onDrop={event => event.preventDefault()} onBeforeInput={event => { if (['insertFromPaste', 'insertFromDrop'].includes(event.nativeEvent.inputType)) event.preventDefault(); }} autoComplete="off" spellCheck={false} placeholder="한글 원소 이름" /></div>
