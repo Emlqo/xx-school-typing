@@ -2,13 +2,13 @@ import { useMemo } from 'react';
 
 export default function CherryBlossomBackground() {
   const petals = useMemo(() => {
-    return Array.from({ length: 18 }).map((_, i) => ({
+    return Array.from({ length: 40 }).map((_, i) => ({
       id: i,
       left: `${Math.random() * 100}%`,
-      animationDuration: `${Math.random() * 15 + 10}s`,
-      animationDelay: `-${Math.random() * 20}s`,
-      width: `${Math.random() * 8 + 12}px`,
-      height: `${Math.random() * 8 + 12}px`,
+      animationDuration: `${Math.random() * 12 + 14}s`,
+      animationDelay: `-${Math.random() * 26}s`,
+      size: `${Math.random() * 5 + 3}px`,
+      drift: `${Math.random() * 70 - 35}px`,
     }));
   }, []);
 
@@ -20,8 +20,9 @@ export default function CherryBlossomBackground() {
           className="petal"
           style={{
             left: p.left,
-            width: p.width,
-            height: p.height,
+            width: p.size,
+            height: p.size,
+            '--snow-drift': p.drift,
             animationDuration: p.animationDuration,
             animationDelay: p.animationDelay,
           }}

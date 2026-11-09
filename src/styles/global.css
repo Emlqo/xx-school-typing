@@ -10,65 +10,51 @@ body {
 
 /* Keep legacy class names so every screen inherits the seasonal theme. */
 .spring-bg {
-  background: #eaf2f5 url('/images/autumn-forest.webp') center / cover fixed no-repeat;
+  background: #eaf4fa url('/images/winter-forest.webp') center / cover fixed no-repeat;
   position: relative;
   overflow: hidden;
   isolation: isolate;
 }
 .spring-bg::before, .spring-bg::after { content: none; }
 .booster-bg {
-  background: #eaf2f5 url('/images/autumn-forest.webp') center / cover fixed no-repeat;
+  background: #eaf4fa url('/images/winter-forest.webp') center / cover fixed no-repeat;
   animation: pulse-bg 2s ease-in-out infinite alternate;
 }
 @keyframes pulse-bg {
-  from { box-shadow: inset 0 0 80px rgba(196, 64, 83, .12); }
-  to { box-shadow: inset 0 0 110px rgba(225, 174, 47, .34); }
+  from { box-shadow: inset 0 0 80px rgba(56, 189, 248, .12); }
+  to { box-shadow: inset 0 0 110px rgba(45, 212, 191, .4); }
 }
 
 .petal {
   position: absolute;
-  background: linear-gradient(135deg, #ecb4a4, #c24753 65%, #913545);
-  border-radius: 85% 12% 85% 12%;
-  opacity: 0.72;
-  box-shadow: none;
-  animation: fall linear infinite, sway ease-in-out infinite alternate;
+  top: -16px;
+  background: #fff;
+  border-radius: 50%;
+  opacity: 0.8;
+  box-shadow: 0 0 5px #ffffff80;
+  animation: winter-snowfall linear infinite;
 }
-
-.petal::after {
-  content: '';
-  position: absolute;
-  left: 48%;
-  top: 14%;
-  width: 1px;
-  height: 72%;
-  background: rgba(255, 255, 255, 0.58);
-  transform: rotate(32deg);
-}
-.petal:nth-child(3n) { background: linear-gradient(135deg, #f5dd83, #d8a02d); border-radius: 75% 75% 12% 75%; }
-.petal:nth-child(3n + 1) { clip-path: polygon(50% 0, 62% 28%, 88% 12%, 80% 42%, 100% 48%, 73% 66%, 80% 90%, 54% 78%, 50% 100%, 44% 78%, 18% 90%, 26% 65%, 0 48%, 20% 42%, 12% 12%, 38% 28%); border-radius: 0; }
-
-@keyframes fall {
-  0% { top: -10%; }
-  100% { top: 110%; }
-}
-
-@keyframes sway {
-  0% { transform: translateX(0) rotate(0deg); }
-  100% { transform: translateX(42px) rotate(72deg); }
+.petal:nth-child(3n) { opacity: 0.45; }
+.petal:nth-child(5n) { background: #e0f2fe; }
+@keyframes winter-snowfall {
+  from { transform: translate3d(0, -16px, 0); }
+  50% { transform: translate3d(var(--snow-drift), 50vh, 0); }
+  to { transform: translate3d(0, calc(100vh + 32px), 0); }
 }
 
 .glass-box {
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(248, 253, 255, 0.93);
   backdrop-filter: blur(16px);
-  border: 1px solid rgba(211, 185, 179, 0.72);
-  box-shadow: 0 18px 50px rgba(52, 69, 65, 0.14);
+  border: 1px solid rgba(186, 218, 235, 0.85);
+  box-shadow: 0 18px 50px rgba(40, 85, 110, 0.16), inset 0 1px 0 #fff;
 }
-.spring-bg .glass-box { border-color: #dfc9c2; }
+.spring-bg .glass-box { border-color: #c7e4f2; }
 .spring-bg h1 { letter-spacing: 0; }
-.spring-bg button.bg-gradient-to-r.from-teal-500 { background: #316451; box-shadow: 0 8px 22px #244d3926; }
-.spring-bg button.bg-gradient-to-r.from-teal-500:hover { background: #244d3e; }
-.spring-bg .custom-scrollbar::-webkit-scrollbar-thumb { background: #b36b73; }
-.spring-bg .custom-scrollbar::-webkit-scrollbar-track { background: #edf1ee; }
+.spring-bg button.bg-gradient-to-r.from-teal-500 { background: #087eab; box-shadow: 0 8px 22px #087eab30; }
+.spring-bg button.bg-gradient-to-r.from-teal-500:hover { background: #09658c; }
+.spring-bg .custom-scrollbar::-webkit-scrollbar-thumb { background: #77afc9; }
+.spring-bg .custom-scrollbar::-webkit-scrollbar-track { background: #edf6fb; }
+@media (max-width: 640px) { .petal:nth-child(n + 25) { display: none; } }
 @media (prefers-reduced-motion: reduce) { .petal { display: none; } .booster-bg { animation: none; } }
 
 .input-success {

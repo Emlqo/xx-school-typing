@@ -66,7 +66,7 @@ export default function PlayingView({
       {showSuccess && (
         <div className="animate-success-pop flex flex-col items-center">
           <div className="text-4xl md:text-5xl font-black text-pink-500 drop-shadow-md italic">
-            {combo > 1 ? `${combo} COMBO 🌸` : 'PERFECT!'}
+            {combo > 1 ? `${combo} COMBO ❄` : 'PERFECT!'}
           </div>
           <div className="text-2xl font-bold text-yellow-500 mt-1">+{lastEarned}</div>
         </div>
