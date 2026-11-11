@@ -16,8 +16,8 @@ try {
       await page.goto(`http://127.0.0.1:5180/tests/autumn-preview.html${home ? '?home=1' : ''}`);
       await page.locator('h1').waitFor();
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
-      assert.equal(await page.locator('.petal').count(), 40);
-      assert.equal(await page.locator('.petal:visible').count(), width < 640 ? 24 : 40);
+      assert.equal(await page.locator('.petal').count(), 72);
+      assert.equal(await page.locator('.petal:visible').count(), width <= 640 ? 44 : 72);
       assert.match(await page.locator('.spring-bg').evaluate(e => getComputedStyle(e).backgroundImage), /winter-forest.webp/);
       assert.equal(await page.evaluate(async () => {
         const img = new Image(); img.src = '/images/winter-forest.webp';

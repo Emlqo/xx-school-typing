@@ -52,7 +52,7 @@ export default function PlayingView({
   };
 
   return (
-    <div className={`min-h-screen flex flex-col p-4 md:p-8 relative overflow-hidden transition-colors duration-500 ${boosterActive ? 'booster-bg' : 'spring-bg'}`}>
+    <div className={`typing-playfield min-h-screen flex flex-col p-4 md:p-8 pb-44 md:pb-48 relative overflow-hidden transition-colors duration-500 ${boosterActive ? 'booster-bg' : 'spring-bg'}`}>
       <CherryBlossomBackground />
 
       <BoosterButton
@@ -93,7 +93,7 @@ export default function PlayingView({
         />
       )}
 
-      <div className={`flex-1 flex flex-col items-center justify-center max-w-4xl w-full mx-auto z-10 ${duelInfo ? '-mt-4 md:-mt-10' : '-mt-10 md:-mt-20'}`}>
+      <div className="flex-1 flex flex-col items-center justify-center max-w-4xl w-full mx-auto z-10 py-4">
         {currentQuiz ? (
           <QuizCard
             currentQuiz={currentQuiz}
@@ -121,8 +121,8 @@ export default function PlayingView({
               onDelete={onInputDelete}
             />
 
-            <p className="mt-8 text-gray-500 text-sm font-medium">
-              백스페이스(지우기)를 누르거나 오답 제출 시 <span className="text-red-400">콤보가 초기화</span>됩니다.
+            <p className="mt-6 bg-white rounded-lg px-4 py-2 text-gray-700 text-sm font-medium text-center">
+              백스페이스(지우기)를 누르거나 오답 제출 시 <span className="text-red-700">콤보가 초기화</span>됩니다.
             </p>
 
             <div className="w-full max-w-3xl h-2 bg-white/50 rounded-full mt-4 overflow-hidden border border-pink-100">

@@ -9,7 +9,7 @@ export default function QuizCard({
   return (
     <div className="w-full text-center mb-8 animate-float-up-fade">
       <div className="bg-indigo-600 text-white text-sm font-bold px-5 py-1.5 rounded-full inline-block mb-6 animate-bounce shadow-md">🚨 돌발 퀴즈!</div>
-      <div className="text-3xl md:text-5xl font-black tracking-wide break-keep leading-tight mb-10 text-gray-800 drop-shadow-sm">
+      <div className="text-3xl md:text-5xl font-black break-words leading-tight mb-10 text-gray-800 bg-white rounded-lg p-5 md:p-8">
         Q. {currentQuiz.question}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto w-full">
@@ -23,8 +23,8 @@ export default function QuizCard({
           </button>
         ))}
       </div>
-      <p className="mt-8 text-gray-500 text-sm font-medium">
-        정답 <span className="text-green-500 font-bold">+{GAME_RULES.quizCorrectBaseScore}점</span> / 오답 <span className="text-red-500 font-bold">{GAME_RULES.quizWrongPenalty}점 (콤보 증발)</span>
+      <p className="mt-8 text-gray-700 text-sm font-medium bg-white rounded-lg px-4 py-2 inline-block">
+        정답 <span className="text-green-700 font-bold">+{GAME_RULES.quizCorrectBaseScore}점</span> / 오답 <span className="text-red-700 font-bold">{GAME_RULES.quizWrongPenalty}점 (콤보 증발)</span>
       </p>
     </div>
   );

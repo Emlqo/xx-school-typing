@@ -54,7 +54,24 @@ body {
 .spring-bg button.bg-gradient-to-r.from-teal-500:hover { background: #09658c; }
 .spring-bg .custom-scrollbar::-webkit-scrollbar-thumb { background: #77afc9; }
 .spring-bg .custom-scrollbar::-webkit-scrollbar-track { background: #edf6fb; }
-@media (max-width: 640px) { .petal:nth-child(n + 25) { display: none; } }
+.typing-playfield.spring-bg, .typing-playfield.booster-bg {
+  background-color: #a6bfc8;
+  background-blend-mode: multiply;
+  isolation: isolate;
+}
+.typing-playfield .petal { opacity: 0.55; }
+.typing-playfield .petal:nth-child(n + 53) { display: none; }
+.typing-word-board {
+  background: #153c3e;
+  border: 1px solid #76adab;
+  box-shadow: 0 12px 32px #123b3d26;
+}
+/* Keep the snow/photo behind the input in every combo and booster state. */
+.typing-input-surface { background: #fff; }
+@media (max-width: 640px) {
+  .petal:nth-child(n + 45) { display: none; }
+  .typing-playfield .petal:nth-child(n + 33) { display: none; }
+}
 @media (prefers-reduced-motion: reduce) { .petal { display: none; } .booster-bg { animation: none; } }
 
 .input-success {
