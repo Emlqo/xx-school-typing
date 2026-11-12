@@ -8,6 +8,7 @@ import { REWARD_RULES } from '../src/constants/rewards.js';
 import { isCosmeticForSale, getEquippedBoosterBonus } from '../src/constants/cosmetics.js';
 import { createShopSeason2Actions } from '../server/shopSeason2.js';
 import { SHOP_SEASON } from '../src/utils/gacha.js';
+import { isAllowedTeacherUid } from '../src/constants/teacherAccess.js';
 
 const APP_ID = 'xx-school-typing-app';
 const TEACHER_UID = String(process.env.TEACHER_UID || 'hnjJNGDuydcd4SfQ2Xq5cE6IujD3').trim();
@@ -109,7 +110,7 @@ function requirePracticeRunId(value) {
 }
 
 function requireTeacher(uid) {
-  if (uid !== TEACHER_UID) {
+  if (!isAllowedTeacherUid(uid, TEACHER_UID)) {
     throw new ApiError(403, 'api/permission-denied', '관리자 권한이 필요합니다.');
   }
 }
@@ -1224,7 +1225,7 @@ async function getDuelHistory(uid, body) {
 }
 
 async function getTeacherDuelHistory(uid, body) {
-  if (uid !== TEACHER_UID) {
+  if (!isAllowedTeacherUid(uid, TEACHER_UID)) {
     throw new ApiError(403, 'api/permission-denied', '관리자 권한이 필요합니다.');
   }
   const cursorMillis = Math.max(0, Number(body.cursorMillis || 0));
@@ -1306,7 +1307,7 @@ async function finalizeDuelInternal(uid, body, teacherFinalize = false) {
   const duelId = requireString(body.duelId, 'duelId');
   const studentId = teacherFinalize ? '' : requireString(body.studentId, 'studentId');
   if (teacherFinalize) {
-    if (uid !== TEACHER_UID) throw new ApiError(403, 'api/permission-denied', '관리자 권한이 필요합니다.');
+    if (!isAllowedTeacherUid(uid, TEACHER_UID)) throw new ApiError(403, 'api/permission-denied', '관리자 권한이 필요합니다.');
   } else {
     await requireSession(uid, studentId);
   }
@@ -1446,7 +1447,7 @@ async function finalizeExpiredDuel(uid, body) {
 }
 
 async function cancelAllActiveDuels(uid) {
-  if (uid !== TEACHER_UID) {
+  if (!isAllowedTeacherUid(uid, TEACHER_UID)) {
     throw new ApiError(403, 'api/permission-denied', '관리자 권한이 필요합니다.');
   }
 
@@ -1509,7 +1510,7 @@ async function cancelAllActiveDuels(uid) {
 }
 
 async function syncPublicClassRoster(uid) {
-  if (uid !== TEACHER_UID) throw new ApiError(403, 'api/permission-denied', '관리자 권한이 없습니다.');
+  if (!isAllowedTeacherUid(uid, TEACHER_UID)) throw new ApiError(403, 'api/permission-denied', '관리자 권한이 없습니다.');
   const students = await publicCollection(PATHS.classStudents).get();
   let batch = database().batch();
   let pending = 0;

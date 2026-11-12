@@ -12,7 +12,7 @@ service cloud.firestore {
 
     function isTeacher() {
       return isSignedIn()
-        && request.auth.uid == 'hnjJNGDuydcd4SfQ2Xq5cE6IujD3';
+        && request.auth.uid in ['hnjJNGDuydcd4SfQ2Xq5cE6IujD3', 'vioi7NZk6WOECUbsu12MMDXPOVh2'];
     }
 
     function isOwner(data) {
