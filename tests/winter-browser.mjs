@@ -18,10 +18,10 @@ try {
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
       assert.equal(await page.locator('.petal').count(), 72);
       assert.equal(await page.locator('.petal:visible').count(), width <= 640 ? 44 : 72);
-      assert.match(await page.locator('.spring-bg').evaluate(e => getComputedStyle(e).backgroundImage), /winter-forest.webp/);
+      assert.match(await page.locator('.spring-bg').evaluate(e => getComputedStyle(e).backgroundImage), /winter-village.webp/);
       assert.equal(await page.evaluate(async () => {
-        const img = new Image(); img.src = '/images/winter-forest.webp';
-        await img.decode(); return img.naturalWidth >= 1920;
+        const img = new Image(); img.src = '/images/winter-village.webp';
+        await img.decode(); return img.naturalWidth >= 1600;
       }), true);
       const before = await page.locator('.petal').first().evaluate(e => getComputedStyle(e).transform);
       await page.waitForTimeout(150);

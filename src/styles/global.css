@@ -10,14 +10,14 @@ body {
 
 /* Keep legacy class names so every screen inherits the seasonal theme. */
 .spring-bg {
-  background: #eaf4fa url('/images/winter-forest.webp') center / cover fixed no-repeat;
+  background: #eaf4fa url('/images/winter-village.webp') center / cover fixed no-repeat;
   position: relative;
   overflow: hidden;
   isolation: isolate;
 }
 .spring-bg::before, .spring-bg::after { content: none; }
 .booster-bg {
-  background: #eaf4fa url('/images/winter-forest.webp') center / cover fixed no-repeat;
+  background: #eaf4fa url('/images/winter-village.webp') center / cover fixed no-repeat;
   animation: pulse-bg 2s ease-in-out infinite alternate;
 }
 @keyframes pulse-bg {
@@ -55,8 +55,7 @@ body {
 .spring-bg .custom-scrollbar::-webkit-scrollbar-thumb { background: #77afc9; }
 .spring-bg .custom-scrollbar::-webkit-scrollbar-track { background: #edf6fb; }
 .typing-playfield.spring-bg, .typing-playfield.booster-bg {
-  background-color: #a6bfc8;
-  background-blend-mode: multiply;
+  background-color: #eaf4fa;
   isolation: isolate;
 }
 .typing-playfield .petal { opacity: 0.55; }
@@ -69,6 +68,7 @@ body {
 /* Keep the snow/photo behind the input in every combo and booster state. */
 .typing-input-surface { background: #fff; }
 @media (max-width: 640px) {
+  .spring-bg, .booster-bg { background-position: 76% center; }
   .petal:nth-child(n + 45) { display: none; }
   .typing-playfield .petal:nth-child(n + 33) { display: none; }
 }
