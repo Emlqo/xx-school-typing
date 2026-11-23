@@ -5,6 +5,7 @@ import GachaShop from './GachaShop.jsx';
 import ShopHistoryPanel from './ShopHistoryPanel.jsx';
 import { SHOP_SEASON } from '../../utils/gacha.js';
 import MemoryKingEffect from './MemoryKingEffect.jsx';
+import TypeforgeProfileGear from './TypeforgeProfileGear.jsx';
 
 export default function StudentHomeShopPanel({
   student,
@@ -19,6 +20,7 @@ export default function StudentHomeShopPanel({
   const [gachaOpen, setGachaOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [purchaseBusy, setPurchaseBusy] = useState(false);
+  const [gearRefresh, setGearRefresh] = useState(0);
   const purchaseLock = useRef(false);
   async function purchase(action) {
     if (purchaseLock.current) return;
@@ -48,10 +50,13 @@ export default function StudentHomeShopPanel({
           <p className="text-xs text-gray-500 font-bold mt-1">최고 기록 {safeToLocaleNumber(student.bestScore)}점</p>
           <button
             type="button"
-            onClick={onRefreshStudentProfile}
+            onClick={() => {
+              onRefreshStudentProfile();
+              setGearRefresh(value => value + 1);
+            }}
             className="mt-3 px-3 py-2 rounded-xl bg-white/85 hover:bg-white border border-cyan-100 text-cyan-700 text-xs font-black transition-colors"
           >
-            내 포인트/칭호 새로고침
+            프로필 새로고침
           </button>
         </div>
         <div className="rounded-2xl bg-emerald-50 border border-emerald-200 px-5 py-3 text-right">
@@ -60,6 +65,8 @@ export default function StudentHomeShopPanel({
         </div>
         </div>
       </div>
+
+      <TypeforgeProfileGear key={student.id} refreshKey={gearRefresh} />
 
       {gachaOpen ? <GachaShop key={student.id} student={student} onProfileChange={onProfileChange} onBack={() => setGachaOpen(false)} api={gachaApi} /> : <>
       <div className="flex flex-wrap gap-3 items-center justify-between mb-5"><h3 className="text-xl font-black text-teal-900">상점 시즌2 · 전교 공통</h3><button type="button" className="shop-button" onClick={() => setGachaOpen(true)}>가챠샵 들어가기</button></div>

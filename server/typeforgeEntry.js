@@ -25,12 +25,22 @@ export function issueTypeforgeAdminEntry({ origin, secret, uid, sessionExpiresAt
   return signEntry(origin, secret, { sub: uid, role: 'catalog-admin' }, sessionExpiresAt, now);
 }
 
+export function issueTypeforgeProfileGrant({ origin, secret, studentId, sessionExpiresAt, now = Date.now() }) {
+  return signClaims(secret, {
+    iss: 'pw_typing', aud: origin, purpose: 'profile-gear', sub: studentId,
+    iat: now, exp: Math.min(now + 30000, sessionExpiresAt),
+  });
+}
+
 function signEntry(origin, secret, identity, sessionExpiresAt, now) {
-  const claims = {
+  return origin + '/#pw-entry=' + signClaims(secret, {
     ...identity, iss: 'pw_typing', aud: origin, nonce: randomUUID(),
     iat: now, exp: Math.min(now + 60000, sessionExpiresAt), sessionExpiresAt,
-  };
+  });
+}
+
+function signClaims(secret, claims) {
   const encoded = Buffer.from(JSON.stringify(claims)).toString('base64url');
   const signature = createHmac('sha256', secret).update(encoded).digest('base64url');
-  return origin + '/#pw-entry=' + encoded + '.' + signature;
+  return encoded + '.' + signature;
 }

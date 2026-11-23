@@ -77,6 +77,7 @@ Vercel 환경변수:
 타자공방으로 연결할 때 기존 사이트의 Vercel 환경에 다음 값을 설정합니다.
 
 - TYPEFORGE_URL에는 타자공방의 HTTPS 기본 주소를 넣습니다.
+- TYPEFORGE_API_URL에는 장비 조회를 처리하는 타자공방 서버의 HTTPS 기본 주소를 넣습니다.
 - TYPEFORGE_BRIDGE_SECRET에는 타자공방 서버와 공유하는 32자 이상의 임의 키를 넣습니다. 서버에서만 읽는 값입니다.
 - 학생 홈에서 입장 버튼을 연결하려면 `src/services/studentSecurityApi.js`의 `createTypeforgeEntry()`를 호출하고, 반환된 `url`로 이동합니다.
 - 관리자 화면도 같은 함수를 사용합니다. 서버가 등록된 Google 관리자 계정을 확인하면 장비 도감으로 입장합니다.

@@ -7,7 +7,7 @@ import { isElementRoom, isValidElementConfig, memoryAnswers, memoryStart } from 
 import { REWARD_RULES } from '../src/constants/rewards.js';
 import { isCosmeticForSale, getEquippedBoosterBonus } from '../src/constants/cosmetics.js';
 import { createShopSeason2Actions } from '../server/shopSeason2.js';
-import { issueTypeforgeAdminEntry, issueTypeforgeEntry, typeforgeOrigin } from '../server/typeforgeEntry.js';
+import { issueTypeforgeAdminEntry, issueTypeforgeEntry, issueTypeforgeProfileGrant, typeforgeOrigin } from '../server/typeforgeEntry.js';
 import { SHOP_SEASON } from '../src/utils/gacha.js';
 import { isAllowedTeacherUid } from '../src/constants/teacherAccess.js';
 
@@ -427,29 +427,63 @@ async function cleanupExpiredStudentSessions(studentId) {
   await batch.commit();
 }
 
-async function getStudentSession(uid) {
+async function getVerifiedStudentSession(uid) {
   const sessionRef = publicCollection(PATHS.studentSessions).doc(uid);
   const sessionSnapshot = await sessionRef.get();
-  if (!sessionSnapshot.exists) return { profile: null, sessionExpiresAt: 0 };
+  if (!sessionSnapshot.exists) return null;
 
   const session = sessionSnapshot.data();
   const sessionExpiresAt = toMillis(session.expiresAt);
   if (!session.studentId || sessionExpiresAt <= Date.now()) {
     await sessionRef.delete().catch(() => {});
-    return { profile: null, sessionExpiresAt: 0 };
+    return null;
   }
 
   const { data: student } = await getActiveStudent(session.studentId);
   if (student.classId !== session.classId) {
     await sessionRef.delete().catch(() => {});
-    return { profile: null, sessionExpiresAt: 0 };
+    return null;
   }
 
+  return { studentId: session.studentId, student, sessionExpiresAt };
+}
+
+async function getStudentSession(uid) {
+  const verified = await getVerifiedStudentSession(uid);
+  if (!verified) return { profile: null, sessionExpiresAt: 0 };
+  const { studentId, student, sessionExpiresAt } = verified;
   return {
-    profile: await safeLoginProfile(session.studentId, student),
+    profile: await safeLoginProfile(studentId, student),
     sessionExpiresAt,
     studentNumber: student.studentNumber ?? student.number,
   };
+}
+
+async function getTypeforgeProfileGear(uid) {
+  const verified = await getVerifiedStudentSession(uid);
+  if (!verified) throw new ApiError(403, 'api/permission-denied', '학생으로 로그인해 주세요.');
+  const origin = typeforgeOrigin(process.env.TYPEFORGE_URL);
+  const apiOrigin = typeforgeOrigin(process.env.TYPEFORGE_API_URL);
+  const secret = process.env.TYPEFORGE_BRIDGE_SECRET;
+  if (!origin || !apiOrigin || !secret || secret.length < 32) {
+    throw new ApiError(503, 'api/unavailable', '타자공방 장비 정보를 불러올 수 없습니다.');
+  }
+  const ticket = issueTypeforgeProfileGrant({ origin: apiOrigin, secret,
+    studentId: verified.studentId, sessionExpiresAt: verified.sessionExpiresAt });
+  try {
+    const response = await fetch(apiOrigin + '/api/profile/gear', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticket }),
+      redirect: 'error', signal: AbortSignal.timeout(4000),
+    });
+    if (!response.ok) throw new Error('Typeforge response failed');
+    const { gear } = await response.json();
+    if (gear === null) return { gear: null };
+    const art = new URL(gear.art, origin);
+    if (art.origin !== origin || !art.pathname.startsWith('/assets/gear-')) throw new Error('Invalid gear art');
+    return { gear: { ...gear, art: art.href } };
+  } catch {
+    throw new ApiError(503, 'api/unavailable', '타자공방 장비 정보를 불러올 수 없습니다.');
+  }
 }
 
 async function createTypeforgeEntry(auth) {
@@ -2033,6 +2067,7 @@ const actions = {
   submitSubwayRun,
   getStudentSession,
   createTypeforgeEntry,
+  getTypeforgeProfileGear,
   logoutStudentSession,
   verifyStudentLoginPin,
   setInitialStudentLoginPin,
@@ -2084,7 +2119,7 @@ export default async function handler(request, response) {
     const action = requireString(body.action, 'action', 50);
     const actionHandler = actions[action];
     if (!actionHandler) throw new ApiError(404, 'api/not-found', '지원하지 않는 보안 작업입니다.');
-    if (action === 'createTypeforgeEntry') response.setHeader('Cache-Control', 'no-store');
+    if (action === 'createTypeforgeEntry' || action === 'getTypeforgeProfileGear') response.setHeader('Cache-Control', 'no-store');
     const data = action === 'createTypeforgeEntry'
       ? await actionHandler(decodedToken)
       : await actionHandler(decodedToken.uid, body);
