@@ -93,6 +93,7 @@ import useScoreSyncRequest from './hooks/useScoreSyncRequest.js';
 import useStudentRoomWatcher from './hooks/useStudentRoomWatcher.js';
 import useTeacherRooms from './hooks/useTeacherRooms.js';
 import useTeacherLiveDuels from './hooks/useTeacherLiveDuels.js';
+import useTypeforgeEntry from './hooks/useTypeforgeEntry.js';
 import useWords from './hooks/useWords.js';
 import LoginView from './components/views/LoginView.jsx';
 import EntryView from './components/views/EntryView.jsx';
@@ -253,6 +254,12 @@ export default function App() {
 
   const { user, authReady } = useFirebaseAuth();
   const teacherAuthorized = useMemo(() => isTeacherUser(user), [user]);
+  const typeforgeStudentId = studentSessionExpiresAt > Date.now() ? studentProfile?.id : undefined;
+  const typeforgeEntry = useTypeforgeEntry({
+    ready: authReady && studentSessionChecked,
+    studentId: typeforgeStudentId,
+    canIssue: Boolean(typeforgeStudentId || (teacherAuthorized && teacherGatePassed)),
+  });
   const scopedUser = view === 'teacher' && !teacherAuthorized ? null : user;
   const firestoreReadsEnabled = !(isPracticeMode && ['playing', 'subway', 'practiceSelection'].includes(view));
   const teacherOverviewActive = view !== 'teacher' || teacherSection === 'overview' || teacherSection === 'classes';
@@ -2964,6 +2971,25 @@ export default function App() {
     );
   }
 
+  if (typeforgeEntry.status === 'checking' || typeforgeEntry.status === 'error') {
+    return (
+      <main className="min-h-screen spring-bg flex items-center justify-center p-4">
+        <section className="glass-box rounded-3xl p-8 text-center max-w-md w-full shadow-xl">
+          <h1 className="text-2xl font-black text-gray-800">타자공방 입장</h1>
+          {typeforgeEntry.status === 'checking' ? <p className="mt-3 text-gray-600" role="status">기존 학생 로그인을 확인하고 있어요…</p> : (
+            <>
+              <p className="mt-3 text-rose-800" role="alert">{typeforgeEntry.error}</p>
+              <div className="mt-5 flex flex-wrap justify-center gap-3">
+                <button type="button" onClick={typeforgeEntry.retry} className="rounded-xl bg-teal-600 px-4 py-2 font-bold text-white">다시 입장</button>
+                <button type="button" onClick={typeforgeEntry.dismiss} className="rounded-xl border border-gray-200 bg-white px-4 py-2 font-bold text-gray-700">타자연습 홈</button>
+              </div>
+            </>
+          )}
+        </section>
+      </main>
+    );
+  }
+
   if (view === 'teacherLogin' || (view === 'teacher' && (!teacherAuthorized || !teacherGatePassed))) {
     return (
       <TeacherLoginView
@@ -2981,7 +3007,7 @@ export default function App() {
     );
   }
 
-  if (view === 'studentLogin') {
+  if (view === 'studentLogin' || (view === 'entry' && typeforgeEntry.status === 'login')) {
     return (
       <StudentLoginView
         classes={classes}
@@ -2990,7 +3016,10 @@ export default function App() {
         setSelectedClassId={setStudentLoginClassId}
         onVerifyPin={handleStudentLoginPin}
         onSetInitialPin={handleStudentInitialLoginPin}
-        onBack={() => setView('entry')}
+        onBack={() => {
+          typeforgeEntry.dismiss();
+          setView('entry');
+        }}
       />
     );
   }
