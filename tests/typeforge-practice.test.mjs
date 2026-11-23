@@ -17,6 +17,7 @@ test('practice gear tickets must be current, signed, practice-scoped and tied to
   const request = { secret, studentId, now, ticket: ticket() };
   assert.deepEqual(readTypeforgePracticeGear(request), { type: 'monitor', level: 12 });
   assert.deepEqual(readTypeforgePracticeGear({ ...request, ticket: ticket({ type: 'printer' }) }), { type: 'printer', level: 12 });
+  assert.deepEqual(readTypeforgePracticeGear({ ...request, ticket: ticket({ type: 'speaker' }) }), { type: 'speaker', level: 12 });
   assert.equal(readTypeforgePracticeGear({ ...request, ticket: ticket({ type: 'toString' }) }), null);
   assert.equal(readTypeforgePracticeGear({ ...request, studentId: 'another-student' }), null);
   assert.equal(readTypeforgePracticeGear({ ...request, now: now + 10000 }), null);
@@ -26,7 +27,7 @@ test('practice gear tickets must be current, signed, practice-scoped and tied to
 });
 
 test('all gear shares the +8 booster and +12 quiz protection thresholds', () => {
-  for (const type of ['keyboard', 'mouse', 'monitor', 'printer']) {
+  for (const type of ['keyboard', 'mouse', 'monitor', 'printer', 'speaker']) {
     for (const [level, seconds, shield] of [[7, 0, false], [8, 5, false], [11, 5, false], [12, 5, true], [20, 5, true]]) {
       const effects = getTypeforgePracticeEffects({ type, level });
       assert.deepEqual([effects.extraBoosterSeconds, effects.quizShield], [seconds, shield]);
