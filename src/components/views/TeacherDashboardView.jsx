@@ -49,9 +49,6 @@ export default function TeacherDashboardView({
   onAllowReentry = () => {},
   reentryPendingIds = [],
   finalizeRankRewards = () => {},
-  toggleBoosterPower = () => {},
-  toggleWeight = () => {},
-  toggleDifficulty = () => {},
   handleSaveAnnouncement = () => {},
   annTitle = '',
   setAnnTitle = () => {},
@@ -244,9 +241,6 @@ export default function TeacherDashboardView({
               onAllowReentry={onAllowReentry}
               reentryPendingIds={reentryPendingIds}
               finalizeRankRewards={finalizeRankRewards}
-              toggleBoosterPower={toggleBoosterPower}
-              toggleWeight={toggleWeight}
-              toggleDifficulty={toggleDifficulty}
             />
           </div>
         )}

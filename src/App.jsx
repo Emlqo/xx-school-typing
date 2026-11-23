@@ -1863,43 +1863,6 @@ export default function App() {
     }
   };
 
-  const toggleDifficulty = async (scoreId, currentDifficulty = 'normal') => {
-    if (!requireTeacherAccess()) return;
-    const nextDifficulty = currentDifficulty === 'normal' ? 'hard' : currentDifficulty === 'hard' ? 'hell' : 'normal';
-
-    try {
-      const scoreRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.scores, scoreId);
-      await updateDoc(scoreRef, { difficulty: nextDifficulty });
-    } catch (error) {
-      console.error(error);
-      alert('난이도 변경 중 오류가 발생했습니다.');
-    }
-  };
-
-  const toggleBoosterPower = async (scoreId, boosterEnabled = true) => {
-    if (!requireTeacherAccess()) return;
-    try {
-      const scoreRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.scores, scoreId);
-      await updateDoc(scoreRef, { boosterEnabled: boosterEnabled === false });
-    } catch (error) {
-      console.error(error);
-      alert('부스터 설정 변경 중 오류가 발생했습니다.');
-    }
-  };
-
-  const toggleWeight = async (scoreId, currentWeight = 1.0) => {
-    if (!requireTeacherAccess()) return;
-    const nextWeight = currentWeight === 1.0 ? 1.5 : currentWeight === 1.5 ? 2.0 : 1.0;
-
-    try {
-      const scoreRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.scores, scoreId);
-      await updateDoc(scoreRef, { pointWeight: nextWeight });
-    } catch (error) {
-      console.error(error);
-      alert('점수 배율 변경 중 오류가 발생했습니다.');
-    }
-  };
-
   const clearAnnouncementForm = () => {
     setEditingAnnId(null);
     setAnnTitle('');
@@ -3396,9 +3359,6 @@ export default function App() {
         onAllowReentry={handleAllowReentry}
         reentryPendingIds={reentryPendingIds}
         finalizeRankRewards={finalizeRankRewards}
-        toggleBoosterPower={toggleBoosterPower}
-        toggleWeight={toggleWeight}
-        toggleDifficulty={toggleDifficulty}
         handleSaveAnnouncement={handleSaveAnnouncement}
         annTitle={annTitle}
         setAnnTitle={setAnnTitle}

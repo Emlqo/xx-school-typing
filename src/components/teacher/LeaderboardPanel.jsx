@@ -6,43 +6,13 @@ import SubwayLeaderboard from './SubwayLeaderboard.jsx';
 import MemoryKingEffect from '../common/MemoryKingEffect.jsx';
 import './LeaderboardPanel.css';
 
-const difficulties = {
-  normal: { label: '보통', icon: '🌱' },
-  hard: { label: '어려움', icon: '🔥' },
-  hell: { label: '매우 어려움', icon: '💀' },
-};
-
-function ScoreSettings({ score, editable, toggleBoosterPower, toggleWeight, toggleDifficulty }) {
-  const { id, boosterEnabled, pointWeight = 1, difficulty = 'normal' } = score;
-  const enabled = boosterEnabled !== false;
-  const difficultyInfo = difficulties[difficulty] ?? difficulties.normal;
-
-  if (!editable) {
-    return <span className="scoreboard-setting-summary">부스터 {enabled ? 'ON' : 'OFF'} · ×{pointWeight || 1} · {difficultyInfo.label}</span>;
-  }
-
-  return (
-    <div className="scoreboard-setting-buttons">
-      <button type="button" className="scoreboard-setting-button" aria-pressed={enabled} onClick={() => toggleBoosterPower(id, boosterEnabled)}>
-        부스터 {enabled ? 'ON' : 'OFF'}
-      </button>
-      <button type="button" className="scoreboard-setting-button" aria-label={`점수 배율 ×${pointWeight || 1}`} onClick={() => toggleWeight(id, pointWeight || 1)}>
-        ×{pointWeight || 1}
-      </button>
-      <button type="button" className="scoreboard-setting-button" aria-label={`난이도 ${difficultyInfo.label}`} onClick={() => toggleDifficulty(id, difficulty || 'normal')}>
-        {difficultyInfo.icon}
-      </button>
-    </div>
-  );
-}
-
 function GearImage({ art, detail = false }) {
   if (!art) return null;
   return <img key={art} src={art} alt="" loading={detail ? 'eager' : 'lazy'} decoding="async" referrerPolicy="no-referrer"
     onError={event => { event.currentTarget.hidden = true; }} />;
 }
 
-function ScoreTable({ scores, showEquipment, onAllowReentry, reentryPendingIds, ...settings }) {
+function ScoreTable({ scores, showEquipment, onAllowReentry, reentryPendingIds }) {
   const [expandedId, setExpandedId] = useState(null);
   const trigger = useRef(null);
   const detailPrefix = useId();
@@ -64,7 +34,6 @@ function ScoreTable({ scores, showEquipment, onAllowReentry, reentryPendingIds, 
             <th scope="col" className="scoreboard-point-col">점수</th>
             <th scope="col" className="scoreboard-cpm-col">타수</th>
             <th scope="col" className="scoreboard-quiz-col">퀴즈</th>
-            <th scope="col" className="scoreboard-settings-col">설정</th>
           </tr>
         </thead>
         <tbody>
@@ -72,26 +41,29 @@ function ScoreTable({ scores, showEquipment, onAllowReentry, reentryPendingIds, 
             const cosmetic = getCosmeticById(score.equippedCosmetic);
             const gear = showEquipment ? score.typeforgeGear : null;
             const gearInfo = getTypeforgePracticeEffects(gear);
+            const gearName = gear?.name || gearInfo?.typeLabel;
             const expanded = expandedId === score.id;
             const detailId = detailPrefix + '-' + encodeURIComponent(score.id);
             const rank = score.screenExitDetected ? '—' : index + 1;
             const reentryPending = reentryPendingIds.includes(score.id);
             return (
               <Fragment key={score.id}>
-                <tr className={`scoreboard-row ${cosmetic?.leaderboardClass || ''}`} data-expanded={expanded || undefined}>
+                <tr className="scoreboard-row" data-expanded={expanded || undefined}>
                   <td className="scoreboard-rank-col">
                     <span className="scoreboard-rank" data-rank={rank}>{rank}</span>
                   </td>
                   <th scope="row" className="scoreboard-student-cell">
-                    {cosmetic && (cosmetic.id === 'title_memory_king' ? <MemoryKingEffect />
-                      : <span className={`cosmetic-effect ${cosmetic.effectClass || 'cosmetic-effect-aura'}`} aria-hidden="true" />)}
-                    <div className="cosmetic-name-content scoreboard-student">
-                      <div className="scoreboard-name-line">
-                        <strong>{score.nickname}</strong>
-                        {cosmetic && <span className={`scoreboard-title-badge ${cosmetic.badgeClass || 'cosmetic-badge cosmetic-badge-teal'}`}>{cosmetic.name}</span>}
+                    <div className="scoreboard-name-line">
+                      <div className={`scoreboard-name-tag ${cosmetic?.leaderboardClass || ''}`}
+                        data-title={cosmetic?.id} title={cosmetic ? `${score.nickname} · ${cosmetic.name}` : score.nickname}>
+                        {cosmetic && (cosmetic.id === 'title_memory_king' ? <MemoryKingEffect />
+                          : <span className={`cosmetic-effect ${cosmetic.effectClass || 'cosmetic-effect-aura'}`} aria-hidden="true" />)}
+                        <strong className="cosmetic-name-content">{score.nickname}</strong>
+                        {cosmetic && <span className="scoreboard-title-label cosmetic-name-content">{cosmetic.name}</span>}
                       </div>
                       {gearInfo && (
                         <button type="button" className="scoreboard-gear" data-tier={gear.tier} data-type={gear.type}
+                          aria-label={`+${gear.level} ${gearName}`} title={gearName}
                           aria-expanded={expanded} aria-controls={detailId} onClick={event => {
                             if (expanded) closeGear();
                             else {
@@ -100,33 +72,32 @@ function ScoreTable({ scores, showEquipment, onAllowReentry, reentryPendingIds, 
                             }
                           }}>
                           <GearImage art={gear.art} />
-                          <span><b>+{gear.level}</b> {gearInfo.typeLabel}</span>
+                          <b>+{gear.level}</b>
+                          <span className="scoreboard-gear-name">{gearName}</span>
                         </button>
                       )}
-                      {score.screenExitDetected && (
-                        <div className="scoreboard-reentry">
-                          <span>화면 이탈 · 진행 중단</span>
-                          <button type="button" disabled={reentryPending} onClick={() => onAllowReentry(score)}>
-                            {reentryPending ? '처리 중…' : '재입장 허용'}
-                          </button>
-                        </div>
-                      )}
-                      <div className="scoreboard-mobile-settings"><ScoreSettings score={score} {...settings} /></div>
                     </div>
+                    {score.screenExitDetected && (
+                      <div className="scoreboard-reentry">
+                        <span>화면 이탈 · 진행 중단</span>
+                        <button type="button" disabled={reentryPending} onClick={() => onAllowReentry(score)}>
+                          {reentryPending ? '처리 중…' : '재입장 허용'}
+                        </button>
+                      </div>
+                    )}
                   </th>
                   <td className="scoreboard-point-col">{safeToLocaleNumber(score.score || 0)}</td>
                   <td className="scoreboard-cpm-col">{safeToLocaleNumber(score.cpm || 0)}<span>타</span></td>
                   <td className="scoreboard-quiz-col">{score.quizCorrectCount || 0}</td>
-                  <td className="scoreboard-settings-col"><ScoreSettings score={score} {...settings} /></td>
                 </tr>
                 {gearInfo && (
                   <tr id={detailId} className="scoreboard-detail-row" hidden={!expanded}>
-                    <td colSpan={6}>
+                    <td colSpan={5}>
                       {expanded && (
                         <div className="scoreboard-gear-detail" role="region" aria-label={`${score.nickname} 장비`}>
                           <GearImage art={gear.art} detail />
                           <div className="scoreboard-detail-copy" aria-live="polite">
-                            <strong>{gear.name || gearInfo.typeLabel}</strong>
+                            <strong>{gearName}</strong>
                             <span>+{gear.level}{gear.tier ? ` · ${gear.tier}` : ''}</span>
                           </div>
                           <button type="button" className="scoreboard-action" onClick={closeGear}>닫기</button>
@@ -138,7 +109,7 @@ function ScoreTable({ scores, showEquipment, onAllowReentry, reentryPendingIds, 
               </Fragment>
             );
           })}
-          {scores.length === 0 && <tr><td className="scoreboard-empty" colSpan={6}>등록된 기록이 아직 없어요.</td></tr>}
+          {scores.length === 0 && <tr><td className="scoreboard-empty" colSpan={5}>등록된 기록이 아직 없어요.</td></tr>}
         </tbody>
       </table>
     </div>
@@ -158,9 +129,6 @@ export default function LeaderboardPanel({
   onAllowReentry = () => {},
   reentryPendingIds = [],
   finalizeRankRewards = () => {},
-  toggleBoosterPower = () => {},
-  toggleWeight = () => {},
-  toggleDifficulty = () => {},
 }) {
   const selectedRoom = rooms.find(room => room.id === viewingRoomId);
   if (selectedRoom?.mode === 'subway') return <SubwayLeaderboard room={selectedRoom} students={students} records={leaderboardScores} currentTime={currentTime} startRoomGame={startRoomGame} requestScoreSync={requestScoreSync} onAllowReentry={onAllowReentry} reentryPendingIds={reentryPendingIds} />;
@@ -223,8 +191,7 @@ export default function LeaderboardPanel({
       {!viewingRoomId && scores.length === 0
         ? <p className="scoreboard-prompt">반을 선택하면 점수가 표시돼요.</p>
         : <ScoreTable key={viewingRoomId} scores={scores} showEquipment={isClassRoom}
-            editable={hasSelection && waiting} reentryPendingIds={reentryPendingIds} onAllowReentry={onAllowReentry}
-            toggleBoosterPower={toggleBoosterPower} toggleWeight={toggleWeight} toggleDifficulty={toggleDifficulty} />}
+            reentryPendingIds={reentryPendingIds} onAllowReentry={onAllowReentry} />}
     </section>
   );
 }

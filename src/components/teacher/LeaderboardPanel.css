@@ -53,7 +53,6 @@
 
 .scoreboard-actions { gap: .4rem; }
 .scoreboard-action,
-.scoreboard-setting-button,
 .scoreboard-reentry button {
   border: 1px solid #e7dbeb;
   border-radius: .5rem;
@@ -66,8 +65,7 @@
 .scoreboard-action.primary { border-color: #315f58; background: #306c60; color: #fff; }
 .scoreboard-action.reward { border-color: #ead4a8; background: #fff1cf; color: #694918; }
 .scoreboard-action:disabled { opacity: .58; }
-.scoreboard-action:not(:disabled):hover,
-.scoreboard-setting-button:hover { box-shadow: 0 1px 5px #49275620; }
+.scoreboard-action:not(:disabled):hover { box-shadow: 0 1px 5px #49275620; }
 
 .teacher-scoreboard button:focus-visible {
   outline: 2px solid #7856aa;
@@ -100,7 +98,7 @@
 .scoreboard-attendance.complete { margin: 0; color: #346a59; }
 
 .scoreboard-table-wrap { overflow-x: auto; }
-.scoreboard-table { width: 100%; border-collapse: collapse; text-align: left; font-size: .82rem; }
+.scoreboard-table { width: 100%; table-layout: fixed; border-collapse: collapse; text-align: left; font-size: .82rem; }
 .scoreboard-table thead { background: var(--score-tint); color: var(--score-muted); font-size: .72rem; }
 .scoreboard-table :is(th, td) { padding: .56rem .65rem; }
 .scoreboard-table thead th { font-weight: 750; }
@@ -108,6 +106,9 @@
 .scoreboard-row[data-expanded],
 .scoreboard-row:hover { background-color: #fcf8fc; }
 .scoreboard-table .scoreboard-rank-col { width: 3.7rem; text-align: center; white-space: nowrap; }
+.scoreboard-table th.scoreboard-point-col { width: clamp(3.4rem, 14cqw, 8rem); }
+.scoreboard-table th.scoreboard-cpm-col { width: clamp(2.65rem, 11cqw, 6rem); }
+.scoreboard-table th.scoreboard-quiz-col { width: clamp(2rem, 9cqw, 5rem); }
 .scoreboard-rank {
   display: inline-grid;
   width: 1.65rem;
@@ -124,19 +125,37 @@
 .scoreboard-rank[data-rank="2"] { background: #e9eef7; color: #4d5f78; }
 .scoreboard-rank[data-rank="3"] { background: #fbede3; color: #895035; }
 
-.scoreboard-student-cell { position: relative; overflow: hidden; }
-.scoreboard-student-cell .cosmetic-effect { opacity: .45; }
-.scoreboard-student { display: flex; flex-direction: column; align-items: flex-start; gap: .29rem; }
-.scoreboard-name-line { display: flex; align-items: center; flex-wrap: wrap; gap: .25rem .45rem; }
-.scoreboard-name-line > strong { overflow-wrap: anywhere; font-size: .91rem; font-weight: 800; }
-.scoreboard-title-badge {
-  max-width: 100%;
-  padding: .14rem .45rem;
-  border-radius: .6rem;
+.scoreboard-name-line { display: flex; align-items: center; gap: .55rem; min-width: 0; }
+.scoreboard-name-tag {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: .3rem;
+  max-width: 43%;
+}
+.scoreboard-name-tag:only-child { max-width: 100%; }
+.scoreboard-name-tag[data-title] {
+  isolation: isolate;
+  overflow: hidden;
+  padding: .17rem .37rem;
+  border-radius: .46rem;
+}
+.scoreboard-name-tag .cosmetic-effect { inset: 0; opacity: .4; border-radius: inherit; }
+.scoreboard-name-tag > strong,
+.scoreboard-title-label,
+.scoreboard-gear-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.scoreboard-name-tag > strong { flex: 0 0 auto; max-width: 100%; font-size: .9rem; font-weight: 800; }
+.scoreboard-title-label {
+  flex: 0 1 auto;
+  padding-inline-start: .3rem;
+  border-inline-start: 1px solid currentColor;
   font-size: .68rem;
-  font-weight: 800;
-  line-height: 1.27;
-  overflow-wrap: anywhere;
+  font-weight: 750;
 }
 
 .scoreboard-gear {
@@ -145,7 +164,8 @@
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: .35rem;
+  gap: .32rem;
+  min-width: 0;
   padding: .15rem .42rem .15rem .16rem;
   border: 1px solid var(--gear-border);
   border-radius: .43rem;
@@ -155,8 +175,8 @@
   font-weight: 725;
   text-align: left;
 }
-.scoreboard-gear b { margin-inline-end: .1rem; color: var(--gear-accent); }
-.scoreboard-gear img { width: 2rem; height: 1.32rem; border-radius: .19rem; object-fit: cover; }
+.scoreboard-gear b { flex: none; color: var(--gear-accent); }
+.scoreboard-gear img { flex: none; width: 2rem; height: 1.32rem; border-radius: .19rem; object-fit: cover; }
 .scoreboard-gear[data-tier="전설"] { --gear-accent: #805621; --gear-border: #d2ad66; }
 .scoreboard-gear[data-tier="신화"] { --gear-accent: #683aa2; --gear-border: #b78adf; }
 .scoreboard-gear[data-tier="우주"] { --gear-accent: #405caa; --gear-border: #93acde; }
@@ -184,14 +204,7 @@
 .scoreboard-table td.scoreboard-cpm-col { color: var(--score-muted); font-weight: 700; }
 .scoreboard-cpm-col span { margin-inline-start: .12rem; font-weight: 500; font-size: .68rem; }
 .scoreboard-table td.scoreboard-quiz-col { color: #56489b; font-weight: 750; }
-.scoreboard-table .scoreboard-settings-col { text-align: center; }
-.scoreboard-setting-summary { color: var(--score-muted); font-size: .69rem; white-space: nowrap; }
-.scoreboard-setting-buttons { display: flex; justify-content: center; flex-wrap: wrap; gap: .2rem; }
-.scoreboard-setting-button { padding: .22rem .32rem; font-size: .68rem; }
-.scoreboard-setting-button[aria-pressed="true"] { color: #8b411b; background: #fff0dc; border-color: #e8c39a; }
-.scoreboard-mobile-settings { display: none; }
-
-.scoreboard-reentry { display: flex; align-items: center; flex-wrap: wrap; gap: .25rem; color: #9c3b49; font-size: .72rem; }
+.scoreboard-reentry { display: flex; align-items: center; flex-wrap: wrap; gap: .25rem; margin-top: .25rem; color: #9c3b49; font-size: .72rem; }
 .scoreboard-reentry button { color: #26614d; padding: .16rem .35rem; }
 .scoreboard-reentry button:disabled { opacity: .55; }
 
@@ -211,17 +224,29 @@
 .scoreboard-table td.scoreboard-empty { margin: 0; padding: 1.4rem .75rem; text-align: center; color: var(--score-muted); font-size: .82rem; }
 
 @container typing-scoreboard (max-width: 37rem) {
-  .scoreboard-table .scoreboard-settings-col { display: none; }
-  .scoreboard-mobile-settings { display: block; }
-  .scoreboard-mobile-settings .scoreboard-setting-buttons { justify-content: flex-start; }
   .scoreboard-table :is(td, th) { padding-inline: .35rem; }
   .scoreboard-table .scoreboard-rank-col { width: 2.2rem; }
+  .scoreboard-name-line { gap: .33rem; }
   .scoreboard-table td.scoreboard-point-col { font-size: .9rem; }
+}
+
+@container typing-scoreboard (max-width: 30rem) {
+  .scoreboard-title-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    border: 0;
+    clip-path: inset(50%);
+  }
+  .scoreboard-gear img { width: 1.5rem; height: 1.1rem; }
 }
 
 @container typing-scoreboard (max-width: 21rem) {
   .scoreboard-table :is(td, th) { padding-inline: .24rem; }
-  .scoreboard-mobile-settings .scoreboard-setting-summary { white-space: normal; }
+  .scoreboard-name-tag > strong { font-size: .82rem; }
+  .scoreboard-gear { font-size: .67rem; gap: .2rem; padding-inline: .15rem .28rem; }
+  .scoreboard-gear img { width: 1.35rem; height: 1rem; }
 }
 
 @media (pointer: coarse) {
