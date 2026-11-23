@@ -7,7 +7,7 @@ import { isElementRoom, isValidElementConfig, memoryAnswers, memoryStart } from 
 import { REWARD_RULES } from '../src/constants/rewards.js';
 import { isCosmeticForSale, getEquippedBoosterBonus } from '../src/constants/cosmetics.js';
 import { createShopSeason2Actions } from '../server/shopSeason2.js';
-import { issueTypeforgeAdminEntry, issueTypeforgeEntry, issueTypeforgeProfileGrant, typeforgeOrigin } from '../server/typeforgeEntry.js';
+import { issueTypeforgeAdminEntry, issueTypeforgeEntry, issueTypeforgeProfileGrant, readTypeforgePracticeGear, typeforgeOrigin } from '../server/typeforgeEntry.js';
 import { SHOP_SEASON } from '../src/utils/gacha.js';
 import { isAllowedTeacherUid } from '../src/constants/teacherAccess.js';
 
@@ -486,14 +486,22 @@ async function getTypeforgeProfileGear(uid) {
   }
 }
 
-async function createTypeforgeEntry(auth) {
+async function verifyTypeforgePracticeGear(uid, body) {
+  const verified = await getVerifiedStudentSession(uid);
+  if (!verified) throw new ApiError(403, 'api/permission-denied', '학생으로 로그인한 뒤 장비를 다시 가져와 주세요.');
+  const gear = readTypeforgePracticeGear({ ticket: body.ticket, secret: process.env.TYPEFORGE_BRIDGE_SECRET, studentId: verified.studentId });
+  if (!gear) throw new ApiError(403, 'api/permission-denied', '장비 확인 시간이 지났거나 다른 학생의 장비예요. 장비를 다시 가져와 주세요.');
+  return { gear, expiresAt: Math.min(verified.sessionExpiresAt, Date.now() + 5 * 60 * 1000) };
+}
+
+async function createTypeforgeEntry(auth, body) {
   const uid = auth.uid;
   const origin = typeforgeOrigin(process.env.TYPEFORGE_URL);
   const secret = process.env.TYPEFORGE_BRIDGE_SECRET;
   if (!origin || !secret || secret.length < 32) {
     throw new ApiError(503, 'api/unavailable', '아직 타자공방 연결을 준비 중입니다.');
   }
-  if (auth.firebase?.sign_in_provider === 'google.com' && isAllowedTeacherUid(uid, TEACHER_UID)) {
+  if (body.returnToPractice !== true && auth.firebase?.sign_in_provider === 'google.com' && isAllowedTeacherUid(uid, TEACHER_UID)) {
     const now = Date.now();
     const sessionExpiresAt = auth.exp * 1000;
     return { url: issueTypeforgeAdminEntry({ origin, secret, uid, sessionExpiresAt, now }) };
@@ -516,8 +524,9 @@ async function createTypeforgeEntry(auth) {
   const parsed = Number(studentNumber ?? numberedName?.[1]);
   const number = Number.isSafeInteger(parsed) && parsed > 0 && parsed <= 999 ? parsed : null;
   if (!name || name.length > 60) throw new ApiError(409, 'api/failed-precondition', '학급 명단에 등록된 학생 이름을 확인해 주세요.');
-  return { url: issueTypeforgeEntry({ origin, secret, studentId: profile.id, classId: profile.classId,
-    grade, classNo, name, number, sessionExpiresAt }) };
+  const url = issueTypeforgeEntry({ origin, secret, studentId: profile.id, classId: profile.classId,
+    grade, classNo, name, number, sessionExpiresAt });
+  return { url: body.returnToPractice === true ? url + '&pw-practice=1' : url };
 }
 
 async function logoutStudentSession(uid) {
@@ -2068,6 +2077,7 @@ const actions = {
   getStudentSession,
   createTypeforgeEntry,
   getTypeforgeProfileGear,
+  verifyTypeforgePracticeGear,
   logoutStudentSession,
   verifyStudentLoginPin,
   setInitialStudentLoginPin,
@@ -2119,9 +2129,9 @@ export default async function handler(request, response) {
     const action = requireString(body.action, 'action', 50);
     const actionHandler = actions[action];
     if (!actionHandler) throw new ApiError(404, 'api/not-found', '지원하지 않는 보안 작업입니다.');
-    if (action === 'createTypeforgeEntry' || action === 'getTypeforgeProfileGear') response.setHeader('Cache-Control', 'no-store');
+    if (['createTypeforgeEntry', 'getTypeforgeProfileGear', 'verifyTypeforgePracticeGear'].includes(action)) response.setHeader('Cache-Control', 'no-store');
     const data = action === 'createTypeforgeEntry'
-      ? await actionHandler(decodedToken)
+      ? await actionHandler(decodedToken, body)
       : await actionHandler(decodedToken.uid, body);
     return response.status(200).json({ data });
   } catch (error) {

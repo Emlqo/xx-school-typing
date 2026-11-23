@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createTypeforgeEntry } from '../services/studentSecurityApi.js';
 
 const channelName = 'pw_typing_typeforge_entry';
-const forgeOrigin = 'https://typeforge-classroom.web.app';
+export const forgeOrigin = 'https://typeforge-classroom.web.app';
 
 function openChannel() {
   try { return new BroadcastChannel(channelName); } catch { return null; }

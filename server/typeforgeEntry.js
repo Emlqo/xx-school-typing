@@ -1,4 +1,4 @@
-import { createCipheriv, createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
+import { createCipheriv, createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 
 export function typeforgeOrigin(value) {
   try {
@@ -30,6 +30,24 @@ export function issueTypeforgeProfileGrant({ origin, secret, studentId, sessionE
     iss: 'pw_typing', aud: origin, purpose: 'profile-gear', sub: studentId,
     iat: now, exp: Math.min(now + 30000, sessionExpiresAt),
   });
+}
+
+export function readTypeforgePracticeGear({ ticket, secret, studentId, now = Date.now() }) {
+  if (typeof ticket !== 'string' || ticket.length > 1200 || typeof secret !== 'string' || secret.length < 32 ||
+      typeof studentId !== 'string' || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{43}$/.test(ticket)) return null;
+  const [encoded, signature] = ticket.split('.');
+  const supplied = Buffer.from(signature, 'base64url');
+  const expected = createHmac('sha256', secret).update(encoded).digest();
+  if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) return null;
+  try {
+    const claims = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
+    const subject = 'pw-' + createHash('sha256').update(studentId).digest('hex').slice(0, 40);
+    if (claims?.iss !== 'typeforge' || claims.aud !== 'pw_typing:free-practice' || claims.sub !== subject ||
+        !['keyboard', 'mouse', 'monitor'].includes(claims.type) || !Number.isInteger(claims.level) || claims.level < 0 || claims.level > 20 ||
+        !Number.isSafeInteger(claims.iat) || claims.iat > now + 5000 || !Number.isSafeInteger(claims.exp) || claims.exp <= now ||
+        claims.exp > claims.iat + 120000) return null;
+    return { type: claims.type, level: claims.level };
+  } catch { return null; }
 }
 
 function signEntry(origin, secret, identity, sessionExpiresAt, now) {

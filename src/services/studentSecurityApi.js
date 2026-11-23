@@ -33,8 +33,9 @@ async function call(action, payload = {}) {
 export const verifyStudentPin = (roomId, studentId, pin) => call('verifyStudentPin', { roomId, studentId, pin });
 export const setInitialStudentPin = (roomId, studentId, pin) => call('setInitialStudentPin', { roomId, studentId, pin });
 export const getStudentSession = () => call('getStudentSession');
-export const createTypeforgeEntry = () => call('createTypeforgeEntry');
+export const createTypeforgeEntry = (payload) => call('createTypeforgeEntry', payload);
 export const getTypeforgeProfileGear = () => call('getTypeforgeProfileGear');
+export const verifyTypeforgePracticeGear = (ticket) => call('verifyTypeforgePracticeGear', { ticket });
 export const logoutStudentSession = () => call('logoutStudentSession');
 export const verifyStudentLoginPin = (studentId, pin) => call('verifyStudentLoginPin', { studentId, pin });
 export const setInitialStudentLoginPin = (studentId, pin) => call('setInitialStudentLoginPin', { studentId, pin });

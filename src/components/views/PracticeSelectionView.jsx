@@ -1,12 +1,25 @@
 import CherryBlossomBackground from '../common/CherryBlossomBackground.jsx';
 import { SubwayTrain } from './SubwayGameView.jsx';
 
-export default function PracticeSelectionView({ nickname, setNickname, onTyping, onSubway, onElements, onBack }) {
+export default function PracticeSelectionView({ nickname, setNickname, onTyping, onSubway, onElements, onBack,
+  onLinkPracticeGear, practiceGear, practiceGearLoading, practiceGearError }) {
   return <main className="min-h-screen spring-bg flex items-center justify-center p-4">
     <CherryBlossomBackground />
     <section className="relative z-10 glass-box w-full max-w-5xl rounded-lg p-6 md:p-8">
       <div className="flex justify-between items-center gap-4"><h1 className="text-2xl font-black text-teal-900">자유연습</h1><button onClick={onBack} className="px-4 py-2 rounded-lg border border-teal-200 bg-white font-bold">뒤로</button></div>
       <label className="block mt-5 font-bold text-gray-700">닉네임<input aria-label="연습 닉네임" value={nickname} onChange={e => setNickname(e.target.value)} maxLength={30} className="block w-full mt-2 p-3 rounded-lg border border-teal-200 bg-white" /></label>
+      {onLinkPracticeGear && <div className="mt-4 flex flex-wrap items-center gap-3">
+        <button type="button" onClick={onLinkPracticeGear} disabled={practiceGearLoading}
+          className="rounded-lg border border-teal-300 bg-white px-3 py-2 text-sm font-bold text-teal-900 disabled:opacity-60">
+          {practiceGearLoading ? '장비 가져오는 중…' : practiceGear ? '타자공방 장비 다시 가져오기' : '타자공방 장비 가져오기'}
+        </button>
+        {practiceGear && <p className="text-sm font-bold text-teal-900" role="status">
+          +{practiceGear.level} {practiceGear.typeLabel} 장착
+          {practiceGear.extraBoosterSeconds > 0 && ' · 부스터 +5초'}
+          {practiceGear.quizShield && ' · 퀴즈 보호 1회'}
+        </p>}
+        {practiceGearError && <p role="alert" className="text-sm text-rose-800">{practiceGearError}</p>}
+      </div>}
       <div className="grid md:grid-cols-3 gap-4 mt-6">
         <button onClick={onTyping} className="rounded-lg border-2 border-teal-200 bg-white/90 p-6 text-left hover:border-teal-500">
           <div aria-hidden="true" className="grid grid-cols-3 gap-2 max-w-48 mb-6">{['가','나','다','A','B','C'].map(letter => <span key={letter} className="text-center py-3 bg-teal-50 border-b-4 border-teal-200 rounded font-black text-teal-700">{letter}</span>)}</div>

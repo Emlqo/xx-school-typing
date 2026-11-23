@@ -7,6 +7,7 @@ import QuizCard from '../game/QuizCard.jsx';
 import TypingInput from '../game/TypingInput.jsx';
 import WordDisplay from '../game/WordDisplay.jsx';
 import DuelScoreboard from '../duel/DuelScoreboard.jsx';
+import './PracticeGearEffects.css';
 
 export default function PlayingView({
   nickname = '',
@@ -29,6 +30,8 @@ export default function PlayingView({
   boosterActive = false,
   boosterTimeLeft = 0,
   activateBooster = () => {},
+  practiceGearEffects = null,
+  practiceGearCue = '',
   inputRef = null,
   duelInfo = null,
 }) {
@@ -84,6 +87,14 @@ export default function PlayingView({
         languageMismatch={languageMismatch}
       />
 
+      {practiceGearEffects?.extraBoosterSeconds > 0 && (
+        <div className="practice-gear-badges">
+          <span>부스터 +{practiceGearEffects.extraBoosterSeconds}초</span>
+          {practiceGearEffects.quizShield && <span>퀴즈 보호 1회</span>}
+          {practiceGearEffects.level >= 12 && !practiceGearEffects.quizShield && <span>퀴즈 보호 사용 완료</span>}
+        </div>
+      )}
+
       {duelInfo && (
         <DuelScoreboard
           myName={duelInfo.myName}
@@ -93,7 +104,13 @@ export default function PlayingView({
         />
       )}
 
-      <div className="flex-1 flex flex-col items-center justify-center max-w-4xl w-full mx-auto z-10 py-4">
+      <div className="relative flex-1 flex flex-col items-center justify-center max-w-4xl w-full mx-auto z-10 py-4">
+        {practiceGearCue && (
+          <div key={practiceGearCue} className="practice-gear-cue" data-cue={practiceGearCue} role="status">
+            <span aria-hidden="true" className="practice-gear-pulse" />
+            <strong>{practiceGearCue === 'booster' ? '⚡ 부스터 연장 · 30초' : '🛡 퀴즈 보호 · 점수와 콤보 유지!'}</strong>
+          </div>
+        )}
         {currentQuiz ? (
           <QuizCard
             currentQuiz={currentQuiz}

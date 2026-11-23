@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import useGameFocusGuard from './hooks/useGameFocusGuard.js';
+import useTypeforgePracticeGear from './hooks/useTypeforgePracticeGear.js';
 import { enterGameFullscreen, readScreenExit, rememberScreenExit, isFocusGuardEnabled } from './utils/fairPlay.js';
+import { getTypeforgePracticeEffects } from './utils/typeforgePractice.js';
 import {
   addDoc,
   arrayRemove,
@@ -165,6 +167,8 @@ export default function App() {
   const [boosterAvailable, setBoosterAvailable] = useState(true);
   const [boosterActive, setBoosterActive] = useState(false);
   const [boosterTimeLeft, setBoosterTimeLeft] = useState(0);
+  const [practiceGearEffects, setPracticeGearEffects] = useState(null);
+  const [practiceGearCue, setPracticeGearCue] = useState('');
   const [isPracticeMode, setIsPracticeMode] = useState(false);
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [newRoomName, setNewRoomName] = useState('');
@@ -243,6 +247,8 @@ export default function App() {
   const lastSyncedScoreRef = useRef(0);
   const isEndingRef = useRef(false);
   const practiceRunIdRef = useRef('');
+  const practiceQuizShieldRef = useRef(false);
+  const practiceGearArrivalHandledRef = useRef(false);
   const autoAnnouncementShownRef = useRef(false);
   const duelWordIndexRef = useRef(0);
   const duelQuizIndexRef = useRef(0);
@@ -260,6 +266,8 @@ export default function App() {
     studentId: typeforgeStudentId,
     canIssue: Boolean(typeforgeStudentId || (teacherAuthorized && teacherGatePassed)),
   });
+  const typeforgePractice = useTypeforgePracticeGear({ ready: authReady && studentSessionChecked, studentId: typeforgeStudentId });
+  const selectedPracticeEffects = useMemo(() => getTypeforgePracticeEffects(typeforgePractice.gear), [typeforgePractice.gear]);
   const scopedUser = view === 'teacher' && !teacherAuthorized ? null : user;
   const firestoreReadsEnabled = !(isPracticeMode && ['playing', 'subway', 'practiceSelection'].includes(view));
   const teacherOverviewActive = view !== 'teacher' || teacherSection === 'overview' || teacherSection === 'classes';
@@ -759,6 +767,9 @@ export default function App() {
     setBoosterAvailable(true);
     setBoosterActive(false);
     setBoosterTimeLeft(0);
+    setPracticeGearEffects(null);
+    setPracticeGearCue('');
+    practiceQuizShieldRef.current = false;
     setIsPracticeMode(practiceMode);
     setLastReward(getDefaultRewardState());
     setScoreSaveFailed(false);
@@ -829,19 +840,28 @@ export default function App() {
       ? (window.crypto?.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2)}`)
       : '';
     resetPlayingState({ practiceMode: true, duration: 300, mode: 'mixed' });
+    const equipment = typeforgePractice.expiresAt > Date.now() ? selectedPracticeEffects : null;
+    setPracticeGearEffects(equipment);
+    practiceQuizShieldRef.current = Boolean(equipment?.quizShield);
     pendingQuizzesRef.current = [...quizzes].sort(() => Math.random() - 0.5);
     wordCountRef.current = 0;
     pickRandomWord('mixed', { practiceMode: true });
     setView('playing');
-  }, [nickname, pickRandomWord, quizzes, resetPlayingState, studentProfile?.id]);
+  }, [nickname, pickRandomWord, quizzes, resetPlayingState, selectedPracticeEffects, studentProfile?.id, typeforgePractice.expiresAt]);
 
-  const openPracticeSelection = () => {
+  const openPracticeSelection = useCallback(() => {
     setSelectedRoomId('');
     setCurrentScoreDocId(null);
     setMyRoomData(null);
     setIsPracticeMode(true);
     setView('practiceSelection');
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!typeforgePractice.arrivalSettled || practiceGearArrivalHandledRef.current) return;
+    practiceGearArrivalHandledRef.current = true;
+    openPracticeSelection();
+  }, [openPracticeSelection, typeforgePractice.arrivalSettled]);
 
   const startSubwayPractice = () => {
     if (!nickname.trim()) return alert('닉네임을 입력해주세요.');
@@ -1287,6 +1307,13 @@ export default function App() {
           : item
       )));
       window.setTimeout(() => setShowSuccess(false), 700);
+    } else if (isPracticeMode && !isDuelMode && practiceQuizShieldRef.current) {
+      practiceQuizShieldRef.current = false;
+      setPracticeGearEffects(previous => previous && { ...previous, quizShield: false });
+      setLastEarned(0);
+      setIsError(false);
+      setShowSuccess(false);
+      setPracticeGearCue('shield');
     } else {
       const penalty = getQuizWrongPenalty();
       setScore((prevScore) => prevScore + penalty);
@@ -1299,7 +1326,7 @@ export default function App() {
     duelSyncDirtyRef.current = isDuelMode || duelSyncDirtyRef.current;
     if (isDuelMode) pickDuelContent();
     else pickRandomWord(gameMode);
-  }, [boosterActive, currentQuiz, currentScoreDocId, gameMode, isDuelMode, myDuelScore, pickDuelContent, pickRandomWord, scores]);
+  }, [boosterActive, currentQuiz, currentScoreDocId, gameMode, isDuelMode, isPracticeMode, myDuelScore, pickDuelContent, pickRandomWord, scores]);
 
   const activateBooster = useCallback(async () => {
     if (!boosterAvailable || boosterActive || duelBoosterActivationRef.current) return;
@@ -1339,9 +1366,17 @@ export default function App() {
 
     setBoosterActive(true);
     setBoosterAvailable(false);
-    const bonus = getScoreBoosterBonus(myInfo, isPracticeMode);
+    const bonus = isPracticeMode ? practiceGearEffects?.extraBoosterSeconds ?? 0 : getScoreBoosterBonus(myInfo, false);
     setBoosterTimeLeft(GAME_RULES.boosterDuration + bonus);
-  }, [activeDuel?.id, boosterActive, boosterAvailable, currentScoreDocId, isDuelMode, isPracticeMode, myDuelScore, scores, studentProfile?.id]);
+    if (isPracticeMode && bonus) setPracticeGearCue('booster');
+  }, [activeDuel?.id, boosterActive, boosterAvailable, currentScoreDocId, isDuelMode, isPracticeMode, myDuelScore,
+    practiceGearEffects?.extraBoosterSeconds, scores, studentProfile?.id]);
+
+  useEffect(() => {
+    if (!practiceGearCue) return undefined;
+    const timer = window.setTimeout(() => setPracticeGearCue(''), 1550);
+    return () => window.clearTimeout(timer);
+  }, [practiceGearCue]);
 
   useStudentRoomWatcher({
     user,
@@ -3196,6 +3231,8 @@ export default function App() {
         boosterActive={boosterActive}
         boosterTimeLeft={boosterTimeLeft}
         activateBooster={activateBooster}
+        practiceGearEffects={isPracticeMode ? practiceGearEffects : null}
+        practiceGearCue={isPracticeMode ? practiceGearCue : ''}
         inputRef={inputRef}
         duelInfo={isDuelMode && activeDuel ? {
           myName: studentProfile?.name || nickname,
@@ -3393,7 +3430,10 @@ export default function App() {
     );
   }
 
-  if (view === 'practiceSelection') return <PracticeSelectionView nickname={nickname} setNickname={setNickname} onTyping={startPractice} onSubway={startSubwayPractice} onElements={startElementPractice} onBack={handleBackToLogin} />;
+  if (view === 'practiceSelection') return <PracticeSelectionView nickname={nickname} setNickname={setNickname} onTyping={startPractice}
+    onSubway={startSubwayPractice} onElements={startElementPractice} onBack={handleBackToLogin}
+    onLinkPracticeGear={typeforgeStudentId ? typeforgePractice.link : null} practiceGear={selectedPracticeEffects}
+    practiceGearLoading={typeforgePractice.linking} practiceGearError={typeforgePractice.error} />;
 
   if (view === 'entry' || !studentProfile) {
     return (
