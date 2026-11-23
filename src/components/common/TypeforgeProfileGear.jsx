@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { getTypeforgeProfileGear } from '../../services/studentSecurityApi.js';
+import { typeforgeEquipmentTypes } from '../../utils/typeforgePractice.js';
 import './TypeforgeProfileGear.css';
-
-const typeLabels = { keyboard: '키보드', mouse: '마우스', monitor: '모니터' };
 
 export default function TypeforgeProfileGear({ refreshKey }) {
   const [result, setResult] = useState({ loading: true });
@@ -30,7 +29,7 @@ export default function TypeforgeProfileGear({ refreshKey }) {
       {gear ? (
         <>
           <div className="typeforge-profile-card__content">
-            <p className="typeforge-profile-card__label">타자공방 장비 <span>{typeLabels[gear.type]}</span></p>
+            <p className="typeforge-profile-card__label">타자공방 장비 <span>{typeforgeEquipmentTypes[gear.type]}</span></p>
             <div className="typeforge-profile-card__rank">
               <span className="typeforge-profile-card__level">+{gear.level}</span>
               <span className="typeforge-profile-card__tier">{gear.tier}</span>

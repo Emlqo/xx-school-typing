@@ -1,4 +1,5 @@
 import { createCipheriv, createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { typeforgeEquipmentTypes } from '../src/utils/typeforgePractice.js';
 
 export function typeforgeOrigin(value) {
   try {
@@ -43,7 +44,7 @@ export function readTypeforgePracticeGear({ ticket, secret, studentId, now = Dat
     const claims = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
     const subject = 'pw-' + createHash('sha256').update(studentId).digest('hex').slice(0, 40);
     if (claims?.iss !== 'typeforge' || claims.aud !== 'pw_typing:free-practice' || claims.sub !== subject ||
-        !['keyboard', 'mouse', 'monitor'].includes(claims.type) || !Number.isInteger(claims.level) || claims.level < 0 || claims.level > 20 ||
+        !Object.hasOwn(typeforgeEquipmentTypes, claims.type) || !Number.isInteger(claims.level) || claims.level < 0 || claims.level > 20 ||
         !Number.isSafeInteger(claims.iat) || claims.iat > now + 5000 || !Number.isSafeInteger(claims.exp) || claims.exp <= now ||
         claims.exp > claims.iat + 120000) return null;
     return { type: claims.type, level: claims.level };
