@@ -32,6 +32,7 @@ export default function PlayingView({
   activateBooster = () => {},
   practiceGearEffects = null,
   practiceGearCue = '',
+  quizAnswerPending = false,
   inputRef = null,
   duelInfo = null,
 }) {
@@ -115,6 +116,8 @@ export default function PlayingView({
           <QuizCard
             currentQuiz={currentQuiz}
             handleQuizAnswer={handleQuizAnswer}
+            answerPending={quizAnswerPending}
+            shieldAvailable={Boolean(practiceGearEffects?.quizShield)}
           />
         ) : (
           <>

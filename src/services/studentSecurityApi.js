@@ -8,7 +8,7 @@ export const fulfillShopPurchase = (purchaseId) => call('fulfillShopPurchase', {
 
 export const submitSubwayRun = (scoreId, answers, hints = {}) => call('submitSubwayRun', { scoreId, answers, hints });
 
-async function call(action, payload = {}) {
+async function call(action, payload = {}, signal) {
   const currentUser = auth.currentUser;
   if (!currentUser) throw new Error('로그인이 필요합니다.');
 
@@ -20,11 +20,13 @@ async function call(action, payload = {}) {
       Authorization: `Bearer ${idToken}`,
     },
     body: JSON.stringify({ action, ...payload }),
+    signal,
   });
   const result = await response.json().catch(() => ({}));
   if (!response.ok) {
     const error = new Error(result.error?.message || '보안 API 요청에 실패했습니다.');
     error.code = result.error?.code || 'api/error';
+    error.status = response.status;
     throw error;
   }
   return result.data;
@@ -40,6 +42,15 @@ export const logoutStudentSession = () => call('logoutStudentSession');
 export const verifyStudentLoginPin = (studentId, pin) => call('verifyStudentLoginPin', { studentId, pin });
 export const setInitialStudentLoginPin = (studentId, pin) => call('setInitialStudentLoginPin', { studentId, pin });
 export const joinClassGame = (roomId, studentId) => call('joinClassGame', { roomId, studentId });
+export async function useTypeforgeRoomBenefit(scoreId, benefit, attemptId) {
+  const payload = { scoreId, benefit, attemptId };
+  try {
+    return await call('useTypeforgeRoomBenefit', payload, AbortSignal.timeout(2500));
+  } catch (error) {
+    if (error.status && error.status < 500) throw error;
+    return call('useTypeforgeRoomBenefit', payload, AbortSignal.timeout(3000));
+  }
+}
 export const joinGuestGame = (roomCode, nickname) => call('joinGuestGame', { roomCode, nickname });
 export async function buyStudentShopItem(studentId, itemId, expectedPrice) {
   const key = `shop-season2-buy-${studentId}-${itemId}`;

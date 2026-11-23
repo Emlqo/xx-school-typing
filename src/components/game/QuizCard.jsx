@@ -3,6 +3,8 @@ import { GAME_RULES } from '../../constants/gameRules.js';
 export default function QuizCard({
   currentQuiz,
   handleQuizAnswer = () => {},
+  answerPending = false,
+  shieldAvailable = false,
 }) {
   if (!currentQuiz) return null;
 
@@ -17,14 +19,17 @@ export default function QuizCard({
           <button
             key={`${option}-${index}`}
             onClick={() => handleQuizAnswer(index)}
-            className="bg-white border-2 border-indigo-200 hover:bg-indigo-50 hover:border-indigo-500 hover:text-indigo-700 text-gray-700 font-bold text-xl md:text-2xl py-6 px-4 rounded-2xl shadow-sm transition-all transform hover:scale-[1.02]"
+            disabled={answerPending}
+            className="bg-white border-2 border-indigo-200 hover:bg-indigo-50 hover:border-indigo-500 hover:text-indigo-700 disabled:opacity-60 text-gray-700 font-bold text-xl md:text-2xl py-6 px-4 rounded-2xl shadow-sm transition-all transform hover:scale-[1.02]"
           >
             {index + 1}. {option}
           </button>
         ))}
       </div>
       <p className="mt-8 text-gray-700 text-sm font-medium bg-white rounded-lg px-4 py-2 inline-block">
-        정답 <span className="text-green-700 font-bold">+{GAME_RULES.quizCorrectBaseScore}점</span> / 오답 <span className="text-red-700 font-bold">{GAME_RULES.quizWrongPenalty}점 (콤보 증발)</span>
+        정답 <span className="text-green-700 font-bold">+{GAME_RULES.quizCorrectBaseScore}점</span> / 오답 {shieldAvailable
+          ? <span className="text-teal-700 font-bold">장비 보호 1회</span>
+          : <span className="text-red-700 font-bold">{GAME_RULES.quizWrongPenalty}점 (콤보 증발)</span>}
       </p>
     </div>
   );

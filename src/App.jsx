@@ -46,8 +46,8 @@ import {
   getDuelHistory,
   getTeacherDuelHistory,
   getStudentSession,
-  getTypeforgeProfileGear,
   joinClassGame,
+  useTypeforgeRoomBenefit,
   joinGuestGame,
   logoutStudentSession,
   recordPracticeCompletion,
@@ -172,6 +172,7 @@ export default function App() {
   const [boosterTimeLeft, setBoosterTimeLeft] = useState(0);
   const [practiceGearEffects, setPracticeGearEffects] = useState(null);
   const [practiceGearCue, setPracticeGearCue] = useState('');
+  const [quizAnswerPending, setQuizAnswerPending] = useState(false);
   const [isPracticeMode, setIsPracticeMode] = useState(false);
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [newRoomName, setNewRoomName] = useState('');
@@ -250,7 +251,8 @@ export default function App() {
   const lastSyncedScoreRef = useRef(0);
   const isEndingRef = useRef(false);
   const practiceRunIdRef = useRef('');
-  const practiceQuizShieldRef = useRef(false);
+  const quizShieldRef = useRef(false);
+  const quizAnswerPendingRef = useRef(false);
   const practiceGearArrivalHandledRef = useRef(false);
   const autoAnnouncementShownRef = useRef(false);
   const duelWordIndexRef = useRef(0);
@@ -772,7 +774,10 @@ export default function App() {
     setBoosterTimeLeft(0);
     setPracticeGearEffects(null);
     setPracticeGearCue('');
-    practiceQuizShieldRef.current = false;
+    roomResultGear.current = null;
+    quizShieldRef.current = false;
+    quizAnswerPendingRef.current = false;
+    setQuizAnswerPending(false);
     setIsPracticeMode(practiceMode);
     setLastReward(getDefaultRewardState());
     setScoreSaveFailed(false);
@@ -845,7 +850,7 @@ export default function App() {
     resetPlayingState({ practiceMode: true, duration: 300, mode: 'mixed' });
     const equipment = typeforgePractice.expiresAt > Date.now() ? selectedPracticeEffects : null;
     setPracticeGearEffects(equipment);
-    practiceQuizShieldRef.current = Boolean(equipment?.quizShield);
+    quizShieldRef.current = Boolean(equipment?.quizShield);
     pendingQuizzesRef.current = [...quizzes].sort(() => Math.random() - 0.5);
     wordCountRef.current = 0;
     pickRandomWord('mixed', { practiceMode: true });
@@ -1021,12 +1026,6 @@ export default function App() {
       const scoreData = joined.score;
       const scoreDocId = scoreData.id;
 
-      if (roomData.mode !== 'subway' && roomResultGear.current?.scoreId !== scoreDocId) {
-        const round = { scoreId: scoreDocId, gear: null };
-        roomResultGear.current = round;
-        void getTypeforgeProfileGear().then(({ gear }) => { round.gear = gear; }).catch(() => {});
-      }
-
       const difficulty = scoreData?.difficulty || 'normal';
       const nextGameMode = difficulty === 'hell' ? 'en' : difficulty === 'hard' ? 'mixed' : roomData.mode || 'ko';
 
@@ -1037,6 +1036,18 @@ export default function App() {
       resetPlayingState({ practiceMode: false, duration, mode: nextGameMode });
       restoreScoreState(scoreData);
       createLocalScoreSnapshot(scoreDocId, scoreData);
+      const gear = roomData.mode === 'subway' ? null : scoreData.typeforgeGear;
+      const effects = getTypeforgePracticeEffects(gear);
+      const boosterUntil = Number(scoreData.typeforgeBoosterUntil || 0);
+      roomResultGear.current = { scoreId: scoreDocId, gear, boosterUntil };
+      quizShieldRef.current = Boolean(effects?.quizShield && !scoreData.typeforgeShieldAttemptId);
+      setPracticeGearEffects(effects && { ...effects, quizShield: quizShieldRef.current });
+      if (boosterUntil) {
+        const seconds = Math.max(0, Math.ceil((boosterUntil - Date.now()) / 1000));
+        setBoosterAvailable(false);
+        setBoosterActive(seconds > 0 && scoreData.boosterEnabled !== false);
+        setBoosterTimeLeft(scoreData.boosterEnabled === false ? 0 : seconds);
+      }
 
       screenExitRef.current = '';
       screenExitRevisionRef.current = Number(scoreData.screenExitRevision || 0);
@@ -1052,8 +1063,9 @@ export default function App() {
       }
 
       if (roomData.status === 'playing') {
-        setTimeLeft(remainingSeconds);
-        gameInfoRef.current.elapsed = Math.max(0, duration - remainingSeconds);
+        const seconds = getRemainingSeconds(roomData);
+        setTimeLeft(seconds);
+        gameInfoRef.current.elapsed = Math.max(0, duration - seconds);
         pendingQuizzesRef.current = [...quizzes].sort(() => Math.random() - 0.5);
         wordCountRef.current = 0;
         pickRandomWord(nextGameMode, { practiceMode: false });
@@ -1298,10 +1310,37 @@ export default function App() {
     setIsError(true);
   }, [boosterActive, combo, currentQuiz, currentScoreDocId, currentWord, gameMode, inputValue, isDuelMode, myDuelScore, pickDuelContent, pickRandomWord, playComboSound, scores]);
 
-  const handleQuizAnswer = useCallback((answerIndex) => {
-    if (!currentQuiz) return;
+  const handleQuizAnswer = useCallback(async (answerIndex) => {
+    if (!currentQuiz || quizAnswerPendingRef.current || timeLeft <= 0) return;
 
     const myInfo = isDuelMode ? myDuelScore || {} : scores.find((item) => item.id === currentScoreDocId) || {};
+
+    let protectedAnswer = false;
+    if (!isDuelMode && answerIndex !== currentQuiz.answer && quizShieldRef.current) {
+      const round = roomResultGear.current;
+      if (isPracticeMode) {
+        protectedAnswer = true;
+        quizShieldRef.current = false;
+      } else if (round?.scoreId === currentScoreDocId) {
+        quizAnswerPendingRef.current = true;
+        setQuizAnswerPending(true);
+        try {
+          const result = await useTypeforgeRoomBenefit(currentScoreDocId, 'shield', crypto.randomUUID());
+          if (roomResultGear.current !== round) return;
+          protectedAnswer = result.protected === true;
+          quizShieldRef.current = false;
+        } catch {
+          // Apply the ordinary wrong-answer rule if the server cannot confirm protection.
+        } finally {
+          if (roomResultGear.current === round) {
+            quizAnswerPendingRef.current = false;
+            setQuizAnswerPending(false);
+          }
+        }
+        if (roomResultGear.current !== round || screenExitRef.current === currentScoreDocId) return;
+      }
+      if (!quizShieldRef.current) setPracticeGearEffects(previous => previous && { ...previous, quizShield: false });
+    }
 
     if (answerIndex === currentQuiz.answer) {
       const earned = calculateQuizScore({
@@ -1318,9 +1357,7 @@ export default function App() {
           : item
       )));
       window.setTimeout(() => setShowSuccess(false), 700);
-    } else if (isPracticeMode && !isDuelMode && practiceQuizShieldRef.current) {
-      practiceQuizShieldRef.current = false;
-      setPracticeGearEffects(previous => previous && { ...previous, quizShield: false });
+    } else if (protectedAnswer) {
       setLastEarned(0);
       setIsError(false);
       setShowSuccess(false);
@@ -1337,7 +1374,7 @@ export default function App() {
     duelSyncDirtyRef.current = isDuelMode || duelSyncDirtyRef.current;
     if (isDuelMode) pickDuelContent();
     else pickRandomWord(gameMode);
-  }, [boosterActive, currentQuiz, currentScoreDocId, gameMode, isDuelMode, isPracticeMode, myDuelScore, pickDuelContent, pickRandomWord, scores]);
+  }, [boosterActive, currentQuiz, currentScoreDocId, gameMode, isDuelMode, isPracticeMode, myDuelScore, pickDuelContent, pickRandomWord, scores, timeLeft]);
 
   const activateBooster = useCallback(async () => {
     if (!boosterAvailable || boosterActive || duelBoosterActivationRef.current) return;
@@ -1368,6 +1405,29 @@ export default function App() {
         } else {
           setBoosterAvailable(true);
           alert(error.message || '부스터를 활성화하지 못했습니다.');
+        }
+      } finally {
+        duelBoosterActivationRef.current = false;
+      }
+      return;
+    }
+
+    const round = roomResultGear.current;
+    if (!isPracticeMode && round?.scoreId === currentScoreDocId && practiceGearEffects?.extraBoosterSeconds) {
+      duelBoosterActivationRef.current = true;
+      setBoosterAvailable(false);
+      try {
+        const { boosterUntil } = await useTypeforgeRoomBenefit(currentScoreDocId, 'booster');
+        if (roomResultGear.current !== round || screenExitRef.current === currentScoreDocId) return;
+        round.boosterUntil = boosterUntil;
+        const seconds = Math.max(0, Math.ceil((boosterUntil - Date.now()) / 1000));
+        setBoosterTimeLeft(seconds);
+        setBoosterActive(seconds > 0);
+        if (seconds > 0) setPracticeGearCue('booster');
+      } catch (error) {
+        if (roomResultGear.current === round) {
+          setBoosterAvailable(true);
+          alert(error.message || '장비 부스터를 사용할 수 없습니다.');
         }
       } finally {
         duelBoosterActivationRef.current = false;
@@ -1468,10 +1528,10 @@ export default function App() {
   }, [activeDuel, gameDuration, isDuelMode, view]);
 
   useEffect(() => {
-    if (view === 'playing' && timeLeft <= 0) {
+    if (view === 'playing' && timeLeft <= 0 && !quizAnswerPending) {
       endGame();
     }
-  }, [endGame, timeLeft, view]);
+  }, [endGame, quizAnswerPending, timeLeft, view]);
 
   useEffect(() => {
     if (view !== 'duelFinishing' || !isDuelMode || isEndingRef.current) return;
@@ -1483,7 +1543,10 @@ export default function App() {
 
     const timer = window.setInterval(() => {
       setBoosterTimeLeft((prevTimeLeft) => {
-        const nextTimeLeft = Math.max(prevTimeLeft - 1, 0);
+        const classBoosterUntil = roomResultGear.current?.boosterUntil;
+        const nextTimeLeft = classBoosterUntil
+          ? Math.max(Math.ceil((classBoosterUntil - Date.now()) / 1000), 0)
+          : Math.max(prevTimeLeft - 1, 0);
         if (nextTimeLeft === 0) {
           setBoosterActive(false);
         }
@@ -3242,8 +3305,9 @@ export default function App() {
         boosterActive={boosterActive}
         boosterTimeLeft={boosterTimeLeft}
         activateBooster={activateBooster}
-        practiceGearEffects={isPracticeMode ? practiceGearEffects : null}
-        practiceGearCue={isPracticeMode ? practiceGearCue : ''}
+        practiceGearEffects={practiceGearEffects}
+        practiceGearCue={practiceGearCue}
+        quizAnswerPending={quizAnswerPending}
         inputRef={inputRef}
         duelInfo={isDuelMode && activeDuel ? {
           myName: studentProfile?.name || nickname,

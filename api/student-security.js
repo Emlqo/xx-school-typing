@@ -10,6 +10,8 @@ import { createShopSeason2Actions } from '../server/shopSeason2.js';
 import { issueTypeforgeAdminEntry, issueTypeforgeEntry, issueTypeforgeProfileGrant, readTypeforgePracticeGear, typeforgeOrigin } from '../server/typeforgeEntry.js';
 import { SHOP_SEASON } from '../src/utils/gacha.js';
 import { isAllowedTeacherUid } from '../src/constants/teacherAccess.js';
+import { GAME_RULES } from '../src/constants/gameRules.js';
+import { getTypeforgePracticeEffects } from '../src/utils/typeforgePractice.js';
 
 const APP_ID = 'xx-school-typing-app';
 const TEACHER_UID = String(process.env.TEACHER_UID || 'hnjJNGDuydcd4SfQ2Xq5cE6IujD3').trim();
@@ -462,14 +464,17 @@ async function getStudentSession(uid) {
 async function getTypeforgeProfileGear(uid) {
   const verified = await getVerifiedStudentSession(uid);
   if (!verified) throw new ApiError(403, 'api/permission-denied', '학생으로 로그인해 주세요.');
+  return { gear: await readTypeforgeGear(verified) };
+}
+
+async function readTypeforgeGear({ studentId, sessionExpiresAt }) {
   const origin = typeforgeOrigin(process.env.TYPEFORGE_URL);
   const apiOrigin = typeforgeOrigin(process.env.TYPEFORGE_API_URL);
   const secret = process.env.TYPEFORGE_BRIDGE_SECRET;
   if (!origin || !apiOrigin || !secret || secret.length < 32) {
     throw new ApiError(503, 'api/unavailable', '타자공방 장비 정보를 불러올 수 없습니다.');
   }
-  const ticket = issueTypeforgeProfileGrant({ origin: apiOrigin, secret,
-    studentId: verified.studentId, sessionExpiresAt: verified.sessionExpiresAt });
+  const ticket = issueTypeforgeProfileGrant({ origin: apiOrigin, secret, studentId, sessionExpiresAt });
   try {
     const response = await fetch(apiOrigin + '/api/profile/gear', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticket }),
@@ -477,10 +482,10 @@ async function getTypeforgeProfileGear(uid) {
     });
     if (!response.ok) throw new Error('Typeforge response failed');
     const { gear } = await response.json();
-    if (gear === null) return { gear: null };
+    if (gear === null) return null;
     const art = new URL(gear.art, origin);
     if (art.origin !== origin || !art.pathname.startsWith('/assets/gear-')) throw new Error('Invalid gear art');
-    return { gear: { ...gear, art: art.href } };
+    return { ...gear, art: art.href };
   } catch {
     throw new ApiError(503, 'api/unavailable', '타자공방 장비 정보를 불러올 수 없습니다.');
   }
@@ -647,67 +652,63 @@ async function joinClassGame(uid, body) {
     .where('studentId', '==', studentId)
     .limit(10)
     .get();
-  let scoreRef;
+  const preferredScoreDoc = [...existing.docs].sort((left, right) => {
+    const leftData = left.data();
+    const rightData = right.data();
+    const leftHasProgress = Number(leftData.score || 0) !== 0
+      || Number(leftData.correctChars || 0) > 0
+      || Number(leftData.quizCorrectCount || 0) > 0;
+    const rightHasProgress = Number(rightData.score || 0) !== 0
+      || Number(rightData.correctChars || 0) > 0
+      || Number(rightData.quizCorrectCount || 0) > 0;
+    if (leftHasProgress !== rightHasProgress) return rightHasProgress ? 1 : -1;
+    const updatedDiff = toMillis(rightData.updatedAt) - toMillis(leftData.updatedAt);
+    if (updatedDiff !== 0) return updatedDiff;
+    const createdDiff = toMillis(rightData.createdAt) - toMillis(leftData.createdAt);
+    if (createdDiff !== 0) return createdDiff;
+    return Number(rightData.score || 0) - Number(leftData.score || 0);
+  })[0];
+  const previous = preferredScoreDoc?.data() ?? {};
+  const gear = room.mode === 'subway' || Object.hasOwn(previous, 'typeforgeGear')
+    ? undefined : await readTypeforgeGear({ studentId, sessionExpiresAt }).catch(() => undefined);
+  const gearField = gear === undefined ? {} : { typeforgeGear: gear };
+  const scoreRef = preferredScoreDoc?.ref ?? publicCollection(PATHS.scores).doc(`class_${roomId}_${studentId}`);
   let score;
-  if (!existing.empty) {
-    const preferredScoreDoc = [...existing.docs].sort((left, right) => {
-      const leftData = left.data();
-      const rightData = right.data();
-      const leftHasProgress = Number(leftData.score || 0) !== 0
-        || Number(leftData.correctChars || 0) > 0
-        || Number(leftData.quizCorrectCount || 0) > 0;
-      const rightHasProgress = Number(rightData.score || 0) !== 0
-        || Number(rightData.correctChars || 0) > 0
-        || Number(rightData.quizCorrectCount || 0) > 0;
-      if (leftHasProgress !== rightHasProgress) return rightHasProgress ? 1 : -1;
-      const updatedDiff = toMillis(rightData.updatedAt) - toMillis(leftData.updatedAt);
-      if (updatedDiff !== 0) return updatedDiff;
-      const createdDiff = toMillis(rightData.createdAt) - toMillis(leftData.createdAt);
-      if (createdDiff !== 0) return createdDiff;
-      return Number(rightData.score || 0) - Number(leftData.score || 0);
-    })[0];
-    scoreRef = preferredScoreDoc.ref;
-    await scoreRef.update({ userId: uid, updatedAt: FieldValue.serverTimestamp() });
-    score = { ...preferredScoreDoc.data(), userId: uid, updatedAt: Timestamp.now() };
-  } else {
-    scoreRef = publicCollection(PATHS.scores).doc(`class_${roomId}_${studentId}`);
-    await database().runTransaction(async (transaction) => {
-      const scoreSnapshot = await transaction.get(scoreRef);
-      if (scoreSnapshot.exists) {
-        score = { ...scoreSnapshot.data(), userId: uid };
-        transaction.update(scoreRef, { userId: uid, updatedAt: FieldValue.serverTimestamp() });
-        return;
-      }
-
-      score = {
-        roomId,
-        classId: room.classId,
-        className: room.className || room.name || '',
-        studentId,
-        nickname: student.name || '',
-        entryType: 'class',
-        gameType: room.mode === 'subway' ? 'subway' : 'typing',
-        equippedCosmetic: student.equippedCosmetic || null,
-        boosterBonusSeconds: room.mode === 'subway' ? 0 : getEquippedBoosterBonus(student),
-        score: 0,
-        cpm: 0,
-        correctChars: 0,
-        difficulty: 'normal',
-        boosterEnabled: true,
-        pointWeight: 1,
-        userId: uid,
-        quizCorrectCount: 0,
-        createdAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
-      };
-      transaction.set(scoreRef, score);
-    });
+  await database().runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(scoreRef);
+    if (snapshot.exists) {
+      const saved = snapshot.data();
+      const updates = { userId: uid, ...(Object.hasOwn(saved, 'typeforgeGear') ? {} : gearField) };
+      transaction.update(scoreRef, { ...updates, updatedAt: FieldValue.serverTimestamp() });
+      score = { ...saved, ...updates };
+      return;
+    }
     score = {
-      ...score,
-      createdAt: toMillis(score.createdAt) ? score.createdAt : Timestamp.now(),
-      updatedAt: Timestamp.now(),
+      roomId,
+      classId: room.classId,
+      className: room.className || room.name || '',
+      studentId,
+      nickname: student.name || '',
+      entryType: 'class',
+      gameType: room.mode === 'subway' ? 'subway' : 'typing',
+      equippedCosmetic: student.equippedCosmetic || null,
+      boosterBonusSeconds: room.mode === 'subway' ? 0 : getEquippedBoosterBonus(student),
+      ...gearField,
+      score: 0,
+      cpm: 0,
+      correctChars: 0,
+      difficulty: 'normal',
+      boosterEnabled: true,
+      pointWeight: 1,
+      userId: uid,
+      quizCorrectCount: 0,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
     };
-  }
+    transaction.set(scoreRef, score);
+  });
+  const now = Timestamp.now();
+  score = { ...score, createdAt: toMillis(score.createdAt) ? score.createdAt : now, updatedAt: now };
   await publicCollection(PATHS.roomPresence).doc(`${roomId}_${studentId}`).set({
     roomId,
     classId: room.classId,
@@ -716,6 +717,52 @@ async function joinClassGame(uid, body) {
     joinedAt: FieldValue.serverTimestamp(),
   }, { merge: true });
   return { score: safeScore(scoreRef.id, score), profile: safeProfile(studentId, student), sessionExpiresAt };
+}
+
+async function useTypeforgeRoomBenefit(uid, body) {
+  const scoreId = requireString(body.scoreId, 'scoreId', 200);
+  const { benefit, attemptId } = body;
+  if (!['booster', 'shield'].includes(benefit) || (benefit === 'shield' && !/^[0-9a-f-]{36}$/i.test(attemptId ?? ''))) {
+    throw new ApiError(400, 'api/invalid-argument', '장비 효과 요청을 확인해 주세요.');
+  }
+  const scoreRef = publicCollection(PATHS.scores).doc(scoreId);
+  const sessionRef = publicCollection(PATHS.studentSessions).doc(uid);
+  return database().runTransaction(async (transaction) => {
+    const [snapshot, sessionSnapshot] = await Promise.all([transaction.get(scoreRef), transaction.get(sessionRef)]);
+    const score = snapshot.data();
+    const session = sessionSnapshot.data();
+    const now = Date.now();
+    if (score?.entryType !== 'class' || (score.gameType ?? 'typing') !== 'typing' || score.userId !== uid ||
+        !session?.studentId || session.studentId !== score.studentId || session.classId !== score.classId ||
+        toMillis(session.expiresAt) <= now || score.screenExitDetected) {
+      throw new ApiError(403, 'api/permission-denied', '학급 타자 참가 기록을 확인해 주세요.');
+    }
+    const effects = getTypeforgePracticeEffects(score.typeforgeGear);
+    if (benefit === 'shield') {
+      if (!effects?.quizShield) return { protected: false };
+      if (score.typeforgeShieldAttemptId) return { protected: score.typeforgeShieldAttemptId === attemptId };
+    } else {
+      if (!effects?.extraBoosterSeconds || score.boosterEnabled === false) {
+        throw new ApiError(409, 'api/failed-precondition', '현재 장비 부스터를 사용할 수 없습니다.');
+      }
+      if (score.typeforgeBoosterUntil) return { boosterUntil: score.typeforgeBoosterUntil };
+    }
+
+    const room = (await transaction.get(publicCollection(PATHS.rooms).doc(score.roomId))).data();
+    const end = toMillis(room?.expiresAt);
+    if (room?.entryType !== 'class' || room.classId !== score.classId || room.mode === 'subway' ||
+        room.status !== 'playing' || (end > 0 && end <= now)) {
+      throw new ApiError(409, 'api/failed-precondition', '진행 중인 학급 타자 방에서 사용할 수 있습니다.');
+    }
+    if (benefit === 'shield') {
+      transaction.update(scoreRef, { typeforgeShieldAttemptId: attemptId });
+      return { protected: true };
+    }
+    const durationMs = (GAME_RULES.boosterDuration + effects.extraBoosterSeconds) * 1000;
+    const boosterUntil = end > 0 ? Math.min(now + durationMs, end) : now + durationMs;
+    transaction.update(scoreRef, { typeforgeBoosterUntil: boosterUntil });
+    return { boosterUntil };
+  });
 }
 
 async function joinGuestGame(uid, body) {
@@ -2084,6 +2131,7 @@ const actions = {
   verifyStudentPin,
   setInitialStudentPin,
   joinClassGame,
+  useTypeforgeRoomBenefit,
   joinGuestGame,
   buyStudentShopItem,
   equipStudentCosmetic,
