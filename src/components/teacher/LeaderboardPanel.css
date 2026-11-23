@@ -1,0 +1,229 @@
+.teacher-scoreboard {
+  --score-ink: #26243a;
+  --score-muted: #645e73;
+  --score-accent: #8c3975;
+  --score-rule: #eee5ef;
+  --score-tint: #fcf7fc;
+  container: typing-scoreboard / inline-size;
+  align-self: start;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #eaddeb;
+  border-radius: 1.25rem;
+  background: #fff;
+  color: var(--score-ink);
+  box-shadow: 0 .55rem 1.55rem #5540680d;
+}
+
+.scoreboard-header,
+.scoreboard-heading,
+.scoreboard-actions,
+.scoreboard-overview {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.scoreboard-header {
+  justify-content: space-between;
+  gap: .75rem;
+  padding: 1.1rem clamp(.75rem, 3vw, 1.4rem);
+}
+
+.scoreboard-heading { gap: .45rem .65rem; }
+.scoreboard-heading h2 {
+  margin: 0;
+  color: var(--score-accent);
+  font-size: clamp(1.12rem, 3vw, 1.5rem);
+  font-weight: 850;
+  line-height: 1.3;
+}
+
+.scoreboard-status {
+  border-radius: 999px;
+  padding: .2rem .5rem;
+  background: #f1eafa;
+  color: #665184;
+  font-size: .69rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.scoreboard-status[data-phase="live"] { background: #ffedf2; color: #97344f; }
+.scoreboard-status[data-phase="finished"] { background: #e5f6f0; color: #236a58; }
+
+.scoreboard-actions { gap: .4rem; }
+.scoreboard-action,
+.scoreboard-setting-button,
+.scoreboard-reentry button {
+  border: 1px solid #e7dbeb;
+  border-radius: .5rem;
+  background: #fff;
+  color: #5e496b;
+  font-weight: 750;
+  white-space: nowrap;
+}
+.scoreboard-action { padding: .45rem .65rem; font-size: .78rem; }
+.scoreboard-action.primary { border-color: #315f58; background: #306c60; color: #fff; }
+.scoreboard-action.reward { border-color: #ead4a8; background: #fff1cf; color: #694918; }
+.scoreboard-action:disabled { opacity: .58; }
+.scoreboard-action:not(:disabled):hover,
+.scoreboard-setting-button:hover { box-shadow: 0 1px 5px #49275620; }
+
+.teacher-scoreboard button:focus-visible {
+  outline: 2px solid #7856aa;
+  outline-offset: 2px;
+}
+
+.scoreboard-overview {
+  gap: .4rem 1rem;
+  padding: .65rem clamp(.75rem, 3vw, 1.4rem);
+  border-block: 1px solid var(--score-rule);
+  background: #fffbfd;
+}
+.scoreboard-summary { display: flex; align-items: center; gap: .5rem 1rem; margin: 0; }
+.scoreboard-summary > div { display: flex; align-items: baseline; gap: .4rem; }
+.scoreboard-summary dt,
+.scoreboard-summary dd span { color: var(--score-muted); font-size: .73rem; font-weight: 650; }
+.scoreboard-summary dd { margin: 0; color: var(--score-accent); font-size: 1rem; font-weight: 850; font-variant-numeric: tabular-nums; }
+.scoreboard-summary dd span { margin-inline-start: .12rem; }
+
+.scoreboard-attendance {
+  display: flex;
+  align-items: baseline;
+  gap: .35rem;
+  color: #81541e;
+  font-size: .72rem;
+}
+.scoreboard-attendance strong { flex: none; }
+.scoreboard-attendance ul { display: flex; flex-wrap: wrap; gap: .15rem .5rem; margin: 0; padding: 0; list-style: none; }
+.scoreboard-attendance li { overflow-wrap: anywhere; }
+.scoreboard-attendance.complete { margin: 0; color: #346a59; }
+
+.scoreboard-table-wrap { overflow-x: auto; }
+.scoreboard-table { width: 100%; border-collapse: collapse; text-align: left; font-size: .82rem; }
+.scoreboard-table thead { background: var(--score-tint); color: var(--score-muted); font-size: .72rem; }
+.scoreboard-table :is(th, td) { padding: .56rem .65rem; }
+.scoreboard-table thead th { font-weight: 750; }
+.scoreboard-table .scoreboard-row { border-top: 1px solid var(--score-rule); }
+.scoreboard-row[data-expanded],
+.scoreboard-row:hover { background-color: #fcf8fc; }
+.scoreboard-table .scoreboard-rank-col { width: 3.7rem; text-align: center; white-space: nowrap; }
+.scoreboard-rank {
+  display: inline-grid;
+  width: 1.65rem;
+  height: 1.65rem;
+  place-items: center;
+  border-radius: .45rem;
+  background: #f5eff8;
+  color: #635b71;
+  font-size: .78rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.scoreboard-rank[data-rank="1"] { background: #fff0ce; color: #77541b; }
+.scoreboard-rank[data-rank="2"] { background: #e9eef7; color: #4d5f78; }
+.scoreboard-rank[data-rank="3"] { background: #fbede3; color: #895035; }
+
+.scoreboard-student-cell { position: relative; overflow: hidden; }
+.scoreboard-student-cell .cosmetic-effect { opacity: .45; }
+.scoreboard-student { display: flex; flex-direction: column; align-items: flex-start; gap: .29rem; }
+.scoreboard-name-line { display: flex; align-items: center; flex-wrap: wrap; gap: .25rem .45rem; }
+.scoreboard-name-line > strong { overflow-wrap: anywhere; font-size: .91rem; font-weight: 800; }
+.scoreboard-title-badge {
+  max-width: 100%;
+  padding: .14rem .45rem;
+  border-radius: .6rem;
+  font-size: .68rem;
+  font-weight: 800;
+  line-height: 1.27;
+  overflow-wrap: anywhere;
+}
+
+.scoreboard-gear {
+  --gear-accent: #5f5574;
+  --gear-border: #dcd2e3;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  padding: .15rem .42rem .15rem .16rem;
+  border: 1px solid var(--gear-border);
+  border-radius: .43rem;
+  background: #fff;
+  color: var(--score-ink);
+  font-size: .72rem;
+  font-weight: 725;
+  text-align: left;
+}
+.scoreboard-gear b { margin-inline-end: .1rem; color: var(--gear-accent); }
+.scoreboard-gear img { width: 2rem; height: 1.32rem; border-radius: .19rem; object-fit: cover; }
+.scoreboard-gear[data-tier="전설"] { --gear-accent: #805621; --gear-border: #d2ad66; }
+.scoreboard-gear[data-tier="신화"] { --gear-accent: #683aa2; --gear-border: #b78adf; }
+.scoreboard-gear[data-tier="우주"] { --gear-accent: #405caa; --gear-border: #93acde; }
+.scoreboard-gear[data-tier="최종"] {
+  --gear-accent: #654793;
+  --finale: linear-gradient(110deg, #e0a5cf, #ad94df, #80c8dc);
+  border-color: transparent;
+  background: linear-gradient(#fff, #fff) padding-box, var(--finale) border-box;
+}
+.scoreboard-gear[data-tier="최종"][data-type="keyboard"] { --finale: linear-gradient(110deg, #a687e6, #f177a8, #f4c2dc); }
+.scoreboard-gear[data-tier="최종"][data-type="mouse"] { --finale: linear-gradient(110deg, #a87ed5, #c99761, #edc779); }
+.scoreboard-gear[data-tier="최종"][data-type="monitor"] { --finale: linear-gradient(110deg, #efa7bb, #74bc91, #e8bc6b, #82a8df); }
+.scoreboard-gear[data-tier="최종"][data-type="printer"] { --finale: linear-gradient(110deg, #f4b486, #b99bd7, #88abd5); }
+.scoreboard-gear[data-tier="최종"][data-type="speaker"] { --finale: linear-gradient(110deg, #9c83cd, #efe3fa, #a7a4c5); }
+.scoreboard-gear[data-tier="최종"][data-type="gpu"] { --finale: linear-gradient(110deg, #ec9dc6, #b494e4, #78bde4, #79cdb3, #eac07d); }
+.scoreboard-gear:hover,
+.scoreboard-gear[aria-expanded="true"] { box-shadow: 0 0 0 2px #ac8adc41; }
+
+.scoreboard-table :is(.scoreboard-point-col, .scoreboard-cpm-col, .scoreboard-quiz-col) {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.scoreboard-table td.scoreboard-point-col { color: var(--score-accent); font-weight: 850; font-size: 1.02rem; }
+.scoreboard-table td.scoreboard-cpm-col { color: var(--score-muted); font-weight: 700; }
+.scoreboard-cpm-col span { margin-inline-start: .12rem; font-weight: 500; font-size: .68rem; }
+.scoreboard-table td.scoreboard-quiz-col { color: #56489b; font-weight: 750; }
+.scoreboard-table .scoreboard-settings-col { text-align: center; }
+.scoreboard-setting-summary { color: var(--score-muted); font-size: .69rem; white-space: nowrap; }
+.scoreboard-setting-buttons { display: flex; justify-content: center; flex-wrap: wrap; gap: .2rem; }
+.scoreboard-setting-button { padding: .22rem .32rem; font-size: .68rem; }
+.scoreboard-setting-button[aria-pressed="true"] { color: #8b411b; background: #fff0dc; border-color: #e8c39a; }
+.scoreboard-mobile-settings { display: none; }
+
+.scoreboard-reentry { display: flex; align-items: center; flex-wrap: wrap; gap: .25rem; color: #9c3b49; font-size: .72rem; }
+.scoreboard-reentry button { color: #26614d; padding: .16rem .35rem; }
+.scoreboard-reentry button:disabled { opacity: .55; }
+
+.scoreboard-detail-row > td { padding: 0; border-top: 1px solid var(--score-rule); }
+.scoreboard-gear-detail {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  padding: .7rem clamp(.6rem, 3vw, 1.4rem);
+  background: var(--score-tint);
+}
+.scoreboard-gear-detail img { width: clamp(4.2rem, 21cqw, 7rem); aspect-ratio: 1.6; border-radius: .42rem; object-fit: cover; }
+.scoreboard-detail-copy { flex: 1; min-width: 0; display: grid; gap: .15rem; overflow-wrap: anywhere; }
+.scoreboard-detail-copy > strong { color: var(--score-ink); font-weight: 850; }
+.scoreboard-detail-copy > span { color: var(--score-muted); font-size: .73rem; }
+.scoreboard-prompt,
+.scoreboard-table td.scoreboard-empty { margin: 0; padding: 1.4rem .75rem; text-align: center; color: var(--score-muted); font-size: .82rem; }
+
+@container typing-scoreboard (max-width: 37rem) {
+  .scoreboard-table .scoreboard-settings-col { display: none; }
+  .scoreboard-mobile-settings { display: block; }
+  .scoreboard-mobile-settings .scoreboard-setting-buttons { justify-content: flex-start; }
+  .scoreboard-table :is(td, th) { padding-inline: .35rem; }
+  .scoreboard-table .scoreboard-rank-col { width: 2.2rem; }
+  .scoreboard-table td.scoreboard-point-col { font-size: .9rem; }
+}
+
+@container typing-scoreboard (max-width: 21rem) {
+  .scoreboard-table :is(td, th) { padding-inline: .24rem; }
+  .scoreboard-mobile-settings .scoreboard-setting-summary { white-space: normal; }
+}
+
+@media (pointer: coarse) {
+  .scoreboard-action, .scoreboard-gear { min-height: 2.35rem; }
+}

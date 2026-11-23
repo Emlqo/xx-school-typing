@@ -1,7 +1,149 @@
+import { Fragment, useId, useRef, useState } from 'react';
 import { safeToLocaleNumber } from '../../utils/format.js';
 import { getCosmeticById } from '../../constants/cosmetics.js';
+import { getTypeforgePracticeEffects } from '../../utils/typeforgePractice.js';
 import SubwayLeaderboard from './SubwayLeaderboard.jsx';
 import MemoryKingEffect from '../common/MemoryKingEffect.jsx';
+import './LeaderboardPanel.css';
+
+const difficulties = {
+  normal: { label: '보통', icon: '🌱' },
+  hard: { label: '어려움', icon: '🔥' },
+  hell: { label: '매우 어려움', icon: '💀' },
+};
+
+function ScoreSettings({ score, editable, toggleBoosterPower, toggleWeight, toggleDifficulty }) {
+  const { id, boosterEnabled, pointWeight = 1, difficulty = 'normal' } = score;
+  const enabled = boosterEnabled !== false;
+  const difficultyInfo = difficulties[difficulty] ?? difficulties.normal;
+
+  if (!editable) {
+    return <span className="scoreboard-setting-summary">부스터 {enabled ? 'ON' : 'OFF'} · ×{pointWeight || 1} · {difficultyInfo.label}</span>;
+  }
+
+  return (
+    <div className="scoreboard-setting-buttons">
+      <button type="button" className="scoreboard-setting-button" aria-pressed={enabled} onClick={() => toggleBoosterPower(id, boosterEnabled)}>
+        부스터 {enabled ? 'ON' : 'OFF'}
+      </button>
+      <button type="button" className="scoreboard-setting-button" aria-label={`점수 배율 ×${pointWeight || 1}`} onClick={() => toggleWeight(id, pointWeight || 1)}>
+        ×{pointWeight || 1}
+      </button>
+      <button type="button" className="scoreboard-setting-button" aria-label={`난이도 ${difficultyInfo.label}`} onClick={() => toggleDifficulty(id, difficulty || 'normal')}>
+        {difficultyInfo.icon}
+      </button>
+    </div>
+  );
+}
+
+function GearImage({ art, detail = false }) {
+  if (!art) return null;
+  return <img key={art} src={art} alt="" loading={detail ? 'eager' : 'lazy'} decoding="async" referrerPolicy="no-referrer"
+    onError={event => { event.currentTarget.hidden = true; }} />;
+}
+
+function ScoreTable({ scores, showEquipment, onAllowReentry, reentryPendingIds, ...settings }) {
+  const [expandedId, setExpandedId] = useState(null);
+  const trigger = useRef(null);
+  const detailPrefix = useId();
+
+  function closeGear() {
+    setExpandedId(null);
+    trigger.current?.focus();
+  }
+
+  return (
+    <div className="scoreboard-table-wrap" onKeyDown={event => {
+      if (event.key === 'Escape' && expandedId !== null) closeGear();
+    }}>
+      <table className="scoreboard-table" aria-label="학생 점수">
+        <thead>
+          <tr>
+            <th scope="col" className="scoreboard-rank-col">순위</th>
+            <th scope="col">학생</th>
+            <th scope="col" className="scoreboard-point-col">점수</th>
+            <th scope="col" className="scoreboard-cpm-col">타수</th>
+            <th scope="col" className="scoreboard-quiz-col">퀴즈</th>
+            <th scope="col" className="scoreboard-settings-col">설정</th>
+          </tr>
+        </thead>
+        <tbody>
+          {scores.map((score, index) => {
+            const cosmetic = getCosmeticById(score.equippedCosmetic);
+            const gear = showEquipment ? score.typeforgeGear : null;
+            const gearInfo = getTypeforgePracticeEffects(gear);
+            const expanded = expandedId === score.id;
+            const detailId = detailPrefix + '-' + encodeURIComponent(score.id);
+            const rank = score.screenExitDetected ? '—' : index + 1;
+            const reentryPending = reentryPendingIds.includes(score.id);
+            return (
+              <Fragment key={score.id}>
+                <tr className={`scoreboard-row ${cosmetic?.leaderboardClass || ''}`} data-expanded={expanded || undefined}>
+                  <td className="scoreboard-rank-col">
+                    <span className="scoreboard-rank" data-rank={rank}>{rank}</span>
+                  </td>
+                  <th scope="row" className="scoreboard-student-cell">
+                    {cosmetic && (cosmetic.id === 'title_memory_king' ? <MemoryKingEffect />
+                      : <span className={`cosmetic-effect ${cosmetic.effectClass || 'cosmetic-effect-aura'}`} aria-hidden="true" />)}
+                    <div className="cosmetic-name-content scoreboard-student">
+                      <div className="scoreboard-name-line">
+                        <strong>{score.nickname}</strong>
+                        {cosmetic && <span className={`scoreboard-title-badge ${cosmetic.badgeClass || 'cosmetic-badge cosmetic-badge-teal'}`}>{cosmetic.name}</span>}
+                      </div>
+                      {gearInfo && (
+                        <button type="button" className="scoreboard-gear" data-tier={gear.tier} data-type={gear.type}
+                          aria-expanded={expanded} aria-controls={detailId} onClick={event => {
+                            if (expanded) closeGear();
+                            else {
+                              trigger.current = event.currentTarget;
+                              setExpandedId(score.id);
+                            }
+                          }}>
+                          <GearImage art={gear.art} />
+                          <span><b>+{gear.level}</b> {gearInfo.typeLabel}</span>
+                        </button>
+                      )}
+                      {score.screenExitDetected && (
+                        <div className="scoreboard-reentry">
+                          <span>화면 이탈 · 진행 중단</span>
+                          <button type="button" disabled={reentryPending} onClick={() => onAllowReentry(score)}>
+                            {reentryPending ? '처리 중…' : '재입장 허용'}
+                          </button>
+                        </div>
+                      )}
+                      <div className="scoreboard-mobile-settings"><ScoreSettings score={score} {...settings} /></div>
+                    </div>
+                  </th>
+                  <td className="scoreboard-point-col">{safeToLocaleNumber(score.score || 0)}</td>
+                  <td className="scoreboard-cpm-col">{safeToLocaleNumber(score.cpm || 0)}<span>타</span></td>
+                  <td className="scoreboard-quiz-col">{score.quizCorrectCount || 0}</td>
+                  <td className="scoreboard-settings-col"><ScoreSettings score={score} {...settings} /></td>
+                </tr>
+                {gearInfo && (
+                  <tr id={detailId} className="scoreboard-detail-row" hidden={!expanded}>
+                    <td colSpan={6}>
+                      {expanded && (
+                        <div className="scoreboard-gear-detail" role="region" aria-label={`${score.nickname} 장비`}>
+                          <GearImage art={gear.art} detail />
+                          <div className="scoreboard-detail-copy" aria-live="polite">
+                            <strong>{gear.name || gearInfo.typeLabel}</strong>
+                            <span>+{gear.level}{gear.tier ? ` · ${gear.tier}` : ''}</span>
+                          </div>
+                          <button type="button" className="scoreboard-action" onClick={closeGear}>닫기</button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            );
+          })}
+          {scores.length === 0 && <tr><td className="scoreboard-empty" colSpan={6}>등록된 기록이 아직 없어요.</td></tr>}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 export default function LeaderboardPanel({
   leaderboardScores = [],
@@ -20,184 +162,69 @@ export default function LeaderboardPanel({
   toggleWeight = () => {},
   toggleDifficulty = () => {},
 }) {
-  const selectedRoom = rooms.find((room) => room.id === viewingRoomId);
-  const displayScores = [
+  const selectedRoom = rooms.find(room => room.id === viewingRoomId);
+  if (selectedRoom?.mode === 'subway') return <SubwayLeaderboard room={selectedRoom} students={students} records={leaderboardScores} currentTime={currentTime} startRoomGame={startRoomGame} requestScoreSync={requestScoreSync} onAllowReentry={onAllowReentry} reentryPendingIds={reentryPendingIds} />;
+
+  const scores = [
     ...leaderboardScores.filter(score => !score.screenExitDetected),
     ...leaderboardScores.filter(score => score.screenExitDetected),
   ];
-  if (selectedRoom?.mode === 'subway') return <SubwayLeaderboard room={selectedRoom} students={students} records={leaderboardScores} currentTime={currentTime} startRoomGame={startRoomGame} requestScoreSync={requestScoreSync} onAllowReentry={onAllowReentry} reentryPendingIds={reentryPendingIds} />;
   const expiresAt = typeof selectedRoom?.expiresAt?.toMillis === 'function'
     ? selectedRoom.expiresAt.toMillis()
     : Number(selectedRoom?.expiresAt || 0);
-  const gameEnded = selectedRoom?.status === 'playing' && expiresAt > 0 && expiresAt <= currentTime;
+  const waiting = selectedRoom?.status === 'waiting';
+  const playing = selectedRoom?.status === 'playing';
+  const gameEnded = playing && expiresAt > 0 && expiresAt <= currentTime;
   const isClassRoom = selectedRoom?.entryType === 'class';
-  const enteredStudentIds = new Set(
-    leaderboardScores
-      .filter((score) => score.studentId)
-      .map((score) => score.studentId),
-  );
-  const missingStudents = isClassRoom
-    ? students.filter((student) => student.active !== false && !enteredStudentIds.has(student.id))
-    : [];
-  const title = viewingRoomId === 'all'
-    ? '풍양중 전체 명예의 전당'
-    : viewingRoomId === ''
-      ? '학생 점수 확인 (반을 선택하세요)'
-      : `[${selectedRoom?.name || '선택한 반'}] 실시간 점수판`;
+  const entered = new Set(leaderboardScores.filter(score => score.studentId).map(score => score.studentId));
+  const activeStudents = isClassRoom ? students.filter(student => student.active !== false) : [];
+  const missingStudents = activeStudents.filter(student => !entered.has(student.id));
+  const hasSelection = Boolean(viewingRoomId && viewingRoomId !== 'all');
+  const title = viewingRoomId === 'all' ? '풍양중 전체 명예의 전당'
+    : hasSelection ? `${selectedRoom?.name || selectedRoom?.className || '선택한 반'} 점수판` : '학생 점수 확인';
+  const status = waiting ? '입장 대기' : gameEnded ? '경기 종료' : playing ? '경기 진행 중' : '';
 
   return (
-    <div className="glass-box p-6 rounded-3xl col-span-1 lg:col-span-2">
-      <div className="flex flex-col gap-4 mb-6">
-        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
-          <h2 className="text-2xl font-bold text-pink-600 flex items-center gap-2 flex-wrap">
-            🏆 {title}
-            {viewingRoomId !== '' && <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full animate-pulse ml-2">🔴 LIVE</span>}
-          </h2>
-
-          {viewingRoomId !== '' && viewingRoomId !== 'all' && (
-            <div className="flex gap-2">
-              {selectedRoom?.status === 'waiting' && (
-                <button onClick={() => startRoomGame(viewingRoomId)} className="px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-xl font-bold animate-bounce shadow-lg">
-                  🚀 게임 시작!
-                </button>
-              )}
-              {selectedRoom?.status === 'playing' && (
-                <>
-                  <button onClick={() => requestScoreSync(viewingRoomId)} className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-bold shadow-lg transition-all">
-                    📡 실시간 가져오기
-                  </button>
-                  {isClassRoom && (
-                    <button
-                      onClick={() => finalizeRankRewards(viewingRoomId)}
-                      disabled={!gameEnded || selectedRoom.rewardFinalized === true || participantCount === 0}
-                      className="px-5 py-3 bg-amber-400 hover:bg-amber-500 disabled:bg-gray-300 disabled:cursor-not-allowed text-amber-950 rounded-xl font-black shadow-lg transition-all"
-                    >
-                      {selectedRoom.rewardFinalized === true
-                        ? '보상 지급 완료'
-                        : gameEnded
-                          ? '순위 보상 확정'
-                          : '게임 종료 후 지급'}
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-          )}
+    <section className="teacher-scoreboard col-span-1 lg:col-span-2" aria-label="관리자 점수판">
+      <header className="scoreboard-header">
+        <div className="scoreboard-heading">
+          <h2>{title}</h2>
+          {status && <span className="scoreboard-status" data-phase={waiting ? 'waiting' : gameEnded ? 'finished' : 'live'}>{status}</span>}
         </div>
-
-        {viewingRoomId !== '' && viewingRoomId !== 'all' && (
-          <div className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 p-6 rounded-2xl text-white shadow-lg flex justify-between items-center transform hover:scale-[1.01] transition-transform">
-            <div>
-              <div className="text-indigo-100 font-bold text-sm mb-1 tracking-wide">학급 평균 점수 (참여: {participantCount}명)</div>
-              <div className="text-5xl font-black drop-shadow-md tracking-tight">
-                {safeToLocaleNumber(roomAverageScore)} <span className="text-2xl font-bold text-indigo-200">PTS</span>
-              </div>
-            </div>
-            <div className="text-6xl animate-bounce drop-shadow-lg">🔥</div>
-          </div>
-        )}
-
-        {viewingRoomId !== '' && viewingRoomId !== 'all' && isClassRoom && students.length > 0 && (
-          <div className="bg-white/90 border border-amber-100 rounded-2xl p-4 shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-              <div>
-                <div className="text-xs font-black text-amber-600 tracking-widest">미입장 학생</div>
-                <div className="text-sm font-bold text-gray-500">
-                  아직 점수 문서가 없는 학생입니다. 튕긴 학생은 이름을 눌러 재입장하면 입장 처리됩니다.
-                </div>
-              </div>
-              <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-sm font-black">
-                {missingStudents.length}명 / {students.filter((student) => student.active !== false).length}명
-              </span>
-            </div>
-            {missingStudents.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {missingStudents.map((student) => (
-                  <span
-                    key={student.id}
-                    className="px-3 py-1.5 rounded-full bg-amber-50 border border-amber-100 text-amber-700 text-sm font-black"
-                  >
-                    {student.name}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3 text-emerald-700 text-sm font-black">
-                모든 학생이 입장했습니다.
-              </div>
+        {hasSelection && (waiting || playing) && (
+          <div className="scoreboard-actions">
+            {waiting && <button type="button" className="scoreboard-action primary" onClick={() => startRoomGame(viewingRoomId)}>게임 시작</button>}
+            {playing && <button type="button" className="scoreboard-action" onClick={() => requestScoreSync(viewingRoomId)}>실시간 가져오기</button>}
+            {playing && isClassRoom && (
+              <button type="button" className="scoreboard-action reward" onClick={() => finalizeRankRewards(viewingRoomId)}
+                disabled={!gameEnded || selectedRoom.rewardFinalized === true || participantCount === 0}>
+                {selectedRoom.rewardFinalized ? '보상 지급 완료' : gameEnded ? '순위 보상 확정' : '게임 종료 후 지급'}
+              </button>
             )}
           </div>
         )}
-      </div>
+      </header>
 
-      <div className="overflow-x-auto custom-scrollbar">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-pink-50 text-pink-800 text-sm">
-              <th className="py-3 px-4 font-bold rounded-tl-xl w-16 text-center">순위</th>
-              <th className="py-3 px-4 font-bold">학생(닉네임)</th>
-              <th className="py-3 px-4 font-bold text-center">설정(밸런스)</th>
-              <th className="py-3 px-4 font-bold text-right">퀴즈</th>
-              <th className="py-3 px-4 font-bold text-right">최고 점수</th>
-              <th className="py-3 px-4 font-bold text-right rounded-tr-xl">타수(CPM)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {displayScores.length > 0 ? displayScores.map((score, index) => {
-              const isEditable = viewingRoomId !== 'all' && selectedRoom?.status === 'waiting';
-              const cosmetic = getCosmeticById(score.equippedCosmetic);
-              const rowCosmeticClass = cosmetic?.leaderboardClass || '';
+      {hasSelection && (
+        <div className="scoreboard-overview">
+          <dl className="scoreboard-summary">
+            <div><dt>학급 평균 점수</dt><dd>{safeToLocaleNumber(roomAverageScore)}</dd></div>
+            <div><dt>참여</dt><dd>{participantCount}<span>명</span></dd></div>
+          </dl>
+          {activeStudents.length > 0 && (missingStudents.length > 0 ? (
+            <div className="scoreboard-attendance" aria-label="미입장 학생">
+              <strong>미입장 {missingStudents.length}명</strong>
+              <ul>{missingStudents.map(student => <li key={student.id}>{student.name}</li>)}</ul>
+            </div>
+          ) : <p className="scoreboard-attendance complete">모든 학생이 입장했습니다.</p>)}
+        </div>
+      )}
 
-              return (
-                <tr key={score.id} className={`border-b border-gray-100 transition-colors hover:bg-white/50 ${rowCosmeticClass}`}>
-                  <td className="py-3 px-4 text-center font-bold">
-                    {score.screenExitDetected ? '—' : index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : <span className="text-gray-400">{index + 1}</span>}
-                  </td>
-                  <td className="py-3 px-4 font-bold text-gray-800 relative overflow-hidden">
-                    {cosmetic && (
-                      cosmetic.id === 'title_memory_king' ? <MemoryKingEffect /> : <span className={`cosmetic-effect ${cosmetic.effectClass || 'cosmetic-effect-aura'}`} aria-hidden="true" />
-                    )}
-                    <div className="cosmetic-name-content flex flex-wrap items-center gap-2">
-                      <span>{score.nickname}</span>
-                      {score.screenExitDetected && <span className="rounded bg-rose-100 px-2 py-1 text-sm font-black text-rose-800">화면 이탈 · 진행 중단</span>}
-                      {score.screenExitDetected && <button type="button" disabled={reentryPendingIds.includes(score.id)} onClick={() => onAllowReentry(score)} className="rounded border border-emerald-600 bg-white px-2 py-1 text-sm font-bold text-emerald-800 disabled:opacity-50">{reentryPendingIds.includes(score.id) ? '처리 중...' : '재입장 허용'}</button>}
-                      {cosmetic && (
-                        <span className={`text-[11px] px-2 py-1 rounded-full font-black ${cosmetic.badgeClass || 'cosmetic-badge cosmetic-badge-teal'}`}>
-                          {cosmetic.name}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-3 px-4 text-center">
-                    {isEditable ? (
-                      <div className="flex justify-center gap-1 flex-wrap">
-                        <button onClick={() => toggleBoosterPower(score.id, score.boosterEnabled)} className={`px-2 py-1 rounded text-xs font-bold transition-all ${score.boosterEnabled !== false ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-400'}`}>
-                          부스터 {score.boosterEnabled !== false ? 'ON' : 'OFF'}
-                        </button>
-                        <button onClick={() => toggleWeight(score.id, score.pointWeight || 1.0)} className="px-2 py-1 rounded text-xs font-bold transition-all bg-purple-500 text-white">
-                          x{score.pointWeight || 1.0}
-                        </button>
-                        <button onClick={() => toggleDifficulty(score.id, score.difficulty || 'normal')} className={`px-2 py-1 rounded text-xs font-bold transition-all ${score.difficulty === 'hell' ? 'bg-black text-white' : score.difficulty === 'hard' ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-600'}`}>
-                          {score.difficulty === 'hell' ? '💀' : score.difficulty === 'hard' ? '🔥' : '🌱'}
-                        </button>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-gray-400 font-bold">
-                        {score.boosterEnabled !== false ? '부스터⭕' : '부스터❌'} | x{score.pointWeight || 1.0} | {score.difficulty === 'hell' ? '💀' : score.difficulty === 'hard' ? '🔥' : '🌱'}
-                      </span>
-                    )}
-                  </td>
-                  <td className="py-3 px-4 text-right font-bold text-indigo-500">{score.quizCorrectCount || 0}개</td>
-                  <td className="py-3 px-4 text-right font-black text-pink-500 text-lg">{safeToLocaleNumber(score.score || 0)}</td>
-                  <td className="py-3 px-4 text-right text-gray-500 font-medium">{score.cpm || 0}타</td>
-                </tr>
-              );
-            }) : (
-              <tr><td colSpan="6" className="py-8 text-center text-gray-400">아직 등록된 기록이 없거나 선택한 반이 없습니다.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+      {!viewingRoomId && scores.length === 0
+        ? <p className="scoreboard-prompt">반을 선택하면 점수가 표시돼요.</p>
+        : <ScoreTable key={viewingRoomId} scores={scores} showEquipment={isClassRoom}
+            editable={hasSelection && waiting} reentryPendingIds={reentryPendingIds} onAllowReentry={onAllowReentry}
+            toggleBoosterPower={toggleBoosterPower} toggleWeight={toggleWeight} toggleDifficulty={toggleDifficulty} />}
+    </section>
   );
 }
