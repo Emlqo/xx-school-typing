@@ -7,6 +7,7 @@ import { isElementRoom, isValidElementConfig, memoryAnswers, memoryStart } from 
 import { REWARD_RULES } from '../src/constants/rewards.js';
 import { isCosmeticForSale, getEquippedBoosterBonus } from '../src/constants/cosmetics.js';
 import { createShopSeason2Actions } from '../server/shopSeason2.js';
+import { issueTypeforgeEntry, typeforgeOrigin } from '../server/typeforgeEntry.js';
 import { SHOP_SEASON } from '../src/utils/gacha.js';
 import { isAllowedTeacherUid } from '../src/constants/teacherAccess.js';
 
@@ -447,7 +448,36 @@ async function getStudentSession(uid) {
   return {
     profile: await safeLoginProfile(session.studentId, student),
     sessionExpiresAt,
+    studentNumber: student.studentNumber ?? student.number,
   };
+}
+
+async function createTypeforgeEntry(uid) {
+  const origin = typeforgeOrigin(process.env.TYPEFORGE_URL);
+  const secret = process.env.TYPEFORGE_BRIDGE_SECRET;
+  if (!origin || !secret || secret.length < 32) {
+    throw new ApiError(503, 'api/unavailable', '아직 타자공방 연결을 준비 중입니다.');
+  }
+  const { profile, sessionExpiresAt, studentNumber } = await getStudentSession(uid);
+  if (!profile?.classId) throw new ApiError(403, 'api/permission-denied', '학생으로 로그인한 뒤 다시 눌러 주세요.');
+  const snapshot = await publicCollection(PATHS.classes).doc(profile.classId).get();
+  const classroom = snapshot.data();
+  const label = typeof classroom?.name === 'string'
+    ? classroom.name.match(/^(\d+)\s*학년\s*(\d+)\s*반$/) : null;
+  const grade = Number(classroom?.grade ?? label?.[1]);
+  const classNo = Number(classroom?.classNumber ?? label?.[2]);
+  if (!snapshot.exists || classroom.active === false ||
+    !Number.isSafeInteger(grade) || grade <= 0 || !Number.isSafeInteger(classNo) || classNo <= 0) {
+    throw new ApiError(409, 'api/failed-precondition', '등록된 학년과 반을 확인해 주세요.');
+  }
+  const rosterName = typeof profile.name === 'string' ? profile.name.trim() : '';
+  const numberedName = /^(\d{1,3})(?:\s*번)?\s*([^\d\s].*)$/.exec(rosterName);
+  const name = (numberedName?.[2] ?? rosterName).trim();
+  const parsed = Number(studentNumber ?? numberedName?.[1]);
+  const number = Number.isSafeInteger(parsed) && parsed > 0 && parsed <= 999 ? parsed : null;
+  if (!name || name.length > 60) throw new ApiError(409, 'api/failed-precondition', '학급 명단에 등록된 학생 이름을 확인해 주세요.');
+  return { url: issueTypeforgeEntry({ origin, secret, studentId: profile.id, classId: profile.classId,
+    grade, classNo, name, number, sessionExpiresAt }) };
 }
 
 async function logoutStudentSession(uid) {
@@ -1996,6 +2026,7 @@ const actions = {
   reportGameScreenExit,
   submitSubwayRun,
   getStudentSession,
+  createTypeforgeEntry,
   logoutStudentSession,
   verifyStudentLoginPin,
   setInitialStudentLoginPin,
@@ -2047,6 +2078,7 @@ export default async function handler(request, response) {
     const action = requireString(body.action, 'action', 50);
     const actionHandler = actions[action];
     if (!actionHandler) throw new ApiError(404, 'api/not-found', '지원하지 않는 보안 작업입니다.');
+    if (action === 'createTypeforgeEntry') response.setHeader('Cache-Control', 'no-store');
     const data = await actionHandler(decodedToken.uid, body);
     return response.status(200).json({ data });
   } catch (error) {
