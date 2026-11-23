@@ -3283,6 +3283,8 @@ export default function App() {
   }
 
   if (view === 'playing') {
+    const titleBoosterBonus = isPracticeMode || isDuelMode ? 0
+      : getScoreBoosterBonus(scores.find(item => item.id === currentScoreDocId));
     return (
       <PlayingView
         nickname={nickname}
@@ -3304,6 +3306,7 @@ export default function App() {
         boosterAvailable={boosterAvailable}
         boosterActive={boosterActive}
         boosterTimeLeft={boosterTimeLeft}
+        boosterBonusSeconds={titleBoosterBonus + (practiceGearEffects?.extraBoosterSeconds ?? 0)}
         activateBooster={activateBooster}
         practiceGearEffects={practiceGearEffects}
         practiceGearCue={practiceGearCue}

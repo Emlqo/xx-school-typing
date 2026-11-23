@@ -4,21 +4,22 @@ import { randomUUID } from 'node:crypto';
 import test from 'node:test';
 import { runInNewContext } from 'node:vm';
 import { GAME_RULES } from '../src/constants/gameRules.js';
+import { getScoreBoosterBonus } from '../src/constants/cosmetics.js';
 import { getTypeforgePracticeEffects } from '../src/utils/typeforgePractice.js';
 
 const source = readFileSync(new URL('../api/student-security.js', import.meta.url), 'utf8');
 const benefitHandler = source.slice(source.indexOf('async function useTypeforgeRoomBenefit('), source.indexOf('async function joinGuestGame('));
 
-function fixture(level = 20) {
+function fixture(level = 20, boosterBonusSeconds = 0) {
   let now = 100000;
   const score = { entryType: 'class', gameType: 'typing', userId: 'owner', studentId: 'student', classId: 'class', roomId: 'room',
-    typeforgeGear: { type: 'gpu', level }, score: 500, boosterBonusSeconds: 5 };
+    typeforgeGear: { type: 'gpu', level }, score: 500, boosterBonusSeconds };
   const session = { studentId: score.studentId, classId: score.classId, expiresAt: now + 600000 };
   const room = { mode: 'ko', status: 'playing', entryType: 'class', classId: score.classId, expiresAt: now + 120000 };
   const docs = { scores: score, studentSessions: session, rooms: room };
   const writes = [];
   const context = {
-    GAME_RULES, getTypeforgePracticeEffects,
+    GAME_RULES, getScoreBoosterBonus, getTypeforgePracticeEffects,
     Date: { now: () => now },
     ApiError: class extends Error { constructor(status, code, message) { super(message); this.status = status; } },
     requireString: value => value,
@@ -49,7 +50,7 @@ test('equipment protection is consumed once and the same request can be safely r
   assert.equal(f.writes.length, 1);
 });
 
-test('equipment booster lasts 30 seconds, persists on retry, and respects room expiry and teacher settings', async () => {
+test('equipment booster lasts 30 seconds or 35 with a title and preserves room limits on retry', async () => {
   const f = fixture(8);
   const started = await f.use('booster');
   assert.equal(started.boosterUntil, f.now() + 30000);
@@ -57,6 +58,10 @@ test('equipment booster lasts 30 seconds, persists on retry, and respects room e
   assert.equal((await f.use('booster')).boosterUntil, started.boosterUntil);
   assert.equal(f.writes.length, 1);
   assert.equal((await f.use('shield', randomUUID())).protected, false);
+  const stacked = fixture(8, 5);
+  assert.equal((await stacked.use('booster')).boosterUntil, stacked.now() + 35000);
+  const invalidBonus = fixture(8, 50);
+  assert.equal((await invalidBonus.use('booster')).boosterUntil, invalidBonus.now() + 30000);
   const ending = fixture();
   ending.room.expiresAt = ending.now() + 7000;
   assert.equal((await ending.use('booster')).boosterUntil, ending.room.expiresAt);

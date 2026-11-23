@@ -5,7 +5,7 @@ import { calculateAssessmentResult, createAssessmentSubmissionId } from '../src/
 import { subwayMillis, subwayHintPenalty, validSubwayAnswers } from '../src/utils/subway.js';
 import { isElementRoom, isValidElementConfig, memoryAnswers, memoryStart } from '../src/utils/memoryGame.js';
 import { REWARD_RULES } from '../src/constants/rewards.js';
-import { isCosmeticForSale, getEquippedBoosterBonus } from '../src/constants/cosmetics.js';
+import { isCosmeticForSale, getEquippedBoosterBonus, getScoreBoosterBonus } from '../src/constants/cosmetics.js';
 import { createShopSeason2Actions } from '../server/shopSeason2.js';
 import { issueTypeforgeAdminEntry, issueTypeforgeEntry, issueTypeforgeProfileGrant, readTypeforgePracticeGear, typeforgeOrigin } from '../server/typeforgeEntry.js';
 import { SHOP_SEASON } from '../src/utils/gacha.js';
@@ -758,7 +758,7 @@ async function useTypeforgeRoomBenefit(uid, body) {
       transaction.update(scoreRef, { typeforgeShieldAttemptId: attemptId });
       return { protected: true };
     }
-    const durationMs = (GAME_RULES.boosterDuration + effects.extraBoosterSeconds) * 1000;
+    const durationMs = (GAME_RULES.boosterDuration + getScoreBoosterBonus(score) + effects.extraBoosterSeconds) * 1000;
     const boosterUntil = end > 0 ? Math.min(now + durationMs, end) : now + durationMs;
     transaction.update(scoreRef, { typeforgeBoosterUntil: boosterUntil });
     return { boosterUntil };

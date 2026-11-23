@@ -7,7 +7,7 @@ function Preview() {
   const params = new URLSearchParams(location.search);
   const [inputValue, setInputValue] = useState('');
   const [isError, setIsError] = useState(params.has('error'));
-  return <PlayingView nickname="Preview" currentWord="Small steps make a big difference."
+  return <PlayingView nickname="Preview" currentWord={params.has('ko') ? '오늘은 하늘이 맑아요.' : 'Small steps make a big difference.'}
     inputValue={inputValue} setInputValue={setInputValue} isError={isError} setIsError={setIsError}
     combo={params.has('combo') ? 4 : 0} boosterActive={params.has('booster')} boosterTimeLeft={20}
     timeLeft={180} score={1200} formatTime={() => '3:00'}

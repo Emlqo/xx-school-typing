@@ -29,6 +29,7 @@ export default function PlayingView({
   boosterAvailable = true,
   boosterActive = false,
   boosterTimeLeft = 0,
+  boosterBonusSeconds = 0,
   activateBooster = () => {},
   practiceGearEffects = null,
   practiceGearCue = '',
@@ -56,7 +57,7 @@ export default function PlayingView({
   };
 
   return (
-    <div className={`typing-playfield min-h-screen flex flex-col p-4 md:p-8 pb-44 md:pb-48 relative overflow-hidden transition-colors duration-500 ${boosterActive ? 'booster-bg' : 'spring-bg'}`}>
+    <div className={`typing-playfield min-h-screen flex flex-col p-3 md:p-5 pb-24 md:pb-28 relative overflow-hidden transition-colors duration-500 ${boosterActive ? 'booster-bg' : 'spring-bg'}`}>
       <CherryBlossomBackground />
 
       <BoosterButton
@@ -88,11 +89,11 @@ export default function PlayingView({
         languageMismatch={languageMismatch}
       />
 
-      {practiceGearEffects?.extraBoosterSeconds > 0 && (
+      {boosterBonusSeconds > 0 && (
         <div className="practice-gear-badges">
-          <span>부스터 +{practiceGearEffects.extraBoosterSeconds}초</span>
-          {practiceGearEffects.quizShield && <span>퀴즈 보호 1회</span>}
-          {practiceGearEffects.level >= 12 && !practiceGearEffects.quizShield && <span>퀴즈 보호 사용 완료</span>}
+          <span>부스터 +{boosterBonusSeconds}초</span>
+          {practiceGearEffects?.quizShield && <span>퀴즈 보호 1회</span>}
+          {practiceGearEffects?.level >= 12 && !practiceGearEffects.quizShield && <span>퀴즈 보호 사용 완료</span>}
         </div>
       )}
 
@@ -105,11 +106,11 @@ export default function PlayingView({
         />
       )}
 
-      <div className="relative flex-1 flex flex-col items-center justify-center max-w-4xl w-full mx-auto z-10 py-4">
+      <div className="relative flex-1 flex flex-col items-center justify-center max-w-3xl w-full mx-auto z-10 py-3">
         {practiceGearCue && (
           <div key={practiceGearCue} className="practice-gear-cue" data-cue={practiceGearCue} role="status">
             <span aria-hidden="true" className="practice-gear-pulse" />
-            <strong>{practiceGearCue === 'booster' ? '⚡ 부스터 연장 · 30초' : '🛡 퀴즈 보호 · 점수와 콤보 유지!'}</strong>
+            <strong>{practiceGearCue === 'booster' ? `⚡ 부스터 연장 · ${boosterTimeLeft}초` : '🛡 퀴즈 보호 · 점수와 콤보 유지!'}</strong>
           </div>
         )}
         {currentQuiz ? (
@@ -141,11 +142,11 @@ export default function PlayingView({
               onDelete={onInputDelete}
             />
 
-            <p className="mt-6 bg-white rounded-lg px-4 py-2 text-gray-700 text-sm font-medium text-center">
+            <p className="mt-4 bg-white rounded-lg px-3 py-1.5 text-gray-700 text-xs sm:text-sm font-medium text-center">
               백스페이스(지우기)를 누르거나 오답 제출 시 <span className="text-red-700">콤보가 초기화</span>됩니다.
             </p>
 
-            <div className="w-full max-w-3xl h-2 bg-white/50 rounded-full mt-4 overflow-hidden border border-pink-100">
+            <div className="w-full h-1.5 bg-white/50 rounded-full mt-3 overflow-hidden border border-pink-100">
               <div
                 className={`h-full transition-all duration-300 ${isError ? 'bg-red-400' : boosterActive ? 'bg-gradient-to-r from-yellow-400 to-orange-500' : 'bg-gradient-to-r from-pink-300 to-pink-500'}`}
                 style={{ width: `${progress}%` }}

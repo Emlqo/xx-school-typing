@@ -40,7 +40,7 @@ export default function TypingInput({
           alert('🚨 앗! 복사/붙여넣기 치트키는 사용할 수 없습니다!');
         }}
         onDrop={(e) => e.preventDefault()}
-        className={`w-full text-center text-2xl md:text-4xl py-6 md:py-8 px-6 outline-none bg-transparent font-bold placeholder:text-base md:placeholder:text-xl placeholder:text-gray-600 transition-colors ${isError ? 'text-red-600' : 'text-gray-800'}`}
+        className={`w-full text-center text-xl md:text-[1.625rem] py-3.5 md:py-4 px-4 outline-none bg-transparent font-bold placeholder:text-sm md:placeholder:text-base placeholder:text-gray-600 transition-colors ${isError ? 'text-red-600' : 'text-gray-800'}`}
         placeholder={currentWord.includes(' ') ? '입력 후 엔터(Enter)를 누르세요' : '입력 후 스페이스바 또는 엔터'}
         autoFocus
         autoComplete="off"

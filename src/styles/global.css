@@ -65,6 +65,31 @@ body {
   border: 1px solid #76adab;
   box-shadow: 0 12px 32px #123b3d26;
 }
+.typing-prompt-text {
+  min-height: 1.55em;
+  font-size: clamp(1.375rem, 2.85vw, 2.125rem);
+  line-height: 1.55;
+}
+.typing-space {
+  --space-color: #a6c9c3;
+  position: relative;
+  display: inline-block;
+  width: .74em;
+  white-space: pre;
+}
+.typing-space::after {
+  position: absolute;
+  inset: auto .12em .35em;
+  height: .26em;
+  border: 2px solid var(--space-color);
+  border-top: 0;
+  border-radius: 0 0 .14em .14em;
+  content: "";
+}
+.typing-space[data-space-state="correct"] { --space-color: #6cf4c9; }
+.typing-space[data-space-state="correct"]::after { background: #6cf4c94d; }
+.typing-space[data-space-state="wrong"] { --space-color: #ffaab5; }
+.typing-space[data-space-state="wrong"]::after { background: #ff8c9866; }
 /* Keep the snow/photo behind the input in every combo and booster state. */
 .typing-input-surface { background: #fff; }
 @media (max-width: 640px) {
