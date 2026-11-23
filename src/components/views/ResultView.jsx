@@ -2,8 +2,9 @@ import CherryBlossomBackground from '../common/CherryBlossomBackground.jsx';
 import { REWARD_RULES } from '../../constants/rewards.js';
 import { calculateCpm } from '../../utils/scoring.js';
 import { safeToLocaleNumber } from '../../utils/format.js';
+import RoomResultGear, { selectRoomResultGear } from './RoomResultGear.jsx';
 
-function RewardSummary({ reward }) {
+function RewardSummary({ reward, animated = false }) {
   if (!reward || !reward.totalEarned) return null;
 
   const growthPercent = Math.round(REWARD_RULES.growthRateThreshold * 100);
@@ -15,7 +16,7 @@ function RewardSummary({ reward }) {
   ].filter(([, value]) => value > 0);
 
   return (
-    <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5 mb-8 text-left shadow-sm">
+    <div className={'bg-emerald-50 border border-emerald-100 rounded-2xl p-5 mb-8 text-left shadow-sm' + (animated ? ' room-result-reward' : '')}>
       <div className="flex items-center justify-between gap-3 mb-3">
         <div>
           <div className="text-xs font-black text-emerald-600 tracking-widest">이번 게임 보상</div>
@@ -40,32 +41,37 @@ export default function ResultView({
   correctChars = 0,
   gameDuration = 0,
   lastReward = null,
+  gear = null,
   scoreSaveFailed = false,
   onRetryScoreSave = () => {},
   onHome = () => {},
   onPracticeAgain = () => {},
 }) {
   const finalCpm = calculateCpm({ chars: correctChars, seconds: gameDuration });
+  const equipment = selectRoomResultGear(gear);
 
   return (
-    <div className="min-h-screen spring-bg flex items-center justify-center p-4 relative overflow-hidden">
-      <CherryBlossomBackground />
+    <div className={equipment ? 'room-result-page' : 'min-h-screen spring-bg flex items-center justify-center p-4 relative overflow-hidden'}>
+      {!equipment && <CherryBlossomBackground />}
 
-      <div className="glass-box rounded-3xl p-10 text-center max-w-md w-full border border-pink-100 shadow-2xl z-10 relative">
-        <div className="w-24 h-24 bg-gradient-to-br from-pink-400 to-rose-400 text-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-pink-200 text-5xl">
-          🏆
-        </div>
+      <div className={equipment ? 'room-result-card' : 'glass-box rounded-3xl p-10 text-center max-w-md w-full border border-pink-100 shadow-2xl z-10 relative'}
+        data-result-gear={equipment?.type} data-result-stage={equipment?.level}>
+        {equipment ? <RoomResultGear gear={equipment} /> : (
+          <div className="w-24 h-24 bg-gradient-to-br from-pink-400 to-rose-400 text-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-pink-200 text-5xl">
+            🏆
+          </div>
+        )}
 
-        <h1 className="text-3xl font-black text-gray-800 mb-2">연습 종료!</h1>
-        <p className="text-gray-500 mb-8 font-medium">
-          오늘의 기록을 확인하고 다음 도전에 이어 가세요.
-        </p>
+        <h1 className={equipment ? 'room-result-heading' : 'text-3xl font-black text-gray-800 mb-2'}>
+          {equipment ? '학급 타자 완료' : '연습 종료!'}
+        </h1>
+        {!equipment && <p className="text-gray-500 mb-8 font-medium">오늘의 기록을 확인하고 다음 도전에 이어 가세요.</p>}
 
-        <div className="bg-white rounded-2xl p-6 mb-8 border border-pink-100 shadow-sm">
+        <div className={equipment ? 'room-result-score bg-white rounded-2xl p-6 mb-5' : 'bg-white rounded-2xl p-6 mb-8 border border-pink-100 shadow-sm'}>
           <div className="text-sm text-gray-500 font-bold mb-1">최종 점수</div>
-          <div className="text-6xl font-black text-pink-500 mb-6">{safeToLocaleNumber(score)}</div>
+          <div className={equipment ? 'room-result-value font-black mb-6' : 'text-6xl font-black text-pink-500 mb-6'}>{safeToLocaleNumber(score)}</div>
 
-          <div className="grid grid-cols-2 gap-4 border-t border-gray-100 pt-5">
+          <div className={equipment ? 'room-result-stats grid grid-cols-2 gap-4 pt-5' : 'grid grid-cols-2 gap-4 border-t border-gray-100 pt-5'}>
             <div>
               <div className="text-xs text-gray-400 font-bold">분당 타수(CPM)</div>
               <div className="text-2xl font-black text-gray-700">{finalCpm} <span className="text-sm text-gray-400 font-medium">타</span></div>
@@ -77,7 +83,7 @@ export default function ResultView({
           </div>
         </div>
 
-        <RewardSummary reward={lastReward} />
+        <RewardSummary reward={lastReward} animated={Boolean(equipment)} />
 
         {scoreSaveFailed && (
           <div className="mb-5 rounded-2xl border-2 border-red-200 bg-red-50 p-4 text-left">

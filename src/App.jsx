@@ -46,6 +46,7 @@ import {
   getDuelHistory,
   getTeacherDuelHistory,
   getStudentSession,
+  getTypeforgeProfileGear,
   joinClassGame,
   joinGuestGame,
   logoutStudentSession,
@@ -151,6 +152,8 @@ export default function App() {
   const [selectedRoomId, setSelectedRoomId] = useState('');
   const [currentScoreDocId, setCurrentScoreDocId] = useState(null);
   const [myRoomData, setMyRoomData] = useState(null);
+  const roomResultGear = useRef(null);
+  const [resultGear, setResultGear] = useState(null);
   const [score, setScore] = useState(0);
   const [correctChars, setCorrectChars] = useState(0);
   const [quizCorrectCount, setQuizCorrectCount] = useState(0);
@@ -1018,6 +1021,12 @@ export default function App() {
       const scoreData = joined.score;
       const scoreDocId = scoreData.id;
 
+      if (roomData.mode !== 'subway' && roomResultGear.current?.scoreId !== scoreDocId) {
+        const round = { scoreId: scoreDocId, gear: null };
+        roomResultGear.current = round;
+        void getTypeforgeProfileGear().then(({ gear }) => { round.gear = gear; }).catch(() => {});
+      }
+
       const difficulty = scoreData?.difficulty || 'normal';
       const nextGameMode = difficulty === 'hell' ? 'en' : difficulty === 'hard' ? 'mixed' : roomData.mode || 'ko';
 
@@ -1143,6 +1152,8 @@ export default function App() {
       return;
     }
 
+    const roomGear = roomResultGear.current;
+    setResultGear(!isPracticeMode && roomGear?.scoreId === currentScoreDocId ? roomGear?.gear : null);
     setView('result');
 
     if (isPracticeMode) {
@@ -3258,6 +3269,7 @@ export default function App() {
         correctChars={correctChars}
         gameDuration={gameDuration}
         lastReward={lastReward}
+        gear={resultGear}
         scoreSaveFailed={scoreSaveFailed}
         onRetryScoreSave={endGame}
         onHome={handleBackToLogin}
