@@ -1,3 +1,6 @@
+import { useState } from 'react';
+import { createTypeforgeEntry } from '../../services/studentSecurityApi.js';
+
 const teacherSections = [
   { id: 'overview', label: '점수판', description: '방 관리와 실시간 점수' },
   { id: 'classes', label: '학급/명단', description: '학급 생성과 학생 등록' },
@@ -16,6 +19,22 @@ export default function TeacherHeader({
   activeSection = 'overview',
   setActiveSection = () => {},
 }) {
+  const [catalogBusy, setCatalogBusy] = useState(false);
+  const [catalogError, setCatalogError] = useState('');
+
+  async function openTypeforgeCatalog() {
+    setCatalogBusy(true);
+    setCatalogError('');
+    try {
+      const { url } = await createTypeforgeEntry();
+      window.location.assign(url);
+    } catch (error) {
+      setCatalogError(error.message || '타자공방 장비 도감을 열 수 없습니다.');
+    } finally {
+      setCatalogBusy(false);
+    }
+  }
+
   return (
     <div className="glass-box p-6 rounded-3xl space-y-5">
       <div className="flex flex-wrap justify-between items-start gap-4">
@@ -23,7 +42,15 @@ export default function TeacherHeader({
           <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">🏫 교무실 타자 점수 관리</h1>
           <p className="text-gray-500 mt-1 font-medium">필요한 관리자 기능을 섹션별로 빠르게 관리하세요.</p>
         </div>
-        <button onClick={onLogout} className="px-5 py-2 bg-white border border-gray-200 text-gray-600 rounded-xl font-medium hover:bg-gray-50">로그아웃</button>
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={openTypeforgeCatalog} disabled={catalogBusy} className="rounded-xl bg-violet-700 px-4 py-2 font-bold text-white hover:bg-violet-800 disabled:opacity-60">
+              {catalogBusy ? '도감 여는 중…' : '타자공방 장비 도감'}
+            </button>
+            <button type="button" onClick={onLogout} className="px-5 py-2 bg-white border border-gray-200 text-gray-600 rounded-xl font-medium hover:bg-gray-50">로그아웃</button>
+          </div>
+          {catalogError && <p role="alert" className="text-sm font-bold text-rose-800">{catalogError}</p>}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-2">

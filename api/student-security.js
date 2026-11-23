@@ -7,7 +7,7 @@ import { isElementRoom, isValidElementConfig, memoryAnswers, memoryStart } from 
 import { REWARD_RULES } from '../src/constants/rewards.js';
 import { isCosmeticForSale, getEquippedBoosterBonus } from '../src/constants/cosmetics.js';
 import { createShopSeason2Actions } from '../server/shopSeason2.js';
-import { issueTypeforgeEntry, typeforgeOrigin } from '../server/typeforgeEntry.js';
+import { issueTypeforgeAdminEntry, issueTypeforgeEntry, typeforgeOrigin } from '../server/typeforgeEntry.js';
 import { SHOP_SEASON } from '../src/utils/gacha.js';
 import { isAllowedTeacherUid } from '../src/constants/teacherAccess.js';
 
@@ -452,11 +452,17 @@ async function getStudentSession(uid) {
   };
 }
 
-async function createTypeforgeEntry(uid) {
+async function createTypeforgeEntry(auth) {
+  const uid = auth.uid;
   const origin = typeforgeOrigin(process.env.TYPEFORGE_URL);
   const secret = process.env.TYPEFORGE_BRIDGE_SECRET;
   if (!origin || !secret || secret.length < 32) {
     throw new ApiError(503, 'api/unavailable', '아직 타자공방 연결을 준비 중입니다.');
+  }
+  if (auth.firebase?.sign_in_provider === 'google.com' && isAllowedTeacherUid(uid, TEACHER_UID)) {
+    const now = Date.now();
+    const sessionExpiresAt = auth.exp * 1000;
+    return { url: issueTypeforgeAdminEntry({ origin, secret, uid, sessionExpiresAt, now }) };
   }
   const { profile, sessionExpiresAt, studentNumber } = await getStudentSession(uid);
   if (!profile?.classId) throw new ApiError(403, 'api/permission-denied', '학생으로 로그인한 뒤 다시 눌러 주세요.');
@@ -2079,7 +2085,9 @@ export default async function handler(request, response) {
     const actionHandler = actions[action];
     if (!actionHandler) throw new ApiError(404, 'api/not-found', '지원하지 않는 보안 작업입니다.');
     if (action === 'createTypeforgeEntry') response.setHeader('Cache-Control', 'no-store');
-    const data = await actionHandler(decodedToken.uid, body);
+    const data = action === 'createTypeforgeEntry'
+      ? await actionHandler(decodedToken)
+      : await actionHandler(decodedToken.uid, body);
     return response.status(200).json({ data });
   } catch (error) {
     console.error(error);

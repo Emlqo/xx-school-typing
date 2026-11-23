@@ -79,6 +79,7 @@ Vercel 환경변수:
 - TYPEFORGE_URL에는 타자공방의 HTTPS 기본 주소를 넣습니다.
 - TYPEFORGE_BRIDGE_SECRET에는 타자공방 서버와 공유하는 32자 이상의 임의 키를 넣습니다. 서버에서만 읽는 값입니다.
 - 학생 홈에서 입장 버튼을 연결하려면 `src/services/studentSecurityApi.js`의 `createTypeforgeEntry()`를 호출하고, 반환된 `url`로 이동합니다.
+- 관리자 화면도 같은 함수를 사용합니다. 서버가 등록된 Google 관리자 계정을 확인하면 장비 도감으로 입장합니다.
 
 입장 버튼은 현재 로그인된 학생의 학급을 서버에서 확인한 뒤 최대 60초짜리 입장권을 발급합니다. 타자공방은 별도 사이트와 Firebase 저장소를 사용합니다.
 

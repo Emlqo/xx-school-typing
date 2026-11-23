@@ -18,9 +18,17 @@ export function issueTypeforgeEntry({ origin, secret, studentId, classId, grade,
   const cipher = createCipheriv('aes-256-gcm', key, iv);
   const ciphertext = Buffer.concat([cipher.update(JSON.stringify({ name, number }), 'utf8'), cipher.final()]);
   const identity = Buffer.concat([iv, ciphertext, cipher.getAuthTag()]).toString('base64url');
+  return signEntry(origin, secret, { sub: studentId, classId, grade, classNo, identity }, sessionExpiresAt, now);
+}
+
+export function issueTypeforgeAdminEntry({ origin, secret, uid, sessionExpiresAt, now = Date.now() }) {
+  return signEntry(origin, secret, { sub: uid, role: 'catalog-admin' }, sessionExpiresAt, now);
+}
+
+function signEntry(origin, secret, identity, sessionExpiresAt, now) {
   const claims = {
-    iss: 'pw_typing', aud: origin, sub: studentId, classId, grade, classNo, identity,
-    nonce: randomUUID(), iat: now, exp: Math.min(now + 60000, sessionExpiresAt), sessionExpiresAt,
+    ...identity, iss: 'pw_typing', aud: origin, nonce: randomUUID(),
+    iat: now, exp: Math.min(now + 60000, sessionExpiresAt), sessionExpiresAt,
   };
   const encoded = Buffer.from(JSON.stringify(claims)).toString('base64url');
   const signature = createHmac('sha256', secret).update(encoded).digest('base64url');
