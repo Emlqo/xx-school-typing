@@ -8,11 +8,11 @@ function openChannel() {
   try { return new BroadcastChannel(channelName); } catch { return null; }
 }
 
-function findOpenStudentSession() {
+function findOpenSchoolSession() {
   const channel = openChannel();
   if (!channel) return Promise.resolve(null);
   const request = crypto.randomUUID();
-  const students = new Map();
+  const accounts = new Map();
 
   return new Promise((resolve, reject) => {
     let target;
@@ -26,23 +26,24 @@ function findOpenStudentSession() {
 
     channel.onmessage = ({ data }) => {
       if (data?.request !== request) return;
-      if (data.kind === 'offer' && !target && typeof data.student === 'string' && typeof data.tab === 'string') {
-        students.set(data.student, data.tab);
+      if (data.kind === 'offer' && !target && typeof data.account === 'string' && typeof data.tab === 'string') {
+        accounts.set(data.account, data.tab);
       }
       if (data.kind === 'entry' && target && data.tab === target) finish(data.url ?? null, data.error);
     };
 
     channel.postMessage({ kind: 'discover', request });
     timer = setTimeout(() => {
-      if (students.size !== 1) return finish(null);
-      target = students.values().next().value;
+      if (accounts.size !== 1) return finish(null);
+      target = accounts.values().next().value;
       channel.postMessage({ kind: 'issue', request, tab: target });
       timer = setTimeout(() => finish(null), 5000);
     }, 450);
   });
 }
 
-export default function useTypeforgeEntry({ ready, studentId, canIssue }) {
+export default function useTypeforgeEntry({ ready, studentId, teacherId }) {
+  const account = teacherId ? 'teacher:' + teacherId : studentId ? 'student:' + studentId : null;
   const [requested, setRequested] = useState(() => new URLSearchParams(location.search).get('typeforge') === 'entry');
   const [status, setStatus] = useState('checking');
   const [error, setError] = useState('');
@@ -50,7 +51,7 @@ export default function useTypeforgeEntry({ ready, studentId, canIssue }) {
   const pending = useRef(null);
 
   useEffect(() => {
-    if (!ready || !studentId) return undefined;
+    if (!ready || !account) return undefined;
     const channel = openChannel();
     if (!channel) return undefined;
     const tab = crypto.randomUUID();
@@ -58,7 +59,7 @@ export default function useTypeforgeEntry({ ready, studentId, canIssue }) {
     channel.onmessage = async ({ data }) => {
       if (typeof data?.request !== 'string') return;
       const { request } = data;
-      if (data.kind === 'discover') channel.postMessage({ kind: 'offer', request, tab, student: studentId });
+      if (data.kind === 'discover') channel.postMessage({ kind: 'offer', request, tab, account });
       if (data.kind !== 'issue' || data.tab !== tab) return;
       try {
         const { url } = await createTypeforgeEntry();
@@ -68,16 +69,16 @@ export default function useTypeforgeEntry({ ready, studentId, canIssue }) {
       }
     };
     return () => { active = false; channel.close(); };
-  }, [ready, studentId]);
+  }, [ready, account]);
 
   useEffect(() => {
     if (!requested || !ready) return undefined;
     let active = true;
     setStatus('checking');
     setError('');
-    const key = JSON.stringify([studentId, canIssue, retry]);
+    const key = JSON.stringify([account, retry]);
     if (pending.current?.key !== key) {
-      const job = canIssue ? createTypeforgeEntry().then(result => result.url) : findOpenStudentSession();
+      const job = account ? createTypeforgeEntry().then(result => result.url) : findOpenSchoolSession();
       pending.current = { key, job };
     }
     pending.current.job.then(url => {
@@ -94,7 +95,7 @@ export default function useTypeforgeEntry({ ready, studentId, canIssue }) {
       setStatus('error');
     });
     return () => { active = false; };
-  }, [requested, ready, studentId, canIssue, retry]);
+  }, [requested, ready, account, retry]);
 
   return {
     status: requested ? status : 'idle',

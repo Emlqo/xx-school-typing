@@ -269,7 +269,7 @@ export default function App() {
   const typeforgeEntry = useTypeforgeEntry({
     ready: authReady && studentSessionChecked,
     studentId: typeforgeStudentId,
-    canIssue: Boolean(typeforgeStudentId || (teacherAuthorized && teacherGatePassed)),
+    teacherId: teacherAuthorized && teacherGatePassed ? user.uid : undefined,
   });
   const typeforgePractice = useTypeforgePracticeGear({ ready: authReady && studentSessionChecked, studentId: typeforgeStudentId });
   const selectedPracticeEffects = useMemo(() => getTypeforgePracticeEffects(typeforgePractice.gear), [typeforgePractice.gear]);
@@ -3048,7 +3048,7 @@ export default function App() {
       <main className="min-h-screen spring-bg flex items-center justify-center p-4">
         <section className="glass-box rounded-3xl p-8 text-center max-w-md w-full shadow-xl">
           <h1 className="text-2xl font-black text-gray-800">타자공방 입장</h1>
-          {typeforgeEntry.status === 'checking' ? <p className="mt-3 text-gray-600" role="status">기존 학생 로그인을 확인하고 있어요…</p> : (
+          {typeforgeEntry.status === 'checking' ? <p className="mt-3 text-gray-600" role="status">풍양정보시스템 로그인을 확인하고 있어요…</p> : (
             <>
               <p className="mt-3 text-rose-800" role="alert">{typeforgeEntry.error}</p>
               <div className="mt-5 flex flex-wrap justify-center gap-3">

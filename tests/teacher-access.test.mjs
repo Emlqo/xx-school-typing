@@ -26,5 +26,7 @@ test('frontend retains anonymous guard and all API checks use shared UID policy'
   assert.match(front, /isAllowedTeacherUid\(user.uid, TEACHER_UID\)/);
   const api = readFileSync(new URL('../api/student-security.js', import.meta.url), 'utf8');
   assert.doesNotMatch(api, /uid\s*[!=]==?\s*TEACHER_UID/);
-  assert.equal([...api.matchAll(/isAllowedTeacherUid\(uid, TEACHER_UID\)/g)].length, 5);
+  const typeforgeEntry = api.slice(api.indexOf('async function createTypeforgeEntry('), api.indexOf('async function logoutStudentSession('));
+  assert.match(typeforgeEntry, /auth\.firebase\?\.sign_in_provider === 'google\.com' && isAllowedTeacherUid\(uid, TEACHER_UID\)/);
+  assert.match(typeforgeEntry, /issueTypeforgeAdminEntry\(/);
 });
