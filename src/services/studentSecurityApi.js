@@ -44,7 +44,7 @@ export const verifyTypeforgePracticeGear = (ticket) => call('verifyTypeforgePrac
 export const logoutStudentSession = () => call('logoutStudentSession');
 export const verifyStudentLoginPin = (classId, name, pin) => call('verifyStudentLoginPin', { classId, name, pin });
 export const setInitialStudentLoginPin = (classId, name, pin) => call('setInitialStudentLoginPin', { classId, name, pin });
-export const joinClassGame = (roomId, studentId) => call('joinClassGame', { roomId, studentId });
+export const joinClassGame = (roomId, studentId, resume = false) => call('joinClassGame', { roomId, studentId, resume });
 export async function useTypeforgeRoomBenefit(scoreId, benefit, attemptId) {
   const payload = { scoreId, benefit, attemptId };
   try {

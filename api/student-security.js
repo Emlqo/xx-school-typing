@@ -1,6 +1,6 @@
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore';
+import { FieldValue, GrpcStatus, Timestamp, getFirestore } from 'firebase-admin/firestore';
 import { calculateAssessmentResult, createAssessmentSubmissionId } from '../src/utils/assessments.js';
 import { subwayMillis, subwayHintPenalty, validSubwayAnswers } from '../src/utils/subway.js';
 import { isElementRoom, isValidElementConfig, memoryAnswers, memoryStart } from '../src/utils/memoryGame.js';
@@ -787,48 +787,62 @@ async function joinClassGame(uid, body) {
 
   const scores = publicCollection(PATHS.scores);
   const fixedScoreRef = scores.doc(`class_${roomId}_${studentId}`);
+  const fixedScoreIds = room.scoreIdVersion === CLASS_SCORE_ID_VERSION;
   let gearRequest;
-  const savedScore = await database().runTransaction(async (transaction) => {
-    const legacyScore = room.scoreIdVersion === CLASS_SCORE_ID_VERSION
-      ? null : await findLegacyClassScore(transaction, scores, roomId, studentId);
-    const snapshot = legacyScore ?? await transaction.get(fixedScoreRef);
-    const previous = snapshot.data() ?? {};
-    let gearField = {};
-    if (room.mode !== 'subway' && !Object.hasOwn(previous, 'typeforgeGear')) {
-      gearRequest ??= readTypeforgeGear({ studentId, sessionExpiresAt }).catch(() => undefined);
-      const gear = await gearRequest;
-      if (gear !== undefined) gearField = { typeforgeGear: gear };
-    }
-    if (snapshot.exists) {
-      const updates = { userId: uid, ...gearField };
-      transaction.update(snapshot.ref, { ...updates, updatedAt: FieldValue.serverTimestamp() });
-      return { id: snapshot.id, data: { ...previous, ...updates } };
-    }
-    const data = {
-      roomId,
-      classId: room.classId,
-      className: room.className || room.name || '',
-      studentId,
-      nickname: student.name || '',
-      entryType: 'class',
-      gameType: room.mode === 'subway' ? 'subway' : 'typing',
-      equippedCosmetic: student.equippedCosmetic || null,
-      boosterBonusSeconds: room.mode === 'subway' ? 0 : getEquippedBoosterBonus(student),
-      ...gearField,
-      score: 0,
-      cpm: 0,
-      correctChars: 0,
-      difficulty: 'normal',
-      boosterEnabled: true,
-      pointWeight: 1,
-      userId: uid,
-      quizCorrectCount: 0,
-      createdAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
-    };
-    transaction.set(snapshot.ref, data);
-    return { id: snapshot.id, data };
+  const getGearField = async () => {
+    if (room.mode === 'subway') return {};
+    gearRequest ??= readTypeforgeGear({ studentId, sessionExpiresAt }).catch(() => undefined);
+    const gear = await gearRequest;
+    return gear === undefined ? {} : { typeforgeGear: gear };
+  };
+  const newScore = async () => ({
+    roomId,
+    classId: room.classId,
+    className: room.className || room.name || '',
+    studentId,
+    nickname: student.name || '',
+    entryType: 'class',
+    gameType: room.mode === 'subway' ? 'subway' : 'typing',
+    equippedCosmetic: student.equippedCosmetic || null,
+    boosterBonusSeconds: room.mode === 'subway' ? 0 : getEquippedBoosterBonus(student),
+    ...await getGearField(),
+    score: 0,
+    cpm: 0,
+    correctChars: 0,
+    difficulty: 'normal',
+    boosterEnabled: true,
+    pointWeight: 1,
+    userId: uid,
+    quizCorrectCount: 0,
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
   });
+  let savedScore;
+  if (fixedScoreIds && body.resume !== true) {
+    const data = await newScore();
+    try {
+      await fixedScoreRef.create(data);
+      savedScore = { id: fixedScoreRef.id, data };
+    } catch (error) {
+      if (error.code !== GrpcStatus.ALREADY_EXISTS) throw error;
+    }
+  }
+  if (!savedScore) {
+    savedScore = await database().runTransaction(async (transaction) => {
+      const legacyScore = fixedScoreIds ? null : await findLegacyClassScore(transaction, scores, roomId, studentId);
+      const snapshot = legacyScore ?? await transaction.get(fixedScoreRef);
+      if (snapshot.exists) {
+        const previous = snapshot.data();
+        const gearField = Object.hasOwn(previous, 'typeforgeGear') ? {} : await getGearField();
+        const updates = { userId: uid, ...gearField };
+        transaction.update(snapshot.ref, { ...updates, updatedAt: FieldValue.serverTimestamp() });
+        return { id: snapshot.id, data: { ...previous, ...updates } };
+      }
+      const data = await newScore();
+      transaction.set(snapshot.ref, data);
+      return { id: snapshot.id, data };
+    });
+  }
   const now = Timestamp.now();
   const score = { ...savedScore.data, createdAt: toMillis(savedScore.data.createdAt) ? savedScore.data.createdAt : now, updatedAt: now };
   await publicCollection(PATHS.roomPresence).doc(`${roomId}_${studentId}`).set({

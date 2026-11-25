@@ -39,6 +39,10 @@ function fixture(size = 1, roomFields = { scoreIdVersion: CLASS_SCORE_ID_VERSION
       path, id: path.split('/').at(-1),
       get: async () => getSnapshot(reference(path)),
       set: async (value) => write('set', path, value),
+      create: async (value) => {
+        if (docs.has(path)) throw Object.assign(new Error('already exists'), { code: 6 });
+        write('create', path, value);
+      },
     };
   }
   function getSnapshot(ref) {
@@ -65,6 +69,7 @@ function fixture(size = 1, roomFields = { scoreIdVersion: CLASS_SCORE_ID_VERSION
   }
   const context = {
     CLASS_SCORE_ID_VERSION,
+    GrpcStatus: { ALREADY_EXISTS: 6 },
     SESSION_MINUTES: 60,
     Date: { now: () => now },
     Timestamp: { now: () => now, fromMillis: (value) => ({ toMillis: () => value }) },
@@ -125,16 +130,17 @@ function fixture(size = 1, roomFields = { scoreIdVersion: CLASS_SCORE_ID_VERSION
   runInNewContext(handlers, context);
   return {
     docs, reads, writes, queries, gearRequests,
-    join: (i, uid = `user-${i}`) => context.joinClassGame(uid, { roomId, studentId: `student-${i}` }),
+    join: (i, uid = `user-${i}`, resume = false) => context.joinClassGame(uid, { roomId, studentId: `student-${i}`, resume }),
     login: (pin) => context.verifyStudentLoginPin('user-0', { classId: 'a', name: '학생 0', pin }),
   };
 }
 
-test('30 simultaneous entrants use 120 reads and 90 writes, with zero score or session collection queries', async () => {
+test('30 simultaneous first entries use 90 reads and 90 writes with no score document reads', async () => {
   const size = 30;
   const f = fixture(size);
   const entrants = await Promise.all(Array.from({ length: size }, (_, i) => f.join(i)));
-  assert.equal(f.reads.length, 4 * size);
+  assert.equal(f.reads.length, 3 * size);
+  assert.ok(f.reads.every((path) => /^(rooms|sessions|students)\//.test(path)));
   assert.equal(f.writes.length, 3 * size);
   assert.deepEqual(f.queries, []);
   assert.equal(f.gearRequests.length, size);
@@ -156,7 +162,7 @@ test('reentry uses the same score and preserves progress, screen-exit state, and
   });
   f.docs.set('sessions/new-user', { studentId: 'student-0', classId: 'a', expiresAt: now + 5000 });
   f.reads.length = 0;
-  const { score } = await f.join(0, 'new-user');
+  const { score } = await f.join(0, 'new-user', true);
   assert.equal(score.id, first.score.id);
   assert.equal(score.userId, 'new-user');
   assert.equal(score.score, 250);
@@ -166,6 +172,13 @@ test('reentry uses the same score and preserves progress, screen-exit state, and
   assert.equal(score.rewardGranted, true);
   assert.equal(score.typeforgeGear, null);
   assert.equal(f.gearRequests.length, 1);
+  assert.equal(f.reads.length, 4);
+  f.reads.length = 0;
+  const unrecognizedBrowser = await f.join(0, 'new-user');
+  assert.equal(unrecognizedBrowser.score.id, first.score.id);
+  assert.equal(unrecognizedBrowser.score.score, 250);
+  assert.equal(unrecognizedBrowser.score.typeforgeGear, null);
+  assert.equal(unrecognizedBrowser.score.screenExitRevision, 3);
   assert.equal(f.reads.length, 4);
 });
 
@@ -219,12 +232,13 @@ test('PIN login still checks the PIN and cleans obsolete sessions, unlike a veri
   assert.equal(f.docs.get('sessions/user-0').expiresAt.toMillis(), now + 60 * 60 * 1000);
 });
 
-test('concurrent reentry creates only one score and preserves the gear through a retry', async () => {
+test('simultaneous join requests create one score and restore it after the other create conflicts', async () => {
   const f = fixture();
   f.docs.set('sessions/another-user', { studentId: 'student-0', classId: 'a', expiresAt: now + 5000 });
   const [first, second] = await Promise.all([f.join(0), f.join(0, 'another-user')]);
   assert.equal(first.score.id, second.score.id);
-  assert.equal(f.writes.filter(({ method, path }) => method === 'set' && path.startsWith('scores/')).length, 1);
+  assert.equal(f.writes.filter(({ method, path }) => method === 'create' && path.startsWith('scores/')).length, 1);
   assert.equal(f.writes.filter(({ method, path }) => method === 'update' && path.startsWith('scores/')).length, 1);
   assert.equal(f.gearRequests.length, 2);
+  assert.equal(f.reads.length, 7);
 });

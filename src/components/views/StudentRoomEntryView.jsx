@@ -6,6 +6,7 @@ export default function StudentRoomEntryView({
   student,
   rooms = [],
   isLoading = false,
+  error = null,
   onRefresh = () => {},
   onJoin = () => {},
   onBack = () => {},
@@ -47,7 +48,9 @@ export default function StudentRoomEntryView({
               </div>
             </button>
           ))}
-          {rooms.length === 0 && (
+          {isLoading && <p role="status" className="sm:col-span-2 py-8 text-center text-sm font-bold text-slate-600">우리 반 방을 확인하고 있어요.</p>}
+          {error && <p role="alert" className="sm:col-span-2 rounded-xl border border-rose-200 bg-rose-50 p-4 text-center text-sm font-bold text-rose-700">방 목록을 불러오지 못했어요. 방 새로고침을 눌러 주세요.</p>}
+          {!isLoading && !error && rooms.length === 0 && (
             <div className="sm:col-span-2 text-center py-14 rounded-2xl bg-white/80 border border-dashed border-cyan-200">
               <div className="text-4xl mb-3">🏫</div>
               <p className="font-black text-gray-500">현재 선생님이 개설한 학급 방이 없습니다.</p>

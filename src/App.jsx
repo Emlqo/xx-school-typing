@@ -328,9 +328,12 @@ export default function App() {
   });
   const {
     openClassRooms,
+    error: openClassRoomsError,
     isLoading: openClassRoomsLoading,
     refreshOpenClassRooms,
-  } = useOpenClassRooms({ user: scopedUser, view, isPracticeMode, enabled: firestoreReadsEnabled });
+  } = useOpenClassRooms({
+    user: scopedUser, view, classId: studentProfile?.classId, isPracticeMode, enabled: firestoreReadsEnabled,
+  });
   const selectedOpenClassRoom = useMemo(
     () => openClassRooms.find((room) => room.id === selectedOpenClassRoomId) || null,
     [openClassRooms, selectedOpenClassRoomId],
@@ -627,12 +630,6 @@ export default function App() {
       .filter((scoreItem) => scoreItem.studentId)
       .map((scoreItem) => scoreItem.studentId),
     [selectedOpenClassRoomScores],
-  );
-  const studentOpenClassRooms = useMemo(
-    () => studentProfile?.classId
-      ? openClassRooms.filter((room) => room.classId === studentProfile.classId)
-      : [],
-    [openClassRooms, studentProfile?.classId],
   );
   const hallOfFame = useMemo(
     () => savedHallOfFame || calculateHallOfFame(monthlyScores),
@@ -1033,7 +1030,8 @@ export default function App() {
 
       const duration = Number(roomData.duration || 300);
       if (isFocusGuardEnabled(roomData) && !await enterGameFullscreen()) return;
-      const joined = await joinClassGame(roomData.id, student.id);
+      const resume = localScores.some((record) => record.roomId === roomData.id && record.studentId === student.id);
+      const joined = await joinClassGame(roomData.id, student.id, resume);
       if (Number(joined.sessionExpiresAt) > Date.now()) {
         setStudentSessionExpiresAt(Number(joined.sessionExpiresAt));
       }
@@ -1095,7 +1093,7 @@ export default function App() {
     } finally {
       joiningClassRoomRef.current = false;
     }
-  }, [pickRandomWord, quizzes, resetPlayingState, selectedOpenClassRoom, user, reportScreenExit]);
+  }, [localScores, pickRandomWord, quizzes, resetPlayingState, selectedOpenClassRoom, user, reportScreenExit]);
 
   const syncDuelScore = useCallback(async ({ finished = false } = {}) => {
     if (!isDuelMode || !myDuelScore?.id || !db) return;
@@ -3070,8 +3068,9 @@ export default function App() {
     return (
       <StudentRoomEntryView
         student={studentProfile}
-        rooms={studentOpenClassRooms}
+        rooms={openClassRooms}
         isLoading={openClassRoomsLoading}
+        error={openClassRoomsError}
         onRefresh={refreshOpenClassRooms}
         onJoin={handleJoinClassStudent}
         onBack={() => setView('login')}
