@@ -12,7 +12,7 @@ import { createShopSeason2Actions } from '../server/shopSeason2.js';
 import { issueTypeforgeAdminEntry, issueTypeforgeEntry, issueTypeforgeProfileGrant, readTypeforgePracticeGear, typeforgeOrigin } from '../server/typeforgeEntry.js';
 import { SHOP_SEASON } from '../src/utils/gacha.js';
 import { isAllowedTeacherUid } from '../src/constants/teacherAccess.js';
-import { GAME_RULES } from '../src/constants/gameRules.js';
+import { CLASS_SCORE_ID_VERSION, GAME_RULES } from '../src/constants/gameRules.js';
 import { getTypeforgePracticeEffects } from '../src/utils/typeforgePractice.js';
 
 const APP_ID = 'xx-school-typing-app';
@@ -403,7 +403,7 @@ async function requireOpenClassRoom(roomId, classId) {
   return room;
 }
 
-async function createSession(uid, studentId, student) {
+async function createSession(uid, studentId, student, { cleanupExpired = true } = {}) {
   const expiresAt = Timestamp.fromMillis(Date.now() + SESSION_MINUTES * 60 * 1000);
   await publicCollection(PATHS.studentSessions).doc(uid).set({
     userId: uid,
@@ -412,9 +412,11 @@ async function createSession(uid, studentId, student) {
     createdAt: FieldValue.serverTimestamp(),
     expiresAt,
   });
-  await cleanupExpiredStudentSessions(studentId).catch((error) => {
-    console.error('Failed to clean up expired student sessions:', error);
-  });
+  if (cleanupExpired) {
+    await cleanupExpiredStudentSessions(studentId).catch((error) => {
+      console.error('Failed to clean up expired student sessions:', error);
+    });
+  }
   return expiresAt.toMillis();
 }
 
@@ -662,21 +664,13 @@ async function setInitialStudentPin(uid, body) {
   return { profile: safeProfile(studentId, student), sessionExpiresAt };
 }
 
-async function joinClassGame(uid, body) {
-  const roomId = requireString(body.roomId, 'roomId');
-  const studentId = requireString(body.studentId, 'studentId');
-  const session = await requireSession(uid, studentId);
-  const { data: student } = await getActiveStudent(studentId);
-  const room = await requireOpenClassRoom(roomId, student.classId);
-  if (session.classId !== student.classId) throw new ApiError(403, 'api/permission-denied', '학급 정보가 일치하지 않습니다.');
-  const sessionExpiresAt = await createSession(uid, studentId, student);
-
-  const existing = await publicCollection(PATHS.scores)
+async function findLegacyClassScore(transaction, scores, roomId, studentId) {
+  const candidates = scores
     .where('roomId', '==', roomId)
     .where('studentId', '==', studentId)
-    .limit(10)
-    .get();
-  const preferredScoreDoc = [...existing.docs].sort((left, right) => {
+    .limit(10);
+  const existing = await transaction.get(candidates);
+  return [...existing.docs].sort((left, right) => {
     const leftData = left.data();
     const rightData = right.data();
     const leftHasProgress = Number(leftData.score || 0) !== 0
@@ -692,22 +686,37 @@ async function joinClassGame(uid, body) {
     if (createdDiff !== 0) return createdDiff;
     return Number(rightData.score || 0) - Number(leftData.score || 0);
   })[0];
-  const previous = preferredScoreDoc?.data() ?? {};
-  const gear = room.mode === 'subway' || Object.hasOwn(previous, 'typeforgeGear')
-    ? undefined : await readTypeforgeGear({ studentId, sessionExpiresAt }).catch(() => undefined);
-  const gearField = gear === undefined ? {} : { typeforgeGear: gear };
-  const scoreRef = preferredScoreDoc?.ref ?? publicCollection(PATHS.scores).doc(`class_${roomId}_${studentId}`);
-  let score;
-  await database().runTransaction(async (transaction) => {
-    const snapshot = await transaction.get(scoreRef);
-    if (snapshot.exists) {
-      const saved = snapshot.data();
-      const updates = { userId: uid, ...(Object.hasOwn(saved, 'typeforgeGear') ? {} : gearField) };
-      transaction.update(scoreRef, { ...updates, updatedAt: FieldValue.serverTimestamp() });
-      score = { ...saved, ...updates };
-      return;
+}
+
+async function joinClassGame(uid, body) {
+  const roomId = requireString(body.roomId, 'roomId');
+  const studentId = requireString(body.studentId, 'studentId');
+  const session = await requireSession(uid, studentId);
+  const { data: student } = await getActiveStudent(studentId);
+  const room = await requireOpenClassRoom(roomId, student.classId);
+  if (session.classId !== student.classId) throw new ApiError(403, 'api/permission-denied', '학급 정보가 일치하지 않습니다.');
+  const sessionExpiresAt = await createSession(uid, studentId, student, { cleanupExpired: false });
+
+  const scores = publicCollection(PATHS.scores);
+  const fixedScoreRef = scores.doc(`class_${roomId}_${studentId}`);
+  let gearRequest;
+  const savedScore = await database().runTransaction(async (transaction) => {
+    const legacyScore = room.scoreIdVersion === CLASS_SCORE_ID_VERSION
+      ? null : await findLegacyClassScore(transaction, scores, roomId, studentId);
+    const snapshot = legacyScore ?? await transaction.get(fixedScoreRef);
+    const previous = snapshot.data() ?? {};
+    let gearField = {};
+    if (room.mode !== 'subway' && !Object.hasOwn(previous, 'typeforgeGear')) {
+      gearRequest ??= readTypeforgeGear({ studentId, sessionExpiresAt }).catch(() => undefined);
+      const gear = await gearRequest;
+      if (gear !== undefined) gearField = { typeforgeGear: gear };
     }
-    score = {
+    if (snapshot.exists) {
+      const updates = { userId: uid, ...gearField };
+      transaction.update(snapshot.ref, { ...updates, updatedAt: FieldValue.serverTimestamp() });
+      return { id: snapshot.id, data: { ...previous, ...updates } };
+    }
+    const data = {
       roomId,
       classId: room.classId,
       className: room.className || room.name || '',
@@ -729,10 +738,11 @@ async function joinClassGame(uid, body) {
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     };
-    transaction.set(scoreRef, score);
+    transaction.set(snapshot.ref, data);
+    return { id: snapshot.id, data };
   });
   const now = Timestamp.now();
-  score = { ...score, createdAt: toMillis(score.createdAt) ? score.createdAt : now, updatedAt: now };
+  const score = { ...savedScore.data, createdAt: toMillis(savedScore.data.createdAt) ? savedScore.data.createdAt : now, updatedAt: now };
   await publicCollection(PATHS.roomPresence).doc(`${roomId}_${studentId}`).set({
     roomId,
     classId: room.classId,
@@ -740,7 +750,7 @@ async function joinClassGame(uid, body) {
     nickname: student.name || '',
     joinedAt: FieldValue.serverTimestamp(),
   }, { merge: true });
-  return { score: safeScore(scoreRef.id, score), profile: safeProfile(studentId, student), sessionExpiresAt };
+  return { score: safeScore(savedScore.id, score), profile: safeProfile(studentId, student), sessionExpiresAt };
 }
 
 async function useTypeforgeRoomBenefit(uid, body) {

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { DEFAULT_ELEMENT_CONFIG } from '../src/constants/elements.js';
+import { CLASS_SCORE_ID_VERSION } from '../src/constants/gameRules.js';
 import { isValidElementConfig, memoryPreviewMs } from '../src/utils/memoryGame.js';
 import { subwayRoute } from '../src/utils/subway.js';
 
@@ -13,7 +14,7 @@ function roomActions(overrides = {}) {
     requireTeacherAccess: () => true, newRoomName: '원소 테스트', roomMode: 'elements', classRoomMode: 'elements', roomDuration: '120', classRoomDuration: '180',
     elementConfig: config, classElementConfig: config, roomFocusGuard: false, classFocusGuard: true, user: { uid: 'teacher' },
     getPublicCollection: (_, appId, name) => `${appId}/${name}`, getPublicDoc: (_, appId, name, id) => `${appId}/${name}/${id}`,
-    db: {}, APP_ID: 'test', FIRESTORE_PATHS: { rooms: 'typing_rooms' },
+    db: {}, APP_ID: 'test', CLASS_SCORE_ID_VERSION, FIRESTORE_PATHS: { rooms: 'typing_rooms' },
     addDoc: async (ref, data) => { created.push({ ref, data }); return { id: 'room1' }; },
     updateDoc: async (ref, data) => updates.push({ ref, data }),
     serverTimestamp: () => 'server', createRoomCode: () => '1234', setViewingRoomId() {}, setNewRoomName() {}, alert: message => alerts.push(message), console,
@@ -43,6 +44,7 @@ test('guest and class rooms retain routes/auth compatibility and selected elemen
   }
   assert.equal(actions.created[1].data.classId, 'c1');
   assert.equal(actions.created[1].data.entryType, 'class');
+  assert.equal(actions.created[1].data.scoreIdVersion, CLASS_SCORE_ID_VERSION);
   await actions.start('room1');
   assert.ok(Math.abs(actions.updates[0].data.expiresAt - Date.now() - 165000) < 1000);
 });

@@ -18,7 +18,7 @@ import {
   where,
   writeBatch,
 } from 'firebase/firestore';
-import { APP_ID, GAME_RULES } from './constants/gameRules.js';
+import { APP_ID, CLASS_SCORE_ID_VERSION, GAME_RULES } from './constants/gameRules.js';
 import { isTeacherUser, TEACHER_IDLE_TIMEOUT_MS, TEACHER_PASSWORD_HASH, TEACHER_UID } from './constants/admin.js';
 import { KOREAN_WORDS, ENGLISH_WORDS } from './constants/words.js';
 import { LOCAL_QUIZZES } from './constants/quizzes.js';
@@ -254,6 +254,7 @@ export default function App() {
   const lastProcessedSyncRef = useRef(0);
   const lastSyncedScoreRef = useRef(0);
   const pendingScoreSyncRef = useRef(null);
+  const joiningClassRoomRef = useRef(false);
   const isEndingRef = useRef(false);
   const practiceRunIdRef = useRef('');
   const quizShieldRef = useRef(false);
@@ -1007,6 +1008,7 @@ export default function App() {
   }, [nickname, pickRandomWord, quizzes, resetPlayingState, roomCodeInput, user, reportScreenExit]);
 
   const handleJoinClassStudent = useCallback(async (student, roomOverride = null) => {
+    if (joiningClassRoomRef.current) return;
     const targetRoom = roomOverride || selectedOpenClassRoom;
     if (!targetRoom?.id || !student?.id) {
       alert('입장할 학급과 이름을 선택해주세요.');
@@ -1018,6 +1020,7 @@ export default function App() {
       return;
     }
 
+    joiningClassRoomRef.current = true;
     try {
       const roomData = targetRoom;
       const remainingSeconds = getRemainingSeconds(roomData);
@@ -1088,6 +1091,8 @@ export default function App() {
     } catch (error) {
       console.error(error);
       alert('학급 입장 중 오류가 발생했습니다.');
+    } finally {
+      joiningClassRoomRef.current = false;
     }
   }, [pickRandomWord, quizzes, resetPlayingState, selectedOpenClassRoom, user, reportScreenExit]);
 
@@ -2844,6 +2849,7 @@ export default function App() {
         classId: classItem.id,
         className: classItem.name || `${classItem.grade || 1}학년 ${classItem.classNumber || ''}반`,
         entryType: 'class',
+        scoreIdVersion: CLASS_SCORE_ID_VERSION,
         createdBy: user?.uid || null,
         createdAt: serverTimestamp(),
       });

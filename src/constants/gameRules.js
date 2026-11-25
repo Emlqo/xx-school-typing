@@ -1,4 +1,5 @@
 export const APP_ID = 'xx-school-typing-app';
+export const CLASS_SCORE_ID_VERSION = 1;
 
 export const GAME_RULES = {
   baseCharScore: 10,
