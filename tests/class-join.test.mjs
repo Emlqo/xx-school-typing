@@ -75,7 +75,9 @@ function fixture(size = 1, roomFields = { scoreIdVersion: CLASS_SCORE_ID_VERSION
     requirePin: (value) => value,
     safeScore: (id, data) => ({ id, ...data }),
     safeProfile: (id, data) => ({ id, name: data.name }),
-    safeLoginProfile: async (id, data) => ({ id, name: data.name }),
+    buildStudentHome: async (_uid, { studentId, student, sessionExpiresAt }) => ({
+      profile: { id: studentId, name: student.name }, sessionExpiresAt,
+    }),
     readTypeforgeGear: async ({ studentId }) => {
       gearRequests.push(studentId);
       return { type: 'gpu', level: 8 };

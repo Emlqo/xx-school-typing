@@ -15,6 +15,7 @@ export default function StudentAssessmentBoard({ cacheKey = '', onOpenAssessment
         ? await getCachedStudentDirectory(`${cacheKey}:assessments`, listActiveAssessments, {
           maxAge: STUDENT_HOME_CACHE_AGE_MS,
           refresh: refreshFromServer,
+          persist: true,
         })
         : await listActiveAssessments();
       setAssessments(result?.assessments || []);

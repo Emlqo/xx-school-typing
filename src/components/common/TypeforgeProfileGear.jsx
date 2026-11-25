@@ -15,6 +15,7 @@ export default function TypeforgeProfileGear({ cacheKey = '', refreshKey }) {
         ? getCachedStudentDirectory(`${cacheKey}:gear`, getTypeforgeProfileGear, {
           maxAge: STUDENT_HOME_CACHE_AGE_MS,
           refresh: request.current !== null,
+          persist: true,
         })
         : getTypeforgeProfileGear();
       request.current = { refreshKey, retry, pending };
@@ -43,7 +44,7 @@ export default function TypeforgeProfileGear({ cacheKey = '', refreshKey }) {
             </div>
             <h3>{gear.name}</h3>
             <p className="typeforge-profile-card__description">{gear.description}</p>
-            {error && <button type="button" className="typeforge-profile-card__retry" onClick={() => setRetry(value => value + 1)}>최신 장비 다시 불러오기</button>}
+            {!loading && <button type="button" className="typeforge-profile-card__retry" onClick={() => setRetry(value => value + 1)}>{error ? '최신 장비 다시 불러오기' : '장비 새로고침'}</button>}
           </div>
           <div className="typeforge-profile-card__image">
             <img key={gear.art} src={gear.art} alt="" decoding="async" referrerPolicy="no-referrer" />
@@ -56,7 +57,7 @@ export default function TypeforgeProfileGear({ cacheKey = '', refreshKey }) {
             <h3>{loading ? '장비를 불러오는 중…' : error ? '장비를 불러오지 못했어요' : '아직 보유한 장비가 없어요'}</h3>
             {!loading && !error && <p className="typeforge-profile-card__description">타자공방에 처음 입장하면 장비가 여기에 표시돼요.</p>}
           </div>
-          {error && <button type="button" className="typeforge-profile-card__retry" onClick={() => setRetry(value => value + 1)}>다시 불러오기</button>}
+          {!loading && <button type="button" className="typeforge-profile-card__retry" onClick={() => setRetry(value => value + 1)}>{error ? '다시 불러오기' : '장비 새로고침'}</button>}
         </div>
       )}
     </section>

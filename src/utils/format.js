@@ -5,3 +5,8 @@ export function formatTime(sec) {
 export function safeToLocaleNumber(value) {
   return typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString() : '0';
 }
+
+export function formatAnnouncementDate(value) {
+  const millis = value?.toMillis?.() ?? (typeof value === 'number' ? value : Number(value?.seconds || 0) * 1000);
+  return millis > 0 ? new Date(millis).toLocaleDateString('ko-KR') : '';
+}

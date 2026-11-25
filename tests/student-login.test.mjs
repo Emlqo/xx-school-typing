@@ -63,7 +63,7 @@ function fixture(entries) {
       sessions.push([uid, studentId]);
       return 1000;
     },
-    safeLoginProfile: id => ({ id }),
+    buildStudentHome: async (_uid, { studentId, sessionExpiresAt }) => ({ profile: { id: studentId }, sessionExpiresAt }),
     database: () => ({
       runTransaction: operation => operation({
         get: async id => snapshot(id),

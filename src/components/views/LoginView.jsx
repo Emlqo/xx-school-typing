@@ -1,129 +1,91 @@
+import { useEffect, useRef } from 'react';
 import AnnouncementModal from '../common/AnnouncementModal.jsx';
 import CherryBlossomBackground from '../common/CherryBlossomBackground.jsx';
 import LinkifiedText from '../common/LinkifiedText.jsx';
-import { REWARD_RULES } from '../../constants/rewards.js';
-import StudentHomeShopPanel from '../common/StudentHomeShopPanel.jsx';
 import StudentAssessmentBoard from '../common/StudentAssessmentBoard.jsx';
+import StudentHomeShopPanel from '../common/StudentHomeShopPanel.jsx';
+import TypeforgeProfileGear from '../common/TypeforgeProfileGear.jsx';
+import { formatAnnouncementDate, safeToLocaleNumber } from '../../utils/format.js';
+import { REWARD_RULES } from '../../constants/rewards.js';
+import './StudentHome.css';
 
-const EXAM_DATE = { year: 2026, monthIndex: 11, day: 7 };
+const EXAM_DATE = new Date(2026, 11, 7);
+const PANELS = [
+  { id: 'assessments', label: '형성평가', icon: '✎' },
+  { id: 'shop', label: '상점', icon: '◇' },
+  { id: 'gear', label: '내 장비', icon: '▣' },
+  { id: 'announcements', label: '공지 내역', icon: '▤' },
+];
 
-function calculateExamDday(today = new Date()) {
-  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const examStart = new Date(
-    EXAM_DATE.year,
-    EXAM_DATE.monthIndex,
-    EXAM_DATE.day,
-  );
-  const diffDays = Math.round((examStart.getTime() - todayStart.getTime()) / 86400000);
-
-  if (diffDays > 0) return `D-${diffDays}`;
-  if (diffDays === 0) return 'D-DAY';
-  return '시험 종료';
+function examCountdown() {
+  const today = new Date();
+  const midnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const remaining = Math.round((EXAM_DATE - midnight) / 86400000);
+  return remaining > 0 ? `시험 D-${remaining}` : remaining === 0 ? '시험 D-DAY' : '';
 }
 
-function formatAnnouncementDate(announcement) {
-  if (announcement.createdAt?.toDate) {
-    return announcement.createdAt.toDate().toLocaleDateString('ko-KR');
-  }
-
-  return '';
-}
-
-function AnnouncementBoard({ announcements = [], onOpenModal = () => {} }) {
+function HomeAction({ label, icon, detail, primary = false, onClick }) {
   return (
-    <div className="bg-white/90 border border-cyan-100 rounded-3xl p-5 shadow-sm">
-      <div className="flex items-center justify-between gap-3 mb-4">
-        <div>
-          <div className="text-xs font-black text-sky-600 tracking-widest">학교 게시판</div>
-          <h2 className="text-xl font-black text-gray-800 flex items-center gap-2">
-            공지사항
-            {announcements.length > 0 && (
-              <span className="bg-teal-500 text-white text-xs px-2 py-1 rounded-full">{announcements.length}</span>
-            )}
-          </h2>
-        </div>
-        <button
-          type="button"
-          onClick={onOpenModal}
-          className="px-4 py-2 bg-cyan-50 hover:bg-cyan-100 text-teal-700 border border-cyan-100 rounded-xl font-black text-sm transition-colors"
-        >
-          크게 보기
+    <button type="button" className="student-home__action" data-primary={primary} onClick={onClick}>
+      <span className="student-home__action-icon" aria-hidden="true">{icon}</span>
+      <span className="student-home__action-copy">
+        <strong>{label}</strong>
+        <span>{detail}</span>
+      </span>
+      <span className="student-home__action-arrow" aria-hidden="true">→</span>
+    </button>
+  );
+}
+
+function AnnouncementHistory({ announcements, loading, error, onRefresh }) {
+  return (
+    <section className="student-home__surface" aria-busy={loading}>
+      <div className="student-home__surface-header">
+        <h2>공지 내역</h2>
+        <button type="button" className="student-home__text-action" disabled={loading} onClick={onRefresh}>
+          {error ? '다시 불러오기' : '새로고침'}
         </button>
       </div>
-
-      <div className="space-y-3 max-h-[360px] overflow-y-auto custom-scrollbar pr-2">
-        {announcements.length > 0 ? (
-          announcements.map((announcement) => (
-            <article
-              key={announcement.id}
-              className={`text-left rounded-2xl border p-4 shadow-sm ${
-                announcement.isAlert
-                  ? 'bg-red-50 border-red-200'
-                  : 'bg-gradient-to-br from-white to-cyan-50/60 border-cyan-100'
-              }`}
-            >
-              <div className="flex items-start justify-between gap-3 mb-2">
-                <h3 className="font-black text-gray-800 leading-snug">
-                  {announcement.isAlert && <span className="text-red-500 mr-1 animate-pulse">🚨</span>}
-                  {announcement.title}
-                </h3>
-                {announcement.isAlert && (
-                  <span className="text-[10px] px-2 py-1 rounded-full bg-red-500 text-white font-black shrink-0">중요</span>
-                )}
-              </div>
-              <LinkifiedText text={announcement.content} className="text-sm text-gray-600 whitespace-pre-wrap leading-relaxed font-medium" />
-              <div className="text-xs text-gray-400 font-bold text-right mt-3">
-                {formatAnnouncementDate(announcement)}
-              </div>
-            </article>
-          ))
-        ) : (
-          <div className="text-center py-12 bg-cyan-50/70 border border-cyan-100 rounded-2xl">
-            <div className="text-4xl mb-2">📭</div>
-            <p className="text-gray-400 font-bold">등록된 공지사항이 없습니다.</p>
-          </div>
-        )}
+      {loading && <p className="student-home__feedback" role="status">공지 내역을 불러오고 있어요.</p>}
+      {error && <p className="student-home__feedback" role="alert">공지 내역을 불러오지 못했어요.</p>}
+      {!loading && !error && announcements.length === 0 && <p className="student-home__feedback">등록된 공지사항이 없어요.</p>}
+      <div className="student-home__history">
+        {!loading && !error && announcements.map((announcement) => (
+          <article key={announcement.id} data-urgent={announcement.isAlert || undefined}>
+            <header>
+              <h3>{announcement.isAlert && <span>긴급</span>}{announcement.title}</h3>
+              <time>{formatAnnouncementDate(announcement.createdAt)}</time>
+            </header>
+            <LinkifiedText text={announcement.content} className="student-home__notice-body" />
+          </article>
+        ))}
       </div>
-    </div>
+    </section>
   );
 }
 
-function RewardGuideBoard() {
-  const growthPercent = Math.round(REWARD_RULES.growthRateThreshold * 100);
-  const rewardItems = [
-    ['순위 보상', `1위 ${REWARD_RULES.rankPoints.first}P · 2위 ${REWARD_RULES.rankPoints.second}P · 3위 ${REWARD_RULES.rankPoints.third}P`, `상위 30%는 ${REWARD_RULES.rankPoints.topThirtyPercent}P, 나머지 완주자는 ${REWARD_RULES.rankPoints.completion}P를 받아요.`],
-    ['퀴즈 정답', `정답 1개당 +${REWARD_RULES.quizCorrectPoints}P`, '돌발 퀴즈를 맞힐수록 포인트가 쌓여요.'],
-    ['최고 기록 갱신', `+${REWARD_RULES.bestScoreBonus}P`, '내 이전 최고 점수를 넘으면 보너스가 있어요.'],
-    [`${growthPercent}% 성장`, `+${REWARD_RULES.growthBonus}P`, '이전 최고 기록보다 크게 성장하면 추가 보상!'],
-  ];
-
+function RewardGuide() {
+  const growth = Math.round(REWARD_RULES.growthRateThreshold * 100);
   return (
-    <div className="bg-gradient-to-br from-emerald-50 to-cyan-50 border border-cyan-100 rounded-3xl p-5 shadow-sm">
-      <div className="flex items-center justify-between gap-3 mb-4">
-        <div>
-          <div className="text-xs font-black text-teal-600 tracking-widest">포인트 얻는 법</div>
-          <h2 className="text-xl font-black text-gray-800">상점 포인트 안내</h2>
-        </div>
-        <div className="text-4xl">💎</div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {rewardItems.map(([title, points, description]) => (
-          <div key={title} className="bg-white/85 border border-white rounded-2xl p-4">
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <div className="font-black text-gray-800">{title}</div>
-              <div className="text-sm font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">{points}</div>
-            </div>
-            <p className="text-xs text-gray-500 font-bold leading-relaxed">{description}</p>
-          </div>
-        ))}
-      </div>
-    </div>
+    <details className="student-home__surface student-home__rewards">
+      <summary>상점 포인트 얻는 방법</summary>
+      <ul>
+        <li>학급 경기 순위 보상은 1위 {REWARD_RULES.rankPoints.first}P, 2위 {REWARD_RULES.rankPoints.second}P, 3위 {REWARD_RULES.rankPoints.third}P예요. 상위 30%는 {REWARD_RULES.rankPoints.topThirtyPercent}P, 나머지 완주자는 {REWARD_RULES.rankPoints.completion}P를 받아요.</li>
+        <li>퀴즈를 맞힐 때마다 {REWARD_RULES.quizCorrectPoints}P를 받아요.</li>
+        <li>최고 기록을 갱신하면 {REWARD_RULES.bestScoreBonus}P, 이전 기록보다 {growth}% 이상 성장하면 {REWARD_RULES.growthBonus}P를 추가로 받아요.</li>
+      </ul>
+    </details>
   );
 }
 
 export default function LoginView({
+  activePanel = '',
+  onPanelChange = () => {},
   announcements = [],
+  announcementsLoading = false,
+  announcementError = null,
+  onRefreshAnnouncements = () => {},
+  urgentAnnouncements = [],
   showAnnouncementModal = false,
   setShowAnnouncementModal = () => {},
   onStudentClick = () => {},
@@ -139,6 +101,9 @@ export default function LoginView({
   studentProfile = null,
   studentHomeCacheKey = '',
   shopItems = [],
+  shopLoading = false,
+  shopError = null,
+  onRefreshShopItems = () => {},
   onBuyCosmetic = async () => null,
   onBuyStockItem = async () => null,
   onEquipCosmetic = async () => null,
@@ -146,101 +111,112 @@ export default function LoginView({
   onShopProfileChange = () => {},
   onOpenAssessment = () => {},
 }) {
-  const examDday = calculateExamDday();
+  const panelRef = useRef(null);
+  const currentPanel = PANELS.find((panel) => panel.id === activePanel);
+  const exam = examCountdown();
+
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (!activePanel || !panel) return;
+    panel.focus({ preventScroll: true });
+    if (panel.getBoundingClientRect().top > window.innerHeight * 0.7) {
+      panel.scrollIntoView({ block: 'start' });
+    }
+  }, [activePanel]);
 
   return (
-    <div className="min-h-screen spring-bg flex items-center justify-center p-4">
+    <div className="spring-bg student-home">
       <CherryBlossomBackground />
+      <main className="student-home__layout">
+        <header className="student-home__header">
+          <div>
+            {exam && <p className="student-home__exam">{exam}</p>}
+            <h1>풍양중학교 정보 시스템</h1>
+          </div>
+          {studentProfile && (
+            <div className="student-home__profile">
+              <span className="student-home__avatar" aria-hidden="true">{studentProfile.name?.trim().slice(-2) || '학생'}</span>
+              <div className="student-home__identity">
+                <strong>{studentProfile.name}</strong>
+                {studentProfile.className && <span>{studentProfile.className}</span>}
+              </div>
+              <span className="student-home__points" aria-label={`보유 포인트 ${safeToLocaleNumber(studentProfile.totalPoints)}점`}>
+                {safeToLocaleNumber(studentProfile.totalPoints)}<small>P</small>
+              </span>
+            </div>
+          )}
+        </header>
 
-      {showAnnouncementModal && (
-        <AnnouncementModal
-          announcements={announcements}
-          onClose={() => setShowAnnouncementModal(false)}
-        />
-      )}
+        <div className="student-home__actions" role="group" aria-label="타자 경기">
+          <HomeAction label="선수 입장" icon="⌨" detail="우리 반 경기 참가" primary onClick={onStudentClick} />
+          <HomeAction label="자유연습" icon="↗" detail="내 속도로 타자 연습" onClick={onPracticeClick} />
+        </div>
 
-      <button
-        onClick={() => setShowAnnouncementModal(true)}
-        className="absolute top-4 right-4 bg-white/80 hover:bg-white text-teal-700 px-4 py-2 rounded-full text-sm font-bold shadow-md border border-cyan-100 transition-all flex items-center gap-2 z-20"
-      >
-        📢 공지사항
-        {announcements.length > 0 && (
-          <span className="bg-teal-500 text-white w-5 h-5 flex items-center justify-center rounded-full text-xs animate-bounce">
-            {announcements.length}
-          </span>
+        {urgentAnnouncements.length > 0 && (
+          <button type="button" className="student-home__urgent" onClick={() => setShowAnnouncementModal(true)}>
+            <strong>긴급 공지</strong>
+            <span>{urgentAnnouncements[0].title}</span>
+            <span aria-hidden="true">→</span>
+          </button>
         )}
-      </button>
 
-      <div className="max-w-6xl w-full z-10 relative space-y-6">
-      <div className="grid grid-cols-1 xl:grid-cols-[420px_minmax(0,1fr)] gap-6">
-        <div className="glass-box rounded-3xl p-8 md:p-10 text-center shadow-2xl border-2 border-cyan-100">
-          <div className="text-6xl mb-3 text-sky-600" aria-hidden="true">❄</div>
-
-          <h1 className="text-4xl md:text-5xl font-black mb-3 text-sky-900 drop-shadow-sm">
-            풍양중학교<br />정보 시스템
-          </h1>
-
-          <p className="text-teal-900/70 font-bold mb-5 tracking-wide">
-            눈 내리는 겨울, 함께 성장하는 타자 대결
-          </p>
-
-          <div className="mb-8 bg-white/80 border border-cyan-100 rounded-2xl px-5 py-4 shadow-sm">
-            <div className="text-xs font-black text-teal-600 tracking-widest mb-1">시험까지 남은 시간!</div>
-            <div className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-sky-500 to-emerald-500">
-              {examDday}
-            </div>
-            <div className="text-xs font-bold text-gray-400 mt-1">시험일 2026년 12월 7일</div>
-          </div>
-
-          <div className="space-y-4">
-            <button onClick={onStudentClick} className="w-full py-4 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 text-white rounded-2xl font-bold text-lg shadow-lg shadow-teal-300/60 transition-all flex items-center justify-center gap-2 transform hover:scale-105">
-              🎒 선수 입장
+        <nav className="student-home__tiles" aria-label="학생 메뉴">
+          {PANELS.map(({ id, label, icon }) => (
+            <button key={id} type="button" aria-expanded={activePanel === id} aria-controls="student-home-panel"
+              onClick={() => onPanelChange(activePanel === id ? '' : id)}>
+              <span className="student-home__tile-icon" aria-hidden="true">{icon}</span>
+              <strong>{label}</strong>
             </button>
-            <button onClick={onHallOfFameClick} className="w-full py-4 bg-gradient-to-r from-amber-300 via-yellow-300 to-orange-300 hover:from-amber-400 hover:via-yellow-400 hover:to-orange-400 text-amber-950 rounded-2xl font-black text-lg shadow-lg shadow-yellow-300/50 transition-all flex items-center justify-center gap-2 transform hover:scale-105">
-              🏆 명예의 전당
-            </button>
-            <button
-              onClick={onDuelClick}
-              disabled={!duelEnabled || duelAvailabilityLoading}
-              className="w-full py-4 bg-gradient-to-r from-rose-500 via-red-500 to-orange-500 hover:from-rose-600 hover:via-red-600 hover:to-orange-600 text-white rounded-2xl font-black text-lg shadow-lg shadow-rose-300/50 transition-all flex items-center justify-center gap-2 transform hover:scale-105 disabled:from-gray-400 disabled:via-gray-400 disabled:to-gray-500 disabled:shadow-none disabled:hover:scale-100 disabled:cursor-not-allowed"
-            >
-              {duelAvailabilityLoading ? '⚔️ 결투 상태 확인 중' : duelEnabled ? '⚔️ 1:1 결투 신청' : '🔒 결투 일시 중지'}
-            </button>
-            <button onClick={onDuelHistoryClick} className="w-full py-3 bg-white/90 hover:bg-white text-rose-600 rounded-2xl font-black border-2 border-rose-100 transition-all flex items-center justify-center gap-2">
-              📜 최근 결투 전적 보기
-            </button>
-            <div className="grid grid-cols-2 gap-3">
-              <button onClick={onPracticeClick} className="py-3 bg-cyan-50 hover:bg-cyan-100 text-teal-700 rounded-2xl font-black border border-cyan-100">자유 연습</button>
-              <button onClick={onGuestClick} className="py-3 bg-sky-50 hover:bg-sky-100 text-sky-700 rounded-2xl font-black border border-sky-100">게스트 입장</button>
-            </div>
-            <button onClick={onTeacherClick} className="w-full py-4 bg-white/85 hover:bg-white text-slate-700 rounded-2xl font-bold text-lg border-2 border-cyan-100 transition-all flex items-center justify-center gap-2">
-              🧑‍🏫 교무실(관리자) 접속
-            </button>
-            <button onClick={onStudentLogout} className="w-full py-2 text-sm font-bold text-gray-400 hover:text-red-500 transition-colors">학생 로그아웃</button>
-          </div>
-        </div>
+          ))}
+        </nav>
 
-        <div className="glass-box rounded-3xl p-5 md:p-6 shadow-2xl border-2 border-cyan-100 space-y-5">
-          <StudentAssessmentBoard key={studentHomeCacheKey} cacheKey={studentHomeCacheKey} onOpenAssessment={onOpenAssessment} />
-          <AnnouncementBoard
-            announcements={announcements}
-            onOpenModal={() => setShowAnnouncementModal(true)}
-          />
-          <RewardGuideBoard />
-        </div>
-      </div>
-      <StudentHomeShopPanel
-        key={studentProfile?.id || 'no-student'}
-        onProfileChange={onShopProfileChange}
-        student={studentProfile}
-        cacheKey={studentHomeCacheKey}
-        shopItems={shopItems}
-        onBuyCosmetic={onBuyCosmetic}
-        onBuyStockItem={onBuyStockItem}
-        onEquipCosmetic={onEquipCosmetic}
-        onRefreshStudentProfile={onRefreshStudentProfile}
-      />
-      </div>
+        <section id="student-home-panel" className="student-home__panel" ref={panelRef} tabIndex={-1}
+          aria-label={currentPanel?.label || '학생 메뉴 내용'} hidden={!currentPanel}>
+          {activePanel === 'assessments' && (
+            <StudentAssessmentBoard key={studentHomeCacheKey} cacheKey={studentHomeCacheKey} onOpenAssessment={onOpenAssessment} />
+          )}
+          {activePanel === 'shop' && (
+            <>
+              <div className="student-home__surface-header student-home__shop-heading">
+                <h2>포인트 상점</h2>
+                <button type="button" className="student-home__text-action" disabled={shopLoading} onClick={onRefreshShopItems}>
+                  {shopError ? '다시 불러오기' : '상품 새로고침'}
+                </button>
+              </div>
+              {shopLoading && <p className="student-home__feedback" role="status">상품을 불러오고 있어요.</p>}
+              {shopError && <p className="student-home__feedback" role="alert">상품을 불러오지 못했어요.</p>}
+              {!shopLoading && !shopError && (
+                <StudentHomeShopPanel key={studentProfile?.id} student={studentProfile} showGear={false}
+                  shopItems={shopItems} onBuyCosmetic={onBuyCosmetic} onBuyStockItem={onBuyStockItem}
+                  onEquipCosmetic={onEquipCosmetic} onRefreshStudentProfile={onRefreshStudentProfile}
+                  onProfileChange={onShopProfileChange} />
+              )}
+              <RewardGuide />
+            </>
+          )}
+          {activePanel === 'gear' && <TypeforgeProfileGear key={studentHomeCacheKey} cacheKey={studentHomeCacheKey} />}
+          {activePanel === 'announcements' && (
+            <AnnouncementHistory announcements={announcements} loading={announcementsLoading}
+              error={announcementError} onRefresh={onRefreshAnnouncements} />
+          )}
+        </section>
+
+        <nav className="student-home__links" aria-label="경기와 기록">
+          <button type="button" onClick={onDuelClick} disabled={!duelEnabled || duelAvailabilityLoading}>
+            {duelAvailabilityLoading ? '결투 확인 중…' : duelEnabled ? '1:1 결투 신청' : '결투 일시 중지'}
+          </button>
+          <button type="button" onClick={onDuelHistoryClick}>최근 결투 전적 보기</button>
+          <button type="button" onClick={onHallOfFameClick}>명예의 전당</button>
+          <button type="button" onClick={onGuestClick}>게스트 입장</button>
+        </nav>
+        <footer className="student-home__footer">
+          <button type="button" onClick={onTeacherClick}>교무실(관리자) 접속</button>
+          <button type="button" onClick={onStudentLogout}>학생 로그아웃</button>
+        </footer>
+      </main>
+      {showAnnouncementModal && urgentAnnouncements.length > 0 && (
+        <AnnouncementModal announcements={urgentAnnouncements} onClose={() => setShowAnnouncementModal(false)} />
+      )}
     </div>
   );
 }

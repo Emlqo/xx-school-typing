@@ -21,6 +21,7 @@ const SESSION_MINUTES = 60;
 
 const PATHS = {
   rooms: 'typing_rooms',
+  announcements: 'typing_announcements',
   scores: 'typing_scores',
   classScoreboards: 'typing_class_scoreboards',
   classes: 'typing_classes',
@@ -466,6 +467,93 @@ async function getStudentSession(uid) {
   };
 }
 
+async function buildStudentHome(uid, { studentId, student, sessionExpiresAt }) {
+  const [profile, duelRecovery] = await Promise.all([
+    safeLoginProfile(studentId, student),
+    readStudentDuelRecovery(uid, studentId, student).catch((error) => {
+      console.error('Failed to recover student duel:', error);
+      return null;
+    }),
+  ]);
+  return { profile, sessionExpiresAt, duelRecovery };
+}
+
+async function getStudentHome(uid) {
+  const verified = await getVerifiedStudentSession(uid);
+  return verified ? buildStudentHome(uid, verified) : { profile: null, sessionExpiresAt: 0 };
+}
+
+function urgentAnnouncement(id, data) {
+  return {
+    id, isAlert: true, title: String(data.title || '').slice(0, 200),
+    content: String(data.content || '').slice(0, 12000),
+    createdAt: toMillis(data.createdAt), updatedAt: toMillis(data.updatedAt),
+  };
+}
+
+function selectUrgentAnnouncements(records) {
+  return records.sort((left, right) => (right.updatedAt || right.createdAt) - (left.updatedAt || left.createdAt)).slice(0, 12);
+}
+
+let pendingUrgentInitialization;
+
+async function initializeHomeAnnouncements() {
+  const settingsRef = publicCollection(PATHS.settings).doc('duel');
+  pendingUrgentInitialization ??= database().runTransaction(async (transaction) => {
+    const settings = await transaction.get(settingsRef);
+    const current = settings.data()?.urgentAnnouncements;
+    if (Array.isArray(current)) return { urgentAnnouncements: current };
+    const snapshot = await transaction.get(publicCollection(PATHS.announcements).where('isAlert', '==', true));
+    const urgentAnnouncements = selectUrgentAnnouncements(snapshot.docs.map((doc) => urgentAnnouncement(doc.id, doc.data())));
+    transaction.set(settingsRef, { urgentAnnouncements }, { merge: true });
+    return { urgentAnnouncements };
+  }).finally(() => {
+    pendingUrgentInitialization = undefined;
+  });
+  return pendingUrgentInitialization;
+}
+
+async function updateSchoolAnnouncement(uid, body) {
+  requireTeacher(uid);
+  const id = body.announcementId ? requireString(body.announcementId, 'announcementId', 200) : '';
+  const remove = body.remove === true;
+  if (remove && !id) throw new ApiError(400, 'api/invalid-argument', '삭제할 공지를 확인해 주세요.');
+  const announcements = publicCollection(PATHS.announcements);
+  const announcementRef = id ? announcements.doc(id) : announcements.doc();
+  const settingsRef = publicCollection(PATHS.settings).doc('duel');
+  const fields = remove ? null : {
+    title: requireString(body.title, 'title', 200),
+    content: requireString(body.content, 'content', 12000),
+    isAlert: body.isAlert === true,
+  };
+  await database().runTransaction(async (transaction) => {
+    const previous = id ? await transaction.get(announcementRef) : null;
+    if (id && !previous.exists) throw new ApiError(404, 'api/not-found', '공지사항을 찾을 수 없습니다.');
+    const previousData = previous?.data();
+    const syncUrgent = previousData?.isAlert === true || fields?.isAlert === true;
+    if (syncUrgent) await transaction.get(settingsRef);
+    const urgent = syncUrgent
+      ? await transaction.get(announcements.where('isAlert', '==', true))
+      : null;
+
+    if (remove) transaction.delete(announcementRef);
+    else if (id) transaction.update(announcementRef, { ...fields, updatedAt: FieldValue.serverTimestamp() });
+    else transaction.create(announcementRef, { ...fields, createdAt: FieldValue.serverTimestamp() });
+    if (urgent) {
+      const records = urgent.docs.filter((doc) => doc.id !== announcementRef.id)
+        .map((doc) => urgentAnnouncement(doc.id, doc.data()));
+      if (fields?.isAlert) {
+        const now = Date.now();
+        records.push(urgentAnnouncement(announcementRef.id, {
+          ...fields, createdAt: previousData?.createdAt ?? now, updatedAt: now,
+        }));
+      }
+      transaction.set(settingsRef, { urgentAnnouncements: selectUrgentAnnouncements(records) }, { merge: true });
+    }
+  });
+  return { announcementId: announcementRef.id };
+}
+
 async function getTypeforgeProfileGear(uid) {
   const verified = await getVerifiedStudentSession(uid);
   if (!verified) throw new ApiError(403, 'api/permission-denied', '학생으로 로그인해 주세요.');
@@ -573,7 +661,7 @@ async function verifyStudentLoginPin(uid, body) {
     throw new ApiError(403, 'api/permission-denied', '학급과 이름, 개인 PIN을 확인해 주세요.');
   }
   const sessionExpiresAt = await createSession(uid, snapshot.id, data);
-  return { profile: await safeLoginProfile(snapshot.id, data), sessionExpiresAt };
+  return buildStudentHome(uid, { studentId: snapshot.id, student: data, sessionExpiresAt });
 }
 
 async function setInitialStudentLoginPin(uid, body) {
@@ -608,7 +696,7 @@ async function setInitialStudentLoginPin(uid, body) {
   });
 
   const sessionExpiresAt = await createSession(uid, studentId, student);
-  return { profile: await safeLoginProfile(studentId, student), sessionExpiresAt };
+  return buildStudentHome(uid, { studentId, student, sessionExpiresAt });
 }
 
 async function requireSession(uid, studentId) {
@@ -1495,6 +1583,10 @@ async function getActiveDuel(uid, body) {
   const studentId = requireString(body.studentId, 'studentId');
   await requireSession(uid, studentId);
   const { data: student } = await getActiveStudent(studentId);
+  return readStudentDuelRecovery(uid, studentId, student);
+}
+
+async function readStudentDuelRecovery(uid, studentId, student) {
   if (!student.activeDuelId) {
     return {
       duel: null,
@@ -2325,6 +2417,9 @@ const actions = {
   reportGameScreenExit,
   submitSubwayRun,
   getStudentSession,
+  getStudentHome,
+  initializeHomeAnnouncements,
+  updateSchoolAnnouncement,
   createTypeforgeEntry,
   getTypeforgeProfileGear,
   verifyTypeforgePracticeGear,
@@ -2383,7 +2478,7 @@ export default async function handler(request, response) {
     const action = requireString(body.action, 'action', 50);
     const actionHandler = actions[action];
     if (!actionHandler) throw new ApiError(404, 'api/not-found', '지원하지 않는 보안 작업입니다.');
-    if (['createTypeforgeEntry', 'getTypeforgeProfileGear', 'verifyTypeforgePracticeGear', 'getFinishedClassScoreboard'].includes(action)) response.setHeader('Cache-Control', 'no-store');
+    if (['createTypeforgeEntry', 'getStudentHome', 'getTypeforgeProfileGear', 'verifyTypeforgePracticeGear', 'getFinishedClassScoreboard'].includes(action)) response.setHeader('Cache-Control', 'no-store');
     const data = action === 'createTypeforgeEntry'
       ? await actionHandler(decodedToken, body)
       : await actionHandler(decodedToken.uid, body);

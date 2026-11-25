@@ -42,8 +42,8 @@ import {
   finalizeExpiredDuel,
   finalizeFinishedClassRankRewards,
   finalizeStudentReward,
-  getActiveDuel,
   getDuelHistory,
+  getStudentHome,
   getTeacherDuelHistory,
   getStudentSession,
   joinClassGame,
@@ -58,6 +58,7 @@ import {
   setInitialStudentLoginPin,
   setInitialStudentPin,
   syncPublicClassRoster,
+  updateSchoolAnnouncement,
   verifyStudentLoginPin,
   verifyStudentPin,
 } from './services/studentSecurityApi.js';
@@ -150,6 +151,7 @@ export default function App() {
     () => window.sessionStorage.getItem('pw_typing_teacher_gate') === 'passed',
   );
   const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
+  const [studentHomePanel, setStudentHomePanel] = useState('');
   const [nickname, setNickname] = useState('');
   const [roomCodeInput, setRoomCodeInput] = useState('');
   const [selectedRoomId, setSelectedRoomId] = useState('');
@@ -260,14 +262,13 @@ export default function App() {
   const quizShieldRef = useRef(false);
   const quizAnswerPendingRef = useRef(false);
   const practiceGearArrivalHandledRef = useRef(false);
-  const autoAnnouncementShownRef = useRef(false);
+  const seenUrgentAnnouncementsRef = useRef(new Set());
   const duelWordIndexRef = useRef(0);
   const duelQuizIndexRef = useRef(0);
   const duelSyncDirtyRef = useRef(false);
   const duelSyncPromiseRef = useRef(null);
   const duelBoosterActivationRef = useRef(false);
   const cancelledDuelHandledRef = useRef('');
-  const duelRecoveryStudentRef = useRef('');
 
   const { user, authReady } = useFirebaseAuth();
   const teacherAuthorized = useMemo(() => isTeacherUser(user), [user]);
@@ -284,11 +285,16 @@ export default function App() {
   const firestoreReadsEnabled = !(isPracticeMode && ['playing', 'subway', 'practiceSelection'].includes(view));
   const teacherOverviewActive = view !== 'teacher' || teacherSection === 'overview' || teacherSection === 'classes';
   const teacherClassDataActive = view !== 'teacher' || ['overview', 'classes', 'shop', 'assessments'].includes(teacherSection);
-  const { announcements: subscribedAnnouncements, refreshAnnouncements } = useAnnouncements({
+  const studentHomeCacheKey = user?.uid && studentProfile?.id ? `${user.uid}:home:${studentProfile.id}` : '';
+  const {
+    announcements: subscribedAnnouncements, error: announcementError,
+    isLoading: announcementsLoading, refreshAnnouncements,
+  } = useAnnouncements({
     user: scopedUser,
-    studentHome: view === 'login',
+    studentHomeKey: view === 'login' ? studentHomeCacheKey : '',
     enabled: firestoreReadsEnabled
-      && (view === 'login' || (view === 'teacher' && teacherSection === 'records')),
+      && ((view === 'login' && studentHomePanel === 'announcements' && Boolean(studentHomeCacheKey))
+        || (view === 'teacher' && teacherSection === 'records')),
   });
   const { quizzes: subscribedQuizzes } = useQuizzes({
     user: scopedUser,
@@ -352,13 +358,15 @@ export default function App() {
   const shopClassId = view === 'teacher'
     ? selectedClassId
     : studentProfile?.classId || selectedOpenClassRoom?.classId || '';
-  const { shopItems, refreshShopItems, applyShopPurchase } = useShopItems({
+  const { shopItems, error: shopError, isLoading: shopLoading, refreshShopItems, applyShopPurchase } = useShopItems({
     user: scopedUser,
     view,
     classId: shopClassId,
     isPracticeMode,
+    studentHomeKey: studentHomeCacheKey,
     enabled: firestoreReadsEnabled
-      && ((view === 'login' && Boolean(studentProfile?.id)) || (view === 'teacher' && teacherSection === 'shop')),
+      && ((view === 'login' && studentHomePanel === 'shop' && Boolean(studentHomeCacheKey))
+        || (view === 'teacher' && teacherSection === 'shop')),
   });
   const { shopPurchases } = useShopPurchases({
     user: scopedUser,
@@ -404,8 +412,10 @@ export default function App() {
     duelEnabled,
     isLoading: duelAvailabilityLoading,
     error: duelAvailabilityError,
+    urgentAnnouncements,
   } = useDuelSettings({
     user: scopedUser,
+    includeUrgent: view !== 'teacher' && Boolean(studentProfile?.id),
     enabled: firestoreReadsEnabled
       && Boolean(scopedUser)
       && (view === 'teacher' ? teacherSection === 'duelLive' : Boolean(studentProfile)),
@@ -448,6 +458,16 @@ export default function App() {
     [duelScores, studentProfile?.id],
   );
 
+  const restoreStudentDuel = useCallback((recovery) => {
+    if (recovery?.duel?.id) {
+      setActiveDuelId(recovery.duel.id);
+      setIsDuelMode(recovery.duel.status !== 'completed');
+      setView(recovery.duel.status === 'completed' ? 'duelResult' : 'duelCountdown');
+    } else {
+      setOutgoingDuelTargetId(recovery?.outgoingChallengeTargetId || '');
+    }
+  }, []);
+
   useEffect(() => {
     if (!authReady) return undefined;
     if (!user) {
@@ -467,7 +487,7 @@ export default function App() {
 
     let cancelled = false;
     setStudentSessionChecked(false);
-    getStudentSession()
+    getStudentHome()
       .then((result) => {
         if (cancelled) return;
         if (result?.profile && Number(result.sessionExpiresAt) > Date.now()) {
@@ -475,6 +495,7 @@ export default function App() {
           setStudentSessionExpiresAt(Number(result.sessionExpiresAt));
           setNickname(result.profile.name || '');
           setView((currentView) => currentView === 'entry' ? 'login' : currentView);
+          restoreStudentDuel(result.duelRecovery);
         } else {
           clearStudentDirectoryCache(user.uid);
           setStudentProfile(null);
@@ -496,27 +517,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [authReady, user?.isAnonymous, user?.uid]);
-
-  useEffect(() => {
-    const studentId = studentProfile?.id || '';
-    if (!studentId || duelRecoveryStudentRef.current === studentId) return;
-    duelRecoveryStudentRef.current = studentId;
-
-    getActiveDuel(studentId)
-      .then((result) => {
-        if (result?.duel?.id) {
-          setActiveDuelId(result.duel.id);
-          setIsDuelMode(result.duel.status !== 'completed');
-          setView(result.duel.status === 'completed' ? 'duelResult' : 'duelCountdown');
-          return;
-        }
-        if (result?.outgoingChallengeTargetId) {
-          setOutgoingDuelTargetId(result.outgoingChallengeTargetId);
-        }
-      })
-      .catch((error) => console.error('결투 상태를 복구하지 못했습니다.', error));
-  }, [studentProfile?.id]);
+  }, [authReady, restoreStudentDuel, user?.isAnonymous, user?.uid]);
 
   useEffect(() => {
     const relevantIncoming = incomingChallenge?.targetStudentId === studentProfile?.id
@@ -1497,13 +1498,13 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (autoAnnouncementShownRef.current) return;
-    if (view !== 'login') return;
-    if (!announcements.some((announcement) => announcement.isAlert === true)) return;
-
-    autoAnnouncementShownRef.current = true;
+    if (view !== 'login' || !urgentAnnouncements.length) return;
+    const keys = urgentAnnouncements.map(({ id, updatedAt, createdAt }) => `${id}:${toDuelMillis(updatedAt || createdAt)}`);
+    const seen = seenUrgentAnnouncementsRef.current;
+    if (keys.every((key) => seen.has(key))) return;
+    keys.forEach((key) => seen.add(key));
     setShowAnnouncementModal(true);
-  }, [announcements, view]);
+  }, [urgentAnnouncements, view]);
 
   useEffect(() => {
     latestScoreRef.current = score;
@@ -1822,25 +1823,11 @@ export default function App() {
     if (!trimmedTitle || !trimmedContent) return;
 
     try {
-      if (editingAnnId) {
-        const announcementRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.announcements, editingAnnId);
-        await updateDoc(announcementRef, {
-          title: trimmedTitle,
-          content: trimmedContent,
-          isAlert: annIsAlert,
-          updatedAt: serverTimestamp(),
-        });
-        await refreshAnnouncements();
-        clearAnnouncementForm();
-        return;
-      }
-
-      const announcementsRef = getPublicCollection(db, APP_ID, FIRESTORE_PATHS.announcements);
-      await addDoc(announcementsRef, {
+      await updateSchoolAnnouncement({
+        announcementId: editingAnnId,
         title: trimmedTitle,
         content: trimmedContent,
         isAlert: annIsAlert,
-        createdAt: serverTimestamp(),
       });
       await refreshAnnouncements();
       clearAnnouncementForm();
@@ -1855,8 +1842,7 @@ export default function App() {
     if (!window.confirm('공지사항을 삭제할까요?')) return;
 
     try {
-      const announcementRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.announcements, announcementId);
-      await deleteDoc(announcementRef);
+      await updateSchoolAnnouncement({ announcementId, remove: true });
       await refreshAnnouncements();
       if (editingAnnId === announcementId) clearAnnouncementForm();
     } catch (error) {
@@ -2182,9 +2168,10 @@ export default function App() {
     setStudentSessionExpiresAt(Number(result.sessionExpiresAt));
     setNickname(profile.name || '');
     setStudentLoginClassId(profile.classId || '');
-    duelRecoveryStudentRef.current = '';
+    setStudentHomePanel('');
     setIsPracticeMode(false);
     setView('login');
+    restoreStudentDuel(result.duelRecovery);
     return true;
   };
 
@@ -2215,7 +2202,9 @@ export default function App() {
     setDuelHistoryHasMore(false);
     setDuelHistoryError('');
     setDuelHistoryStudentId('');
-    duelRecoveryStudentRef.current = '';
+    setStudentHomePanel('');
+    setShowAnnouncementModal(false);
+    seenUrgentAnnouncementsRef.current.clear();
     setView('entry');
   };
 
@@ -3405,19 +3394,31 @@ export default function App() {
     );
   }
 
+  const homeInvite = incomingChallenge?.targetStudentId === studentProfile?.id ? incomingChallenge : null;
+  const showingDuelInvite = homeInvite?.status === 'pending' && toDuelMillis(homeInvite.expiresAt) > currentTime;
   return (
     <>
       <LoginView
-        studentHomeCacheKey={user?.uid && studentProfile?.id ? `${user.uid}:home:${studentProfile.id}` : ''}
+        studentHomeCacheKey={studentHomeCacheKey}
+        activePanel={studentHomePanel}
+        onPanelChange={setStudentHomePanel}
         onShopProfileChange={(profile) => setStudentProfile(previous => previous?.id === profile.id ? normalizeClassStudent({ ...previous, ...profile, className: profile.className || previous.className }) : previous)}
         announcements={announcements}
-        showAnnouncementModal={showAnnouncementModal}
+        announcementsLoading={announcementsLoading}
+        announcementError={announcementError}
+        onRefreshAnnouncements={() => refreshAnnouncements()}
+        urgentAnnouncements={urgentAnnouncements}
+        showAnnouncementModal={showAnnouncementModal && !showingDuelInvite}
         setShowAnnouncementModal={setShowAnnouncementModal}
         onStudentClick={() => {
+          setStudentHomePanel('');
           setIsPracticeMode(false);
           setView('studentRoomEntry');
         }}
-        onPracticeClick={openPracticeSelection}
+        onPracticeClick={() => {
+          setStudentHomePanel('');
+          openPracticeSelection();
+        }}
         onGuestClick={() => setView('studentLobby')}
         onHallOfFameClick={() => setView('hallOfFame')}
         onDuelClick={() => {
@@ -3435,6 +3436,9 @@ export default function App() {
         onTeacherClick={openTeacherLogin}
         studentProfile={studentProfile}
         shopItems={shopItems}
+        shopLoading={shopLoading}
+        shopError={shopError}
+        onRefreshShopItems={() => refreshShopItems()}
         onBuyCosmetic={handleBuyCosmetic}
         onBuyStockItem={handleBuyStockItem}
         onEquipCosmetic={handleEquipCosmetic}
@@ -3446,7 +3450,7 @@ export default function App() {
       />
       {view === 'login' && (
         <DuelChallengeModal
-          challenge={incomingChallenge?.targetStudentId === studentProfile?.id ? incomingChallenge : null}
+          challenge={homeInvite}
           isProcessing={duelProcessing}
           canAccept={duelEnabled
             && !duelAvailabilityLoading

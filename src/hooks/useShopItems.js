@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { getDocs, query, where } from 'firebase/firestore';
 import { APP_ID } from '../constants/gameRules.js';
 import { FIRESTORE_PATHS } from '../constants/firestorePaths.js';
@@ -21,32 +21,39 @@ export default function useShopItems({
   view,
   isPracticeMode = false,
   enabled = true,
+  studentHomeKey = '',
 }) {
   const [shopItems, setShopItems] = useState([]);
-  const [error, setError] = useState(null);
+  const [state, setState] = useState(null);
 
-  const cacheKey = view === 'login' && user ? `${user.uid}:home-shop:${SHOP_SEASON}` : '';
+  const cacheKey = view === 'login' && studentHomeKey ? `${studentHomeKey}:shop:${SHOP_SEASON}` : '';
+  const loadKey = enabled && user && db && !isPracticeMode && (view === 'teacher' || view === 'login')
+    ? cacheKey || user.uid : '';
+  const activeKey = useRef(loadKey);
+  activeKey.current = loadKey;
   const refreshShopItems = useCallback(async (refresh = true) => {
-    const canSubscribe = view === 'teacher' || view === 'login';
-
-    if (!enabled || !user || !db || !canSubscribe || isPracticeMode) {
+    if (!loadKey) {
       setShopItems([]);
+      setState(null);
       return [];
     }
 
+    setState({ key: loadKey, loading: true });
     try {
       const nextItems = cacheKey
-        ? await getCachedStudentDirectory(cacheKey, loadShopItems, { maxAge: STUDENT_HOME_CACHE_AGE_MS, refresh })
+        ? await getCachedStudentDirectory(cacheKey, loadShopItems, { maxAge: STUDENT_HOME_CACHE_AGE_MS, refresh, persist: true })
         : await loadShopItems();
-      setShopItems(nextItems);
-      setError(null);
+      if (activeKey.current === loadKey) {
+        setShopItems(nextItems);
+        setState({ key: loadKey, loading: false });
+      }
       return nextItems;
     } catch (loadError) {
       console.error(loadError);
-      setError(loadError);
+      if (activeKey.current === loadKey) setState({ key: loadKey, loading: false, error: loadError });
       return [];
     }
-  }, [cacheKey, enabled, isPracticeMode, user, view]);
+  }, [cacheKey, loadKey]);
 
   useEffect(() => {
     refreshShopItems(false);
@@ -58,5 +65,8 @@ export default function useShopItems({
     if (cacheKey) updateCachedStudentDirectory(cacheKey, applyStock);
     setShopItems(applyStock);
   }, [cacheKey]);
-  return { shopItems, error, refreshShopItems, applyShopPurchase };
+  return {
+    shopItems, error: state?.key === loadKey ? state.error : null,
+    isLoading: Boolean(loadKey && (state?.key !== loadKey || state.loading)), refreshShopItems, applyShopPurchase,
+  };
 }
