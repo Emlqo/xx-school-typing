@@ -539,22 +539,43 @@ async function logoutStudentSession(uid) {
   return { success: true };
 }
 
-async function verifyStudentLoginPin(uid, body) {
-  const studentId = requireString(body.studentId, 'studentId');
-  const pin = requirePin(body.pin);
-  const { data } = await getActiveStudent(studentId);
-  if (!data.studentPin || String(data.studentPin) !== pin) {
-    throw new ApiError(403, 'api/permission-denied', '개인 PIN이 일치하지 않습니다.');
+async function findStudentForLogin(body) {
+  if (body.classId === undefined && body.name === undefined) {
+    return getActiveStudent(requireString(body.studentId, 'studentId'));
   }
-  const sessionExpiresAt = await createSession(uid, studentId, data);
-  return { profile: await safeLoginProfile(studentId, data), sessionExpiresAt };
+  const classId = requireString(body.classId, 'classId');
+  const name = requireString(body.name, 'name');
+  const matches = await publicCollection(PATHS.classStudents)
+    .where('classId', '==', classId)
+    .where('active', '==', true)
+    .where('name', '==', name)
+    .limit(2)
+    .get();
+  if (matches.size !== 1) {
+    throw new ApiError(403, 'api/permission-denied', '학급과 이름, 개인 PIN을 확인해 주세요.');
+  }
+  const [snapshot] = matches.docs;
+  return { snapshot, data: snapshot.data() };
+}
+
+async function verifyStudentLoginPin(uid, body) {
+  const pin = requirePin(body.pin);
+  const { snapshot, data } = await findStudentForLogin(body);
+  if (!data.studentPin) {
+    throw new ApiError(409, 'api/pin-not-set', '처음 사용할 개인 PIN을 설정하세요.');
+  }
+  if (String(data.studentPin) !== pin) {
+    throw new ApiError(403, 'api/permission-denied', '학급과 이름, 개인 PIN을 확인해 주세요.');
+  }
+  const sessionExpiresAt = await createSession(uid, snapshot.id, data);
+  return { profile: await safeLoginProfile(snapshot.id, data), sessionExpiresAt };
 }
 
 async function setInitialStudentLoginPin(uid, body) {
-  const studentId = requireString(body.studentId, 'studentId');
   const pin = requirePin(body.pin);
-  const { data: initialStudent } = await getActiveStudent(studentId);
-  const studentRef = publicCollection(PATHS.classStudents).doc(studentId);
+  const { snapshot: initial, data: initialStudent } = await findStudentForLogin(body);
+  const studentId = initial.id;
+  const studentRef = initial.ref;
   const rosterRef = publicCollection(PATHS.classRoster).doc(studentId);
   let student;
 
@@ -564,8 +585,8 @@ async function setInitialStudentLoginPin(uid, body) {
       throw new ApiError(404, 'api/not-found', '학생 정보를 찾을 수 없습니다.');
     }
     student = snapshot.data();
-    if (student.classId !== initialStudent.classId) {
-      throw new ApiError(409, 'api/failed-precondition', '학급 정보가 변경되었습니다.');
+    if (student.classId !== initialStudent.classId || student.name !== initialStudent.name) {
+      throw new ApiError(409, 'api/failed-precondition', '학급 명단이 변경되었습니다. 다시 로그인해 주세요.');
     }
     if (student.studentPin) {
       throw new ApiError(409, 'api/already-exists', '이미 PIN이 설정된 학생입니다.');

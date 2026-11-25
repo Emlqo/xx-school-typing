@@ -271,6 +271,7 @@ export default function App() {
     studentId: typeforgeStudentId,
     teacherId: teacherAuthorized && teacherGatePassed ? user.uid : undefined,
   });
+  const studentLoginVisible = view === 'studentLogin' || (view === 'entry' && typeforgeEntry.status === 'login');
   const typeforgePractice = useTypeforgePracticeGear({ ready: authReady && studentSessionChecked, studentId: typeforgeStudentId });
   const selectedPracticeEffects = useMemo(() => getTypeforgePracticeEffects(typeforgePractice.gear), [typeforgePractice.gear]);
   const scopedUser = view === 'teacher' && !teacherAuthorized ? null : user;
@@ -303,7 +304,7 @@ export default function App() {
   });
   const { classes } = useClasses({
     user: scopedUser,
-    view,
+    view: studentLoginVisible ? 'studentLogin' : view,
     isPracticeMode,
     enabled: firestoreReadsEnabled && (teacherClassDataActive || (view === 'teacher' && teacherSection === 'growth')),
   });
@@ -319,10 +320,8 @@ export default function App() {
   const { students: classStudents } = useClassStudents({
     user: scopedUser,
     view,
-    classId: view === 'studentLogin'
-      ? studentLoginClassId
-      : view === 'duelChallenge'
-        ? duelClassId
+    classId: view === 'duelChallenge'
+      ? duelClassId
       : view === 'studentLobby'
         ? selectedOpenClassRoom?.classId || ''
         : selectedClassId,
@@ -2245,14 +2244,14 @@ export default function App() {
     return true;
   };
 
-  const handleStudentLoginPin = async (studentId, pin) => {
-    const result = await verifyStudentLoginPin(studentId, pin);
+  const handleStudentLoginPin = async (classId, name, pin) => {
+    const result = await verifyStudentLoginPin(classId, name, pin);
     completeStudentLogin(result);
     return result;
   };
 
-  const handleStudentInitialLoginPin = async (studentId, pin) => {
-    const result = await setInitialStudentLoginPin(studentId, pin);
+  const handleStudentInitialLoginPin = async (classId, name, pin) => {
+    const result = await setInitialStudentLoginPin(classId, name, pin);
     completeStudentLogin(result);
     return result;
   };
@@ -3079,11 +3078,10 @@ export default function App() {
     );
   }
 
-  if (view === 'studentLogin' || (view === 'entry' && typeforgeEntry.status === 'login')) {
+  if (studentLoginVisible) {
     return (
       <StudentLoginView
         classes={classes}
-        classStudents={classStudents}
         selectedClassId={studentLoginClassId}
         setSelectedClassId={setStudentLoginClassId}
         onVerifyPin={handleStudentLoginPin}
