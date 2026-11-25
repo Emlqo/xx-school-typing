@@ -12,7 +12,6 @@ import {
   getDocs,
   increment,
   query,
-  runTransaction,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -41,6 +40,7 @@ import {
   equipStudentCosmetic,
   finalizeDuel,
   finalizeExpiredDuel,
+  finalizeFinishedClassRankRewards,
   finalizeStudentReward,
   getActiveDuel,
   getDuelHistory,
@@ -51,6 +51,7 @@ import {
   joinGuestGame,
   logoutStudentSession,
   recordPracticeCompletion,
+  removeClassRoomScoreboard,
   reportGameScreenExit,
   allowGameReentry,
   rejectDuelChallenge,
@@ -69,7 +70,8 @@ import { getCurrentDuelDailyWinPoints, normalizeClassStudent } from './utils/cla
 import { DUEL_RULES } from './constants/duelRules.js';
 import { verifyTeacherPassword } from './utils/teacherAuth.js';
 import { PRACTICE_RECORD_RULES } from './constants/rewards.js';
-import { calculateRankRewards, getDefaultRewardState } from './utils/rewards.js';
+import { getDefaultRewardState } from './utils/rewards.js';
+import { getClassScoreboardEnd, selectLeaderboardScores } from './utils/classScoreboard.js';
 import {
   createDuelQuizSequence,
   getDuelBoosterState,
@@ -81,6 +83,7 @@ import useAnnouncements from './hooks/useAnnouncements.js';
 import useClasses from './hooks/useClasses.js';
 import useClassStudents from './hooks/useClassStudents.js';
 import useFirebaseAuth from './hooks/useFirebaseAuth.js';
+import useFinishedClassScoreboard from './hooks/useFinishedClassScoreboard.js';
 import useDuel from './hooks/useDuel.js';
 import useDuelChallenge from './hooks/useDuelChallenge.js';
 import useDuelScores from './hooks/useDuelScores.js';
@@ -210,6 +213,7 @@ export default function App() {
   const classPointsGrantLock = useRef(false);
   const [lastReward, setLastReward] = useState(() => getDefaultRewardState());
   const [scoreSaveFailed, setScoreSaveFailed] = useState(false);
+  const [scoreSaving, setScoreSaving] = useState(false);
   const [duelClassId, setDuelClassId] = useState('');
   const [outgoingDuelTargetId, setOutgoingDuelTargetId] = useState('');
   const [activeDuelId, setActiveDuelId] = useState('');
@@ -249,6 +253,7 @@ export default function App() {
   const latestQuizCorrectCountRef = useRef(0);
   const lastProcessedSyncRef = useRef(0);
   const lastSyncedScoreRef = useRef(0);
+  const pendingScoreSyncRef = useRef(null);
   const isEndingRef = useRef(false);
   const practiceRunIdRef = useRef('');
   const quizShieldRef = useRef(false);
@@ -280,6 +285,7 @@ export default function App() {
   const teacherClassDataActive = view !== 'teacher' || ['overview', 'classes', 'shop', 'assessments'].includes(teacherSection);
   const { announcements: subscribedAnnouncements, refreshAnnouncements } = useAnnouncements({
     user: scopedUser,
+    studentHome: view === 'login',
     enabled: firestoreReadsEnabled
       && (view === 'login' || (view === 'teacher' && teacherSection === 'records')),
   });
@@ -295,6 +301,11 @@ export default function App() {
     view,
     enabled: firestoreReadsEnabled && teacherOverviewActive,
   });
+  const selectedScoreboardRoom = subscribedRooms.find((room) => room.id === viewingRoomId);
+  const scoreboardEndsAt = getClassScoreboardEnd(selectedScoreboardRoom);
+  const classScoreboardEnded = Boolean(scoreboardEndsAt && scoreboardEndsAt <= currentTime);
+  const archivedScoreboardRoomId = view === 'teacher' && teacherSection === 'overview' && classScoreboardEnded ? viewingRoomId : '';
+  const finishedScoreboard = useFinishedClassScoreboard({ roomId: archivedScoreboardRoomId, endsAt: scoreboardEndsAt });
   const wordsView = isDuelMode && view === 'playing' ? 'duelPlaying' : view;
   const { words } = useWords({
     user: scopedUser,
@@ -326,7 +337,9 @@ export default function App() {
         ? selectedOpenClassRoom?.classId || ''
         : selectedClassId,
     isPracticeMode,
-    enabled: firestoreReadsEnabled && teacherClassDataActive,
+    enabled: firestoreReadsEnabled && teacherClassDataActive
+      && (view !== 'teacher' || teacherSection !== 'overview'
+        || (selectedScoreboardRoom?.entryType === 'class' && !classScoreboardEnded)),
   });
   const { roomScores: selectedOpenClassRoomScores } = useRoomScores({
     user: scopedUser,
@@ -356,7 +369,7 @@ export default function App() {
   const { scores: subscribedScores } = useScores({
     user: scopedUser,
     view,
-    viewingRoomId,
+    viewingRoomId: !classScoreboardEnded && (selectedScoreboardRoom || viewingRoomId === 'all') ? viewingRoomId : '',
     currentScoreDocId,
     enabled: firestoreReadsEnabled && teacherOverviewActive,
   });
@@ -394,8 +407,7 @@ export default function App() {
     user: scopedUser,
     enabled: firestoreReadsEnabled
       && Boolean(scopedUser)
-      && ((view === 'teacher' && teacherSection === 'duelLive')
-        || (Boolean(studentProfile) && (view === 'login' || view === 'duelChallenge'))),
+      && (view === 'teacher' ? teacherSection === 'duelLive' : Boolean(studentProfile)),
   });
   const { duel: activeDuel } = useDuel({
     user: scopedUser,
@@ -1196,62 +1208,53 @@ export default function App() {
 
     if (!currentScoreDocId || !db) return;
 
+    setScoreSaveFailed(false);
+    setScoreSaving(true);
     let scoreSaved = false;
     try {
       const elapsedSeconds = gameInfoRef.current.elapsed || gameDuration || 1;
-      const finalCpm = calculateCpm({ chars: latestCharsRef.current, seconds: elapsedSeconds });
-      const scoreRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.scores, currentScoreDocId);
+      const finalScore = {
+        score: latestScoreRef.current,
+        cpm: calculateCpm({ chars: latestCharsRef.current, seconds: elapsedSeconds }),
+        correctChars: latestCharsRef.current,
+        quizCorrectCount: latestQuizCorrectCountRef.current,
+      };
       const currentScoreInfo = scores.find((item) => item.id === currentScoreDocId) || {};
+      const classScore = currentScoreInfo.entryType === 'class';
+      const pendingSync = pendingScoreSyncRef.current;
+      if (pendingSync?.scoreId === currentScoreDocId) await pendingSync.request;
 
       let lastSaveError = null;
       for (let attempt = 0; attempt < 3 && !scoreSaved; attempt += 1) {
         try {
-          await updateDoc(scoreRef, {
-            score: latestScoreRef.current,
-            cpm: finalCpm,
-            correctChars: latestCharsRef.current,
-            quizCorrectCount: latestQuizCorrectCountRef.current,
-            updatedAt: serverTimestamp(),
-          });
+          if (classScore) {
+            const { reward, profile } = await finalizeStudentReward(currentScoreDocId, finalScore);
+            setLastReward(reward);
+            setStudentProfile((previous) => previous && previous.id === profile?.id
+              ? normalizeClassStudent({ ...previous, ...profile, className: profile.className || previous.className })
+              : previous);
+            setLocalScores((previous) => previous.map((item) => item.id === currentScoreDocId
+              ? {
+                ...item,
+                ...finalScore,
+                rewardGranted: true,
+                rewardEarned: reward.totalEarned,
+                rewardBreakdown: reward,
+              }
+              : item));
+          } else {
+            const scoreRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.scores, currentScoreDocId);
+            await updateDoc(scoreRef, { ...finalScore, updatedAt: serverTimestamp() });
+          }
           scoreSaved = true;
-          setScoreSaveFailed(false);
         } catch (saveError) {
           lastSaveError = saveError;
-          if (attempt < 2) {
-            await new Promise((resolve) => window.setTimeout(resolve, 700 * (attempt + 1)));
-          }
+          if (['api/invalid-argument', 'api/permission-denied', 'api/not-found', 'permission-denied'].includes(saveError.code)) break;
+          if (attempt < 2) await new Promise((resolve) => window.setTimeout(resolve, 700 * (attempt + 1)));
         }
       }
       if (!scoreSaved) throw lastSaveError || new Error('점수를 저장하지 못했습니다.');
-      lastSyncedScoreRef.current = latestScoreRef.current;
-
-      if (
-        currentScoreInfo.entryType === 'class'
-        && currentScoreInfo.classId
-        && currentScoreInfo.studentId
-        && currentScoreInfo.rewardGranted !== true
-      ) {
-        const { reward } = await finalizeStudentReward(currentScoreDocId);
-        setLastReward(reward);
-        const refreshedSession = await getStudentSession();
-        if (refreshedSession?.profile) {
-          setStudentProfile(normalizeClassStudent(refreshedSession.profile));
-        }
-        setLocalScores((prevScores) => prevScores.map((scoreItem) => (
-          scoreItem.id === currentScoreDocId
-            ? {
-              ...scoreItem,
-              score: latestScoreRef.current,
-              cpm: finalCpm,
-              correctChars: latestCharsRef.current,
-              quizCorrectCount: latestQuizCorrectCountRef.current,
-              rewardGranted: true,
-              rewardEarned: reward.totalEarned,
-              rewardBreakdown: reward,
-            }
-            : scoreItem
-        )));
-      }
+      lastSyncedScoreRef.current = finalScore.score;
     } catch (error) {
       console.error(error);
       if (!scoreSaved) {
@@ -1260,6 +1263,7 @@ export default function App() {
         alert('점수 저장에 실패했습니다. 인터넷 연결을 확인한 뒤 결과 화면을 닫지 말고 다시 시도해주세요.');
       }
     } finally {
+      setScoreSaving(false);
       if (scoreSaved) {
         setSelectedRoomId('');
         setCurrentScoreDocId(null);
@@ -1477,6 +1481,8 @@ export default function App() {
     gameInfoRef,
     lastProcessedSyncRef,
     lastSyncedScoreRef,
+    pendingScoreSyncRef,
+    isEndingRef,
     enabled: true,
   });
 
@@ -1750,83 +1756,15 @@ export default function App() {
 
   const finalizeRankRewards = async (roomId) => {
     if (!requireTeacherAccess()) return;
-    if (!roomId || roomId === 'all') return;
-
-    const room = rooms.find((item) => item.id === roomId);
-    if (room?.rewardFinalized === true) {
-      alert('이미 순위 보상이 지급된 게임입니다.');
-      return;
-    }
+    if (!archivedScoreboardRoomId || roomId !== archivedScoreboardRoomId || !finishedScoreboard.result) return;
     if (!window.confirm('현재 점수 순위로 포인트를 확정 지급할까요? 지급 후에는 다시 지급할 수 없습니다.')) return;
 
-    const roomRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.rooms, roomId);
-    let rewardClaimed = false;
-
     try {
-      const scoresRef = getPublicCollection(db, APP_ID, FIRESTORE_PATHS.scores);
-      const scoreSnapshot = await getDocs(query(scoresRef, where('roomId', '==', roomId)));
-      const roomScores = scoreSnapshot.docs.map((scoreDoc) => ({ id: scoreDoc.id, ...scoreDoc.data() }));
-      const rankRewards = calculateRankRewards(roomScores.filter(item => !item.screenExitDetected));
-
-      if (rankRewards.length === 0) {
-        alert('순위 보상을 지급할 학급 학생 기록이 없습니다.');
-        return;
-      }
-
-      await runTransaction(db, async (transaction) => {
-        const roomSnapshot = await transaction.get(roomRef);
-        if (!roomSnapshot.exists()) throw new Error('ROOM_NOT_FOUND');
-
-        const roomData = roomSnapshot.data();
-        if (roomData.rewardFinalized === true || roomData.rewardFinalizing === true) {
-          throw new Error('REWARD_ALREADY_CLAIMED');
-        }
-
-        transaction.update(roomRef, {
-          rewardFinalizing: true,
-          rewardFinalizingAt: serverTimestamp(),
-          rewardFinalizingBy: user?.uid || null,
-        });
-      });
-      rewardClaimed = true;
-
-      const batch = writeBatch(db);
-      rankRewards.forEach((reward) => {
-        const studentRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.classStudents, reward.studentId);
-        const scoreRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.scores, reward.scoreId);
-        batch.update(studentRef, {
-          totalPoints: increment(reward.points),
-          updatedAt: serverTimestamp(),
-        });
-        batch.update(scoreRef, {
-          rank: reward.rank,
-          rankRewardPoints: reward.points,
-          rankRewardGranted: true,
-          rewardEarned: increment(reward.points),
-          updatedAt: serverTimestamp(),
-        });
-      });
-
-      batch.update(roomRef, {
-        rewardFinalized: true,
-        rewardFinalizing: false,
-        rewardFinalizedAt: serverTimestamp(),
-        rewardFinalizedBy: user?.uid || null,
-      });
-      await batch.commit();
+      await finalizeFinishedClassRankRewards(roomId);
       alert('순위 보상 지급이 완료되었습니다.');
     } catch (error) {
       console.error(error);
-      if (rewardClaimed) {
-        await updateDoc(roomRef, {
-          rewardFinalizing: false,
-          rewardFinalizingAt: null,
-          rewardFinalizingBy: null,
-        }).catch((unlockError) => console.error(unlockError));
-      }
-      alert(error?.message === 'REWARD_ALREADY_CLAIMED'
-        ? '이미 다른 화면에서 순위 보상 지급을 처리 중이거나 완료했습니다.'
-        : '순위 보상 지급 중 오류가 발생했습니다.');
+      alert(error?.message || '순위 보상 지급 중 오류가 발생했습니다.');
     }
   };
 
@@ -1835,17 +1773,18 @@ export default function App() {
     if (!window.confirm(`[${roomName}] 반을 삭제할까요?`)) return;
 
     try {
-      const scoresRef = getPublicCollection(db, APP_ID, FIRESTORE_PATHS.scores);
-      const roomScoresQuery = query(scoresRef, where('roomId', '==', roomId));
-      const roomScoresSnapshot = await getDocs(roomScoresQuery);
-      await Promise.all(roomScoresSnapshot.docs.map((scoreDoc) => updateDoc(scoreDoc.ref, {
-        excludedFromHallOfFame: true,
-        roomDeleted: true,
-        updatedAt: serverTimestamp(),
-      })));
-
-      const roomRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.rooms, roomId);
-      await deleteDoc(roomRef);
+      if (rooms.find((room) => room.id === roomId)?.entryType === 'class') {
+        await removeClassRoomScoreboard(roomId, true);
+      } else {
+        const scoresRef = getPublicCollection(db, APP_ID, FIRESTORE_PATHS.scores);
+        const roomScores = await getDocs(query(scoresRef, where('roomId', '==', roomId)));
+        await Promise.all(roomScores.docs.map((scoreDoc) => updateDoc(scoreDoc.ref, {
+          excludedFromHallOfFame: true,
+          roomDeleted: true,
+          updatedAt: serverTimestamp(),
+        })));
+        await deleteDoc(getPublicDoc(db, APP_ID, FIRESTORE_PATHS.rooms, roomId));
+      }
       setLocalScores((prevScores) => prevScores.map((scoreItem) => (
         scoreItem.roomId === roomId
           ? {
@@ -2920,8 +2859,7 @@ export default function App() {
     if (!window.confirm(`[${roomName || '선택한 학급 방'}] 방을 닫을까요?`)) return;
 
     try {
-      const roomRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.rooms, roomId);
-      await deleteDoc(roomRef);
+      await removeClassRoomScoreboard(roomId);
       setViewingRoomId((prevRoomId) => (prevRoomId === roomId ? '' : prevRoomId));
     } catch (error) {
       console.error(error);
@@ -2930,47 +2868,14 @@ export default function App() {
   };
 
   const getLeaderboard = () => {
+    if (archivedScoreboardRoomId) return selectLeaderboardScores(finishedScoreboard.result?.scores || []);
     const filteredScores = viewingRoomId === 'all'
       ? scores
       : viewingRoomId
         ? scores.filter((scoreItem) => scoreItem.roomId === viewingRoomId)
         : [];
 
-    const latestByStudent = new Map();
-
-    filteredScores.forEach((scoreItem) => {
-      const studentKey = scoreItem.studentId
-        ? `student:${scoreItem.studentId}`
-        : `guest:${scoreItem.nickname || scoreItem.userId || scoreItem.id}`;
-      const previous = latestByStudent.get(studentKey);
-      const currentUpdatedAt = getTimestampMillis(scoreItem.updatedAt)
-        || getTimestampMillis(scoreItem.createdAt);
-      const previousUpdatedAt = getTimestampMillis(previous?.updatedAt)
-        || getTimestampMillis(previous?.createdAt);
-      const currentHasProgress = Number(scoreItem.score || 0) !== 0
-        || Number(scoreItem.correctChars || 0) > 0
-        || Number(scoreItem.quizCorrectCount || 0) > 0;
-      const previousHasProgress = Number(previous?.score || 0) !== 0
-        || Number(previous?.correctChars || 0) > 0
-        || Number(previous?.quizCorrectCount || 0) > 0;
-      const shouldPreferProgress = viewingRoomId !== 'all'
-        && currentHasProgress !== previousHasProgress;
-
-      if (
-        !previous
-        || (shouldPreferProgress && currentHasProgress)
-        || (!shouldPreferProgress && currentUpdatedAt > previousUpdatedAt)
-        || (
-          !shouldPreferProgress
-          && currentUpdatedAt === previousUpdatedAt
-          && Number(scoreItem.score || 0) > Number(previous.score || 0)
-        )
-      ) {
-        latestByStudent.set(studentKey, scoreItem);
-      }
-    });
-
-    return [...latestByStudent.values()].sort((a, b) => (b.score || 0) - (a.score || 0));
+    return selectLeaderboardScores(filteredScores, viewingRoomId !== 'all');
   };
 
   const handleBackToLogin = () => {
@@ -3298,6 +3203,7 @@ export default function App() {
         gameDuration={gameDuration}
         lastReward={lastReward}
         gear={resultGear}
+        scoreSaving={scoreSaving}
         scoreSaveFailed={scoreSaveFailed}
         onRetryScoreSave={endGame}
         onHome={handleBackToLogin}
@@ -3357,6 +3263,7 @@ export default function App() {
         onAllowReentry={handleAllowReentry}
         reentryPendingIds={reentryPendingIds}
         finalizeRankRewards={finalizeRankRewards}
+        finishedScoreboard={archivedScoreboardRoomId ? finishedScoreboard : null}
         handleSaveAnnouncement={handleSaveAnnouncement}
         annTitle={annTitle}
         setAnnTitle={setAnnTitle}
@@ -3495,6 +3402,7 @@ export default function App() {
   return (
     <>
       <LoginView
+        studentHomeCacheKey={user?.uid && studentProfile?.id ? `${user.uid}:home:${studentProfile.id}` : ''}
         onShopProfileChange={(profile) => setStudentProfile(previous => previous?.id === profile.id ? normalizeClassStudent({ ...previous, ...profile, className: profile.className || previous.className }) : previous)}
         announcements={announcements}
         showAnnouncementModal={showAnnouncementModal}

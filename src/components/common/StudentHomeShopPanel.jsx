@@ -9,6 +9,7 @@ import TypeforgeProfileGear from './TypeforgeProfileGear.jsx';
 
 export default function StudentHomeShopPanel({
   student,
+  cacheKey = '',
   shopItems = [],
   onBuyCosmetic = async () => null,
   onBuyStockItem = async () => null,
@@ -66,7 +67,7 @@ export default function StudentHomeShopPanel({
         </div>
       </div>
 
-      <TypeforgeProfileGear key={student.id} refreshKey={gearRefresh} />
+      <TypeforgeProfileGear key={cacheKey || student.id} cacheKey={cacheKey} refreshKey={gearRefresh} />
 
       {gachaOpen ? <GachaShop key={student.id} student={student} onProfileChange={onProfileChange} onBack={() => setGachaOpen(false)} api={gachaApi} /> : <>
       <div className="flex flex-wrap gap-3 items-center justify-between mb-5"><h3 className="text-xl font-black text-teal-900">상점 시즌2 · 전교 공통</h3><button type="button" className="shop-button" onClick={() => setGachaOpen(true)}>가챠샵 들어가기</button></div>

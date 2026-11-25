@@ -66,7 +66,10 @@ export async function buyStudentShopItem(studentId, itemId, expectedPrice) {
   }
 }
 export const equipStudentCosmetic = (studentId, cosmeticId) => call('equipStudentCosmetic', { studentId, cosmeticId });
-export const finalizeStudentReward = (scoreId) => call('finalizeStudentReward', { scoreId });
+export const finalizeStudentReward = (scoreId, finalScore) => call('finalizeStudentReward', { scoreId, finalScore });
+export const getFinishedClassScoreboard = (roomId, signal) => call('getFinishedClassScoreboard', { roomId }, signal);
+export const finalizeFinishedClassRankRewards = (roomId) => call('finalizeFinishedClassRankRewards', { roomId });
+export const removeClassRoomScoreboard = (roomId, excludeScores = false) => call('removeClassRoomScoreboard', { roomId, excludeScores });
 export const recordPracticeCompletion = (studentId, practiceRunId, durationSec, correctChars, cpm) => call(
   'recordPracticeCompletion',
   { studentId, practiceRunId, durationSec, correctChars, cpm },

@@ -1,16 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
 import { getTypeforgeProfileGear } from '../../services/studentSecurityApi.js';
+import { getCachedStudentDirectory, STUDENT_HOME_CACHE_AGE_MS } from '../../services/studentDirectoryCache.js';
 import { typeforgeEquipmentTypes } from '../../utils/typeforgePractice.js';
 import './TypeforgeProfileGear.css';
 
-export default function TypeforgeProfileGear({ refreshKey }) {
+export default function TypeforgeProfileGear({ cacheKey = '', refreshKey }) {
   const [result, setResult] = useState({ loading: true });
   const [retry, setRetry] = useState(0);
   const request = useRef(null);
 
   useEffect(() => {
-    if (request.current?.refreshKey !== refreshKey || request.current?.retry !== retry) {
-      request.current = { refreshKey, retry, pending: getTypeforgeProfileGear() };
+    if (!request.current || request.current.refreshKey !== refreshKey || request.current.retry !== retry) {
+      const pending = cacheKey
+        ? getCachedStudentDirectory(`${cacheKey}:gear`, getTypeforgeProfileGear, {
+          maxAge: STUDENT_HOME_CACHE_AGE_MS,
+          refresh: request.current !== null,
+        })
+        : getTypeforgeProfileGear();
+      request.current = { refreshKey, retry, pending };
     }
     let active = true;
     setResult(previous => ({ ...previous, loading: true, error: false }));
@@ -20,7 +27,7 @@ export default function TypeforgeProfileGear({ refreshKey }) {
       if (active) setResult(previous => ({ ...previous, loading: false, error: true }));
     });
     return () => { active = false; };
-  }, [refreshKey, retry]);
+  }, [cacheKey, refreshKey, retry]);
 
   const { gear, loading, error } = result;
 

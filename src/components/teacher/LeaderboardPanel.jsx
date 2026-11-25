@@ -12,7 +12,7 @@ function GearImage({ art, detail = false }) {
     onError={event => { event.currentTarget.hidden = true; }} />;
 }
 
-function ScoreTable({ scores, showEquipment, onAllowReentry, reentryPendingIds }) {
+function ScoreTable({ scores, showEquipment, onAllowReentry, reentryPendingIds, gameEnded }) {
   const [expandedId, setExpandedId] = useState(null);
   const trigger = useRef(null);
   const detailPrefix = useId();
@@ -80,9 +80,9 @@ function ScoreTable({ scores, showEquipment, onAllowReentry, reentryPendingIds }
                     {score.screenExitDetected && (
                       <div className="scoreboard-reentry">
                         <span>화면 이탈 · 진행 중단</span>
-                        <button type="button" disabled={reentryPending} onClick={() => onAllowReentry(score)}>
+                        {!gameEnded && <button type="button" disabled={reentryPending} onClick={() => onAllowReentry(score)}>
                           {reentryPending ? '처리 중…' : '재입장 허용'}
-                        </button>
+                        </button>}
                       </div>
                     )}
                   </th>
@@ -129,6 +129,7 @@ export default function LeaderboardPanel({
   onAllowReentry = () => {},
   reentryPendingIds = [],
   finalizeRankRewards = () => {},
+  finishedScoreboard = null,
 }) {
   const selectedRoom = rooms.find(room => room.id === viewingRoomId);
   if (selectedRoom?.mode === 'subway') return <SubwayLeaderboard room={selectedRoom} students={students} records={leaderboardScores} currentTime={currentTime} startRoomGame={startRoomGame} requestScoreSync={requestScoreSync} onAllowReentry={onAllowReentry} reentryPendingIds={reentryPendingIds} />;
@@ -162,10 +163,12 @@ export default function LeaderboardPanel({
         {hasSelection && (waiting || playing) && (
           <div className="scoreboard-actions">
             {waiting && <button type="button" className="scoreboard-action primary" onClick={() => startRoomGame(viewingRoomId)}>게임 시작</button>}
-            {playing && <button type="button" className="scoreboard-action" onClick={() => requestScoreSync(viewingRoomId)}>실시간 가져오기</button>}
+            {playing && (!gameEnded || !isClassRoom) && <button type="button" className="scoreboard-action" onClick={() => requestScoreSync(viewingRoomId)}>실시간 가져오기</button>}
+            {finishedScoreboard && <button type="button" className="scoreboard-action"
+              onClick={finishedScoreboard.refresh} disabled={finishedScoreboard.loading}>결과 새로고침</button>}
             {playing && isClassRoom && (
               <button type="button" className="scoreboard-action reward" onClick={() => finalizeRankRewards(viewingRoomId)}
-                disabled={!gameEnded || selectedRoom.rewardFinalized === true || participantCount === 0}>
+                disabled={!gameEnded || !finishedScoreboard?.result || selectedRoom.rewardFinalized === true || participantCount === 0}>
                 {selectedRoom.rewardFinalized ? '보상 지급 완료' : gameEnded ? '순위 보상 확정' : '게임 종료 후 지급'}
               </button>
             )}
@@ -173,7 +176,10 @@ export default function LeaderboardPanel({
         )}
       </header>
 
-      {hasSelection && (
+      {finishedScoreboard?.loading && <p className="scoreboard-prompt" role="status">최종 결과를 모으고 있어요.</p>}
+      {finishedScoreboard?.error && <p className="scoreboard-prompt" role="alert">최종 결과를 불러오지 못했어요. 결과 새로고침을 눌러 주세요.</p>}
+
+      {hasSelection && (!finishedScoreboard || finishedScoreboard.result) && (
         <div className="scoreboard-overview">
           <dl className="scoreboard-summary">
             <div><dt>학급 평균 점수</dt><dd>{safeToLocaleNumber(roomAverageScore)}</dd></div>
@@ -188,10 +194,10 @@ export default function LeaderboardPanel({
         </div>
       )}
 
-      {!viewingRoomId && scores.length === 0
+      {(!finishedScoreboard || finishedScoreboard.result) && (!viewingRoomId && scores.length === 0
         ? <p className="scoreboard-prompt">반을 선택하면 점수가 표시돼요.</p>
         : <ScoreTable key={viewingRoomId} scores={scores} showEquipment={isClassRoom}
-            reentryPendingIds={reentryPendingIds} onAllowReentry={onAllowReentry} />}
+            reentryPendingIds={reentryPendingIds} onAllowReentry={onAllowReentry} gameEnded={gameEnded} />)}
     </section>
   );
 }

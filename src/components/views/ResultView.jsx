@@ -42,6 +42,7 @@ export default function ResultView({
   gameDuration = 0,
   lastReward = null,
   gear = null,
+  scoreSaving = false,
   scoreSaveFailed = false,
   onRetryScoreSave = () => {},
   onHome = () => {},
@@ -85,6 +86,8 @@ export default function ResultView({
 
         <RewardSummary reward={lastReward} animated={Boolean(equipment)} />
 
+        {scoreSaving && <p role="status" className="mb-5 text-sm font-bold text-gray-600">점수를 저장하고 있어요.</p>}
+
         {scoreSaveFailed && (
           <div className="mb-5 rounded-2xl border-2 border-red-200 bg-red-50 p-4 text-left">
             <div className="font-black text-red-700">점수가 아직 저장되지 않았습니다.</div>
@@ -100,10 +103,10 @@ export default function ResultView({
         )}
 
         <div className="space-y-3">
-          <button onClick={onHome} disabled={scoreSaveFailed} className="w-full py-4 bg-gray-800 hover:bg-gray-900 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-2xl font-bold text-lg shadow-md transition-colors">
+          <button onClick={onHome} disabled={scoreSaving || scoreSaveFailed} className="w-full py-4 bg-gray-800 hover:bg-gray-900 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-2xl font-bold text-lg shadow-md transition-colors">
             처음으로 돌아가기
           </button>
-          <button onClick={onPracticeAgain} disabled={scoreSaveFailed} className="w-full py-4 bg-white border-2 border-pink-300 disabled:border-gray-200 disabled:text-gray-300 disabled:cursor-not-allowed text-pink-600 hover:bg-pink-50 rounded-2xl font-bold text-lg shadow-sm transition-colors">
+          <button onClick={onPracticeAgain} disabled={scoreSaving || scoreSaveFailed} className="w-full py-4 bg-white border-2 border-pink-300 disabled:border-gray-200 disabled:text-gray-300 disabled:cursor-not-allowed text-pink-600 hover:bg-pink-50 rounded-2xl font-bold text-lg shadow-sm transition-colors">
             다시 연습하기
           </button>
         </div>

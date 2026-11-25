@@ -1,16 +1,22 @@
 import { useCallback, useEffect, useState } from 'react';
 import { listActiveAssessments } from '../../services/studentSecurityApi.js';
+import { getCachedStudentDirectory, STUDENT_HOME_CACHE_AGE_MS } from '../../services/studentDirectoryCache.js';
 
-export default function StudentAssessmentBoard({ onOpenAssessment = () => {} }) {
+export default function StudentAssessmentBoard({ cacheKey = '', onOpenAssessment = () => {} }) {
   const [assessments, setAssessments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (refreshFromServer = false) => {
     setIsLoading(true);
     setError('');
     try {
-      const result = await listActiveAssessments();
+      const result = cacheKey
+        ? await getCachedStudentDirectory(`${cacheKey}:assessments`, listActiveAssessments, {
+          maxAge: STUDENT_HOME_CACHE_AGE_MS,
+          refresh: refreshFromServer,
+        })
+        : await listActiveAssessments();
       setAssessments(result?.assessments || []);
     } catch (loadError) {
       console.error(loadError);
@@ -18,7 +24,7 @@ export default function StudentAssessmentBoard({ onOpenAssessment = () => {} }) 
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [cacheKey]);
 
   useEffect(() => {
     refresh();
@@ -34,7 +40,7 @@ export default function StudentAssessmentBoard({ onOpenAssessment = () => {} }) 
         </div>
         <button
           type="button"
-          onClick={refresh}
+          onClick={() => refresh(true)}
           disabled={isLoading}
           className="px-3 py-2 rounded-xl bg-white border border-cyan-100 text-teal-700 text-xs font-black disabled:opacity-50"
         >

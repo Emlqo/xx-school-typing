@@ -14,6 +14,8 @@ export default function useScores({
 }) {
   const [scores, setScores] = useState([]);
   const [error, setError] = useState(null);
+  const teacherRoomId = view === 'teacher' ? viewingRoomId : '';
+  const studentScoreId = view === 'teacher' || view === 'result' ? '' : currentScoreDocId;
 
   useEffect(() => {
     if (!enabled || !user || !db) {
@@ -21,16 +23,11 @@ export default function useScores({
       return undefined;
     }
 
-    if (view === 'teacher') {
-      if (viewingRoomId === '') {
-        setScores([]);
-        return undefined;
-      }
-
+    if (teacherRoomId) {
       const scoresRef = getPublicCollection(db, APP_ID, FIRESTORE_PATHS.scores);
-      const scoresQuery = viewingRoomId === 'all'
+      const scoresQuery = teacherRoomId === 'all'
         ? query(scoresRef, orderBy('updatedAt', 'desc'), limit(100))
-        : query(scoresRef, where('roomId', '==', viewingRoomId));
+        : query(scoresRef, where('roomId', '==', teacherRoomId));
 
       const unsubscribeScores = onSnapshot(
         scoresQuery,
@@ -47,12 +44,12 @@ export default function useScores({
       return () => unsubscribeScores();
     }
 
-    if (!currentScoreDocId) {
+    if (!studentScoreId) {
       setScores([]);
       return undefined;
     }
 
-    const scoreRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.scores, currentScoreDocId);
+    const scoreRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.scores, studentScoreId);
     const unsubscribeScore = onSnapshot(
       scoreRef,
       (snapshot) => {
@@ -66,7 +63,7 @@ export default function useScores({
     );
 
     return () => unsubscribeScore();
-  }, [currentScoreDocId, enabled, user, view, viewingRoomId]);
+  }, [enabled, studentScoreId, teacherRoomId, user]);
 
   return { scores, error };
 }

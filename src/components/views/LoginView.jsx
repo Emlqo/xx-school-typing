@@ -137,6 +137,7 @@ export default function LoginView({
   onStudentLogout = () => {},
   onTeacherClick = () => {},
   studentProfile = null,
+  studentHomeCacheKey = '',
   shopItems = [],
   onBuyCosmetic = async () => null,
   onBuyStockItem = async () => null,
@@ -220,7 +221,7 @@ export default function LoginView({
         </div>
 
         <div className="glass-box rounded-3xl p-5 md:p-6 shadow-2xl border-2 border-cyan-100 space-y-5">
-          <StudentAssessmentBoard onOpenAssessment={onOpenAssessment} />
+          <StudentAssessmentBoard key={studentHomeCacheKey} cacheKey={studentHomeCacheKey} onOpenAssessment={onOpenAssessment} />
           <AnnouncementBoard
             announcements={announcements}
             onOpenModal={() => setShowAnnouncementModal(true)}
@@ -232,6 +233,7 @@ export default function LoginView({
         key={studentProfile?.id || 'no-student'}
         onProfileChange={onShopProfileChange}
         student={studentProfile}
+        cacheKey={studentHomeCacheKey}
         shopItems={shopItems}
         onBuyCosmetic={onBuyCosmetic}
         onBuyStockItem={onBuyStockItem}

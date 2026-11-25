@@ -5,6 +5,8 @@ import { calculateAssessmentResult, createAssessmentSubmissionId } from '../src/
 import { subwayMillis, subwayHintPenalty, validSubwayAnswers } from '../src/utils/subway.js';
 import { isElementRoom, isValidElementConfig, memoryAnswers, memoryStart } from '../src/utils/memoryGame.js';
 import { REWARD_RULES } from '../src/constants/rewards.js';
+import { calculateRankRewards } from '../src/utils/rewards.js';
+import { CLASS_SCOREBOARD_SETTLE_MS, getClassScoreboardEnd, selectLeaderboardScores } from '../src/utils/classScoreboard.js';
 import { isCosmeticForSale, getEquippedBoosterBonus, getScoreBoosterBonus } from '../src/constants/cosmetics.js';
 import { createShopSeason2Actions } from '../server/shopSeason2.js';
 import { issueTypeforgeAdminEntry, issueTypeforgeEntry, issueTypeforgeProfileGrant, readTypeforgePracticeGear, typeforgeOrigin } from '../server/typeforgeEntry.js';
@@ -20,6 +22,7 @@ const SESSION_MINUTES = 60;
 const PATHS = {
   rooms: 'typing_rooms',
   scores: 'typing_scores',
+  classScoreboards: 'typing_class_scoreboards',
   classes: 'typing_classes',
   classStudents: 'typing_class_students',
   classRoster: 'typing_class_roster',
@@ -923,38 +926,194 @@ async function equipStudentCosmetic(uid, body) {
   return { profile: safeProfile(studentId, { ...student, equippedCosmetic: cosmeticId }) };
 }
 
+function classScoreboardRow(id, score, updatedAt = toMillis(score.updatedAt)) {
+  return {
+    id,
+    roomId: score.roomId,
+    studentId: score.studentId,
+    entryType: score.entryType,
+    nickname: score.nickname || '',
+    equippedCosmetic: score.equippedCosmetic || null,
+    typeforgeGear: score.typeforgeGear || null,
+    screenExitDetected: Boolean(score.screenExitDetected),
+    score: Number(score.score || 0),
+    cpm: Number(score.cpm || 0),
+    correctChars: Number(score.correctChars || 0),
+    quizCorrectCount: Number(score.quizCorrectCount || 0),
+    createdAt: toMillis(score.createdAt),
+    updatedAt,
+  };
+}
+
+function assertClassScoreboardReady(room) {
+  const endsAt = getClassScoreboardEnd(room);
+  if (!endsAt || Date.now() < endsAt + CLASS_SCOREBOARD_SETTLE_MS) {
+    throw new ApiError(409, 'api/scoreboard-pending', '최종 결과를 모으고 있어요.');
+  }
+}
+
+async function getFinishedClassScoreboard(uid, body) {
+  requireTeacher(uid);
+  const roomId = requireString(body.roomId, 'roomId', 200);
+  const summaryRef = publicCollection(PATHS.classScoreboards).doc(roomId);
+  return database().runTransaction(async (transaction) => {
+    const saved = await transaction.get(summaryRef);
+    if (saved.exists) return saved.data();
+
+    const roomSnapshot = await transaction.get(publicCollection(PATHS.rooms).doc(roomId));
+    if (!roomSnapshot.exists) throw new ApiError(404, 'api/not-found', '경기 방을 찾을 수 없습니다.');
+    const room = roomSnapshot.data();
+    assertClassScoreboardReady(room);
+    const [scores, roster] = await Promise.all([
+      transaction.get(publicCollection(PATHS.scores).where('roomId', '==', roomId)),
+      transaction.get(publicCollection(PATHS.classStudents).where('classId', '==', room.classId).where('active', '==', true)),
+    ]);
+    const result = {
+      scores: scores.docs
+        .filter((entry) => entry.data().entryType === 'class' && entry.data().studentId && !entry.data().roomDeleted)
+        .map((entry) => classScoreboardRow(entry.id, entry.data())),
+      students: roster.docs
+        .map((entry) => ({ id: entry.id, name: entry.data().name || '' }))
+        .sort((a, b) => a.name.localeCompare(b.name, 'ko')),
+    };
+    transaction.set(summaryRef, result);
+    return result;
+  });
+}
+
+function updateFinishedClassScoreboard(transaction, snapshot, scoreId, score) {
+  if (!snapshot?.exists) return;
+  const rows = snapshot.data().scores;
+  const updated = classScoreboardRow(scoreId, score, Date.now());
+  const nextRows = rows.some((row) => row.id === scoreId)
+    ? rows.map((row) => row.id === scoreId ? updated : row)
+    : [...rows, updated];
+  transaction.update(snapshot.ref, { scores: nextRows });
+}
+
+async function finalizeFinishedClassRankRewards(uid, body) {
+  requireTeacher(uid);
+  const roomId = requireString(body.roomId, 'roomId', 200);
+  const roomRef = publicCollection(PATHS.rooms).doc(roomId);
+  const summaryRef = publicCollection(PATHS.classScoreboards).doc(roomId);
+  return database().runTransaction(async (transaction) => {
+    const [roomSnapshot, summarySnapshot] = await Promise.all([transaction.get(roomRef), transaction.get(summaryRef)]);
+    if (!roomSnapshot.exists) throw new ApiError(404, 'api/not-found', '경기 방을 찾을 수 없습니다.');
+    const room = roomSnapshot.data();
+    assertClassScoreboardReady(room);
+    if (room.rewardFinalized || room.rewardFinalizing) {
+      throw new ApiError(409, 'api/already-exists', '이미 순위 보상을 지급했거나 처리 중입니다.');
+    }
+    if (!summarySnapshot.exists) {
+      throw new ApiError(409, 'api/scoreboard-pending', '결과를 불러온 뒤 순위 보상을 지급해 주세요.');
+    }
+    const ranked = selectLeaderboardScores(summarySnapshot.data().scores).filter((score) => !score.screenExitDetected);
+    const rewards = calculateRankRewards(ranked);
+    if (!rewards.length) throw new ApiError(409, 'api/failed-precondition', '순위 보상을 지급할 학생 기록이 없습니다.');
+
+    for (const reward of rewards) {
+      transaction.update(publicCollection(PATHS.classStudents).doc(reward.studentId), {
+        totalPoints: FieldValue.increment(reward.points),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      transaction.update(publicCollection(PATHS.scores).doc(reward.scoreId), {
+        rank: reward.rank,
+        rankRewardPoints: reward.points,
+        rankRewardGranted: true,
+        rewardEarned: FieldValue.increment(reward.points),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    }
+    transaction.update(roomRef, {
+      rewardFinalized: true,
+      rewardFinalizing: false,
+      rewardFinalizedAt: FieldValue.serverTimestamp(),
+      rewardFinalizedBy: uid,
+    });
+    return { rewarded: rewards.length };
+  });
+}
+
+async function removeClassRoomScoreboard(uid, body) {
+  requireTeacher(uid);
+  const roomId = requireString(body.roomId, 'roomId', 200);
+  const roomRef = publicCollection(PATHS.rooms).doc(roomId);
+  const summaryRef = publicCollection(PATHS.classScoreboards).doc(roomId);
+  await database().runTransaction(async (transaction) => {
+    const room = await transaction.get(roomRef);
+    if (!room.exists) return;
+    if (room.data().entryType !== 'class') throw new ApiError(400, 'api/invalid-argument', '학급 방을 확인해 주세요.');
+    if (body.excludeScores === true) {
+      const scores = await transaction.get(publicCollection(PATHS.scores).where('roomId', '==', roomId));
+      scores.docs.forEach((score) => transaction.update(score.ref, {
+        excludedFromHallOfFame: true,
+        roomDeleted: true,
+        updatedAt: FieldValue.serverTimestamp(),
+      }));
+    }
+    transaction.delete(roomRef);
+    transaction.delete(summaryRef);
+  });
+  return { roomId };
+}
+
 async function finalizeStudentReward(uid, body) {
   const scoreId = requireString(body.scoreId, 'scoreId');
-  const scoreRef = publicCollection(PATHS.scores).doc(scoreId);
-  const initialScore = await scoreRef.get();
-  if (!initialScore.exists) throw new ApiError(404, 'api/not-found', '점수 기록을 찾을 수 없습니다.');
-  const initialData = initialScore.data();
-  if (initialData.gameType === 'subway') throw new ApiError(400, 'api/failed-precondition', '지하철판에는 포인트 보상이 없습니다.');
-  if (initialData.userId !== uid || initialData.entryType !== 'class' || !initialData.studentId) {
-    throw new ApiError(403, 'api/permission-denied', '보상을 받을 수 없는 기록입니다.');
-  }
-  await requireSession(uid, initialData.studentId);
-
-  let reward;
-  await database().runTransaction(async (transaction) => {
-    const scoreSnapshot = await transaction.get(scoreRef);
-    const score = scoreSnapshot.data();
-    if (score.screenExitDetected) throw new ApiError(403, 'api/permission-denied', '화면 이탈로 중단된 경기는 보상을 받을 수 없습니다.');
-    if (score.rewardGranted === true) {
-      reward = score.rewardBreakdown || { totalEarned: Number(score.rewardEarned || 0) };
-      return;
+  let finalScore;
+  if (body.finalScore !== undefined) {
+    const fields = ['score', 'cpm', 'correctChars', 'quizCorrectCount'];
+    if (fields.some((field) => {
+      const value = body.finalScore?.[field];
+      return !Number.isSafeInteger(value) || (field !== 'score' && value < 0);
+    })) {
+      throw new ApiError(400, 'api/invalid-argument', '최종 점수 형식이 올바르지 않습니다.');
     }
+    finalScore = Object.fromEntries(fields.map((field) => [field, body.finalScore[field]]));
+  }
+
+  const scoreRef = publicCollection(PATHS.scores).doc(scoreId);
+  const sessionRef = publicCollection(PATHS.studentSessions).doc(uid);
+  return database().runTransaction(async (transaction) => {
+    const [scoreSnapshot, sessionSnapshot] = await Promise.all([
+      transaction.get(scoreRef),
+      transaction.get(sessionRef),
+    ]);
+    if (!scoreSnapshot.exists) throw new ApiError(404, 'api/not-found', '점수 기록을 찾을 수 없습니다.');
+    const score = scoreSnapshot.data();
+    if (score.userId !== uid || score.entryType !== 'class' || !score.studentId) {
+      throw new ApiError(403, 'api/permission-denied', '보상을 받을 수 없는 기록입니다.');
+    }
+    if (score.gameType === 'subway') throw new ApiError(400, 'api/failed-precondition', '지하철판에는 포인트 보상이 없습니다.');
+    const session = sessionSnapshot.data();
+    if (!session || session.studentId !== score.studentId || session.classId !== score.classId
+      || toMillis(session.expiresAt) <= Date.now()) {
+      throw new ApiError(403, 'api/permission-denied', '유효한 학생 인증이 필요합니다.');
+    }
+    if (score.screenExitDetected) throw new ApiError(403, 'api/permission-denied', '화면 이탈로 중단된 경기는 보상을 받을 수 없습니다.');
     const studentRef = publicCollection(PATHS.classStudents).doc(score.studentId);
-    const studentSnapshot = await transaction.get(studentRef);
+    const summaryRef = score.roomId && publicCollection(PATHS.classScoreboards).doc(score.roomId);
+    const [studentSnapshot, summarySnapshot] = await Promise.all([
+      transaction.get(studentRef),
+      summaryRef && !score.roomDeleted && !score.rewardGranted ? transaction.get(summaryRef) : null,
+    ]);
     if (!studentSnapshot.exists) throw new ApiError(404, 'api/not-found', '학생 정보를 찾을 수 없습니다.');
     const student = studentSnapshot.data();
-    const currentScore = Math.max(0, Number(score.score || 0));
-    const quizCount = Math.max(0, Number(score.quizCorrectCount || 0));
+    if (student.active === false || student.classId !== session.classId) {
+      throw new ApiError(403, 'api/permission-denied', '학생의 학급 정보가 일치하지 않습니다.');
+    }
+    const profile = safeProfile(score.studentId, { ...student, className: student.className || score.className });
+    if (score.rewardGranted === true) {
+      return { reward: score.rewardBreakdown || { totalEarned: Number(score.rewardEarned || 0) }, profile };
+    }
+
+    const result = finalScore || score;
+    const currentScore = Math.max(0, Number(result.score || 0));
+    const quizCount = Math.max(0, Number(result.quizCorrectCount || 0));
     const previousBest = Math.max(0, Number(student.bestScore || 0));
     const isNewBestScore = currentScore > previousBest;
     const growthRate = previousBest > 0 ? (currentScore - previousBest) / previousBest : 0;
     const isGrowthAchieved = isNewBestScore && growthRate >= REWARD_RULES.growthRateThreshold;
-    reward = {
+    const reward = {
       totalEarned: quizCount * REWARD_RULES.quizCorrectPoints
         + (isNewBestScore ? REWARD_RULES.bestScoreBonus : 0)
         + (isGrowthAchieved ? REWARD_RULES.growthBonus : 0),
@@ -966,19 +1125,25 @@ async function finalizeStudentReward(uid, body) {
       isGrowthAchieved,
       nextBestScore: isNewBestScore ? currentScore : previousBest,
     };
-    transaction.update(studentRef, {
-      totalPoints: Math.max(0, Number(student.totalPoints || 0)) + reward.totalEarned,
-      bestScore: reward.nextBestScore,
-      updatedAt: FieldValue.serverTimestamp(),
-    });
+    profile.totalPoints += reward.totalEarned;
+    profile.bestScore = reward.nextBestScore;
+    if (reward.totalEarned > 0 || isNewBestScore) {
+      transaction.update(studentRef, {
+        totalPoints: profile.totalPoints,
+        bestScore: profile.bestScore,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    }
     transaction.update(scoreRef, {
+      ...finalScore,
       rewardGranted: true,
-      rewardEarned: reward.totalEarned,
+      rewardEarned: Number(score.rankRewardPoints || 0) + reward.totalEarned,
       rewardBreakdown: reward,
       updatedAt: FieldValue.serverTimestamp(),
     });
+    updateFinishedClassScoreboard(transaction, summarySnapshot, scoreId, { ...score, ...finalScore });
+    return { reward, profile };
   });
-  return { reward };
 }
 
 async function recordPracticeCompletion(uid, body) {
@@ -2059,16 +2224,23 @@ async function reportGameScreenExit(uid, body) {
       throw new ApiError(403, 'api/permission-denied', '본인의 경기만 중단할 수 있습니다.');
     }
     // Ignore delayed reports from the attempt a teacher has already unlocked.
-    const roomSnapshot = await transaction.get(publicCollection(PATHS.rooms).doc(snapshot.data().roomId));
-    if (roomSnapshot.data()?.focusGuardEnabled === false) return;
-    if (Number(body.revision || 0) !== Number(snapshot.data().screenExitRevision || 0)) return;
-    if (snapshot.data().screenExitDetected) return;
+    const score = snapshot.data();
+    const roomSnapshot = await transaction.get(publicCollection(PATHS.rooms).doc(score.roomId));
+    const room = roomSnapshot.data();
+    if (room?.focusGuardEnabled === false) return;
+    if (Number(body.revision || 0) !== Number(score.screenExitRevision || 0)) return;
+    if (score.screenExitDetected) return;
+    const endsAt = getClassScoreboardEnd(room);
+    const summary = endsAt && Date.now() >= endsAt + CLASS_SCOREBOARD_SETTLE_MS
+      ? await transaction.get(publicCollection(PATHS.classScoreboards).doc(score.roomId))
+      : null;
     transaction.update(scoreRef, {
       screenExitDetected: true,
       screenExitReason: reason,
       screenExitAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     });
+    updateFinishedClassScoreboard(transaction, summary, scoreId, { ...score, screenExitDetected: true });
   });
   return { stopped: true };
 }
@@ -2157,6 +2329,9 @@ const actions = {
   buyStudentShopItem,
   equipStudentCosmetic,
   finalizeStudentReward,
+  getFinishedClassScoreboard,
+  finalizeFinishedClassRankRewards,
+  removeClassRoomScoreboard,
   recordPracticeCompletion,
   syncPublicClassRoster,
   createDuelChallenge,
@@ -2198,7 +2373,7 @@ export default async function handler(request, response) {
     const action = requireString(body.action, 'action', 50);
     const actionHandler = actions[action];
     if (!actionHandler) throw new ApiError(404, 'api/not-found', '지원하지 않는 보안 작업입니다.');
-    if (['createTypeforgeEntry', 'getTypeforgeProfileGear', 'verifyTypeforgePracticeGear'].includes(action)) response.setHeader('Cache-Control', 'no-store');
+    if (['createTypeforgeEntry', 'getTypeforgeProfileGear', 'verifyTypeforgePracticeGear', 'getFinishedClassScoreboard'].includes(action)) response.setHeader('Cache-Control', 'no-store');
     const data = action === 'createTypeforgeEntry'
       ? await actionHandler(decodedToken, body)
       : await actionHandler(decodedToken.uid, body);

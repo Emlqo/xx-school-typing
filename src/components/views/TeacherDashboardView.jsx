@@ -49,6 +49,7 @@ export default function TeacherDashboardView({
   onAllowReentry = () => {},
   reentryPendingIds = [],
   finalizeRankRewards = () => {},
+  finishedScoreboard = null,
   handleSaveAnnouncement = () => {},
   annTitle = '',
   setAnnTitle = () => {},
@@ -230,7 +231,8 @@ export default function TeacherDashboardView({
             />
             <LeaderboardPanel
               leaderboardScores={leaderboardScores}
-              students={rooms.some(room => room.id === viewingRoomId && room.entryType === 'class' && room.classId === selectedClassId) ? students : []}
+              students={finishedScoreboard ? finishedScoreboard.result?.students || []
+                : rooms.some(room => room.id === viewingRoomId && room.entryType === 'class' && room.classId === selectedClassId) ? students : []}
               rooms={rooms}
               viewingRoomId={viewingRoomId}
               participantCount={participantCount}
@@ -241,6 +243,7 @@ export default function TeacherDashboardView({
               onAllowReentry={onAllowReentry}
               reentryPendingIds={reentryPendingIds}
               finalizeRankRewards={finalizeRankRewards}
+              finishedScoreboard={finishedScoreboard}
             />
           </div>
         )}

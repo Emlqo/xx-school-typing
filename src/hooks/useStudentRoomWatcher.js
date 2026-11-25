@@ -28,9 +28,9 @@ export default function useStudentRoomWatcher({
 }) {
   const [room, setRoom] = useState(null);
   const [error, setError] = useState(null);
+  const shouldWatchRoom = view === 'waiting' || view === 'playing' || view === 'subway';
 
   useEffect(() => {
-    const shouldWatchRoom = view === 'waiting' || view === 'playing' || view === 'subway';
     if (!enabled || !user || !db || !selectedRoomId || !shouldWatchRoom) {
       setRoom(null);
       return undefined;
@@ -50,28 +50,6 @@ export default function useStudentRoomWatcher({
         setRoom(roomData);
         setMyRoomData(roomData);
         setError(null);
-
-        if (roomData.status !== 'playing' || view !== 'waiting') return;
-        if (roomData.mode === 'subway') {
-          setView('subway');
-          return;
-        }
-
-        const myScore = scores.find((score) => score.id === currentScoreDocId) || {};
-        const myDifficulty = myScore.difficulty || 'normal';
-        const gameMode = resolveGameMode(roomData.mode, myDifficulty);
-        setGameMode(gameMode);
-
-        if (pendingQuizzesRef) {
-          pendingQuizzesRef.current = [...quizzes].sort(() => Math.random() - 0.5);
-        }
-
-        if (wordCountRef) {
-          wordCountRef.current = 0;
-        }
-
-        pickRandomWord(gameMode, { practiceMode: false });
-        setView('playing');
       },
       (snapshotError) => {
         console.error(snapshotError);
@@ -80,18 +58,33 @@ export default function useStudentRoomWatcher({
     );
 
     return () => unsubscribeRoom();
+  }, [enabled, selectedRoomId, setMyRoomData, shouldWatchRoom, user]);
+
+  useEffect(() => {
+    if (!enabled || view !== 'waiting' || !room || room.id !== selectedRoomId || room.status !== 'playing') return;
+    if (room.mode === 'subway') {
+      setView('subway');
+      return;
+    }
+
+    const myScore = scores.find((score) => score.id === currentScoreDocId);
+    const gameMode = resolveGameMode(room.mode, myScore?.difficulty || 'normal');
+    setGameMode(gameMode);
+    if (pendingQuizzesRef) pendingQuizzesRef.current = [...quizzes].sort(() => Math.random() - 0.5);
+    if (wordCountRef) wordCountRef.current = 0;
+    pickRandomWord(gameMode, { practiceMode: false });
+    setView('playing');
   }, [
     currentScoreDocId,
     enabled,
     pendingQuizzesRef,
     pickRandomWord,
     quizzes,
+    room,
     scores,
     selectedRoomId,
     setGameMode,
-    setMyRoomData,
     setView,
-    user,
     view,
     wordCountRef,
   ]);

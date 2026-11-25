@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
+import { CLASS_SCOREBOARD_SETTLE_MS, getClassScoreboardEnd } from '../src/utils/classScoreboard.js';
 
 const source = readFileSync(new URL('../api/student-security.js', import.meta.url), 'utf8');
 function fixture() {
@@ -21,6 +22,7 @@ function fixture() {
       update: (ref, values) => { writes++; Object.assign(score, values); },
     }) }),
   };
+  Object.assign(context, { CLASS_SCOREBOARD_SETTLE_MS, getClassScoreboardEnd, updateFinishedClassScoreboard: () => {} });
   runInNewContext(source.slice(source.indexOf('async function allowGameReentry('), source.indexOf('async function submitSubwayRun(')), context);
   return { score, room, context, writes: () => writes };
 }

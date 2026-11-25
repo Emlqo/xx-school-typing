@@ -27,13 +27,15 @@ export default function useScoreSyncRequest({
   gameInfoRef,
   lastProcessedSyncRef,
   lastSyncedScoreRef,
+  pendingScoreSyncRef,
+  isEndingRef,
   enabled = true,
 }) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
     if (!enabled || !user || !db) return;
-    if (view !== 'playing') return;
+    if (view !== 'playing' || isEndingRef.current) return;
     if (isPracticeMode) return;
     if (!myRoomData?.syncRequestedAt || !currentScoreDocId) return;
     if (!lastProcessedSyncRef || !lastSyncedScoreRef) return;
@@ -48,7 +50,7 @@ export default function useScoreSyncRequest({
     const cpm = calculateCpm({ chars: correctChars, seconds: elapsedSeconds });
     const scoreRef = getPublicDoc(db, APP_ID, FIRESTORE_PATHS.scores, currentScoreDocId);
 
-    updateDoc(scoreRef, {
+    const request = updateDoc(scoreRef, {
       score,
       cpm,
       correctChars,
@@ -62,17 +64,23 @@ export default function useScoreSyncRequest({
       .catch((syncError) => {
         console.error(syncError);
         setError(syncError);
+      })
+      .finally(() => {
+        if (pendingScoreSyncRef.current?.request === request) pendingScoreSyncRef.current = null;
       });
+    pendingScoreSyncRef.current = { scoreId: currentScoreDocId, request };
   }, [
     correctChars,
     currentScoreDocId,
     enabled,
     gameDuration,
     gameInfoRef,
+    isEndingRef,
     isPracticeMode,
     lastProcessedSyncRef,
     lastSyncedScoreRef,
     myRoomData,
+    pendingScoreSyncRef,
     quizCorrectCount,
     score,
     user,
