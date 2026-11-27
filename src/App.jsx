@@ -66,7 +66,7 @@ import { clearStudentDirectoryCache } from './services/studentDirectoryCache.js'
 import { getPublicCollection, getPublicDoc } from './utils/firestoreRefs.js';
 import { calculateHallOfFame, getHallOfFameTitleWinners, getMonthKey } from './utils/hallOfFame.js';
 import { calculateCpm, calculateQuizScore, calculateTypingScore, getQuizWrongPenalty } from './utils/scoring.js';
-import { createRoomQuizQueue, roomQuizzesEnabled } from './utils/roomQuizzes.js';
+import { createRoomQuizQueue, roomQuizzesEnabled, shuffleQuizOptions } from './utils/roomQuizzes.js';
 import { formatTime } from './utils/format.js';
 import { getCurrentDuelDailyWinPoints, normalizeClassStudent } from './utils/classStudents.js';
 import { DUEL_RULES } from './constants/duelRules.js';
@@ -175,6 +175,7 @@ export default function App() {
   const [lastEarned, setLastEarned] = useState(0);
   const [isError, setIsError] = useState(false);
   const [currentQuiz, setCurrentQuiz] = useState(null);
+  const [correctingQuiz, setCorrectingQuiz] = useState(false);
   const [boosterAvailable, setBoosterAvailable] = useState(true);
   const [boosterActive, setBoosterActive] = useState(false);
   const [boosterTimeLeft, setBoosterTimeLeft] = useState(0);
@@ -246,7 +247,6 @@ export default function App() {
   const [localRooms] = useState([]);
   const [localScores, setLocalScores] = useState([]);
   const [localAnnouncements] = useState([]);
-  const [localQuizzes] = useState(() => LOCAL_QUIZZES);
 
   const inputRef = useRef(null);
   const audioCtxRef = useRef(null);
@@ -618,14 +618,7 @@ export default function App() {
   }, [view]);
 
   const announcements = useMemo(() => [...localAnnouncements, ...subscribedAnnouncements], [localAnnouncements, subscribedAnnouncements]);
-  const quizzes = useMemo(
-    () => (view === 'teacher'
-      ? subscribedQuizzes
-      : subscribedQuizzes.length > 0
-        ? subscribedQuizzes
-        : localQuizzes),
-    [localQuizzes, subscribedQuizzes, view],
-  );
+  const quizzes = view === 'teacher' ? subscribedQuizzes : LOCAL_QUIZZES;
   const rooms = useMemo(() => [...localRooms, ...subscribedRooms], [localRooms, subscribedRooms]);
   const scores = useMemo(() => [...localScores, ...subscribedScores], [localScores, subscribedScores]);
   const enteredClassStudentIds = useMemo(
@@ -723,7 +716,7 @@ export default function App() {
     ) {
       const [nextQuiz, ...restQuizzes] = pendingQuizzesRef.current;
       pendingQuizzesRef.current = restQuizzes;
-      setCurrentQuiz(nextQuiz);
+      setCurrentQuiz(shuffleQuizOptions(nextQuiz));
       setCurrentWord('');
       wordCountRef.current = 0;
       return;
@@ -782,6 +775,7 @@ export default function App() {
     setLastEarned(0);
     setIsError(false);
     setCurrentQuiz(null);
+    setCorrectingQuiz(false);
     setBoosterAvailable(true);
     setBoosterActive(false);
     setBoosterTimeLeft(0);
@@ -864,7 +858,7 @@ export default function App() {
     const equipment = typeforgePractice.expiresAt > Date.now() ? selectedPracticeEffects : null;
     setPracticeGearEffects(equipment);
     quizShieldRef.current = Boolean(equipment?.quizShield);
-    pendingQuizzesRef.current = [...quizzes].sort(() => Math.random() - 0.5);
+    pendingQuizzesRef.current = createRoomQuizQueue(null, quizzes);
     wordCountRef.current = 0;
     pickRandomWord('mixed', { practiceMode: true });
     setView('playing');
@@ -1321,12 +1315,14 @@ export default function App() {
   }, [boosterActive, combo, currentQuiz, currentScoreDocId, currentWord, gameMode, inputValue, isDuelMode, myDuelScore, pickDuelContent, pickRandomWord, playComboSound, scores]);
 
   const handleQuizAnswer = useCallback(async (answerIndex) => {
-    if (!currentQuiz || quizAnswerPendingRef.current || timeLeft <= 0) return;
+    if (!currentQuiz || correctingQuiz || quizAnswerPendingRef.current || timeLeft <= 0) return;
+
+    const answeredCorrectly = answerIndex === currentQuiz.answer;
 
     const myInfo = isDuelMode ? myDuelScore || {} : scores.find((item) => item.id === currentScoreDocId) || {};
 
     let protectedAnswer = false;
-    if (!isDuelMode && answerIndex !== currentQuiz.answer && quizShieldRef.current) {
+    if (!isDuelMode && !answeredCorrectly && quizShieldRef.current) {
       const round = roomResultGear.current;
       if (isPracticeMode) {
         protectedAnswer = true;
@@ -1352,7 +1348,7 @@ export default function App() {
       if (!quizShieldRef.current) setPracticeGearEffects(previous => previous && { ...previous, quizShield: false });
     }
 
-    if (answerIndex === currentQuiz.answer) {
+    if (answeredCorrectly) {
       const earned = calculateQuizScore({
         pointWeight: myInfo.pointWeight || 1.0,
         boosterActive,
@@ -1380,11 +1376,22 @@ export default function App() {
       setIsError(true);
     }
 
-    setCurrentQuiz(null);
+    if (!answeredCorrectly && !isDuelMode) {
+      setCorrectingQuiz(true);
+      return;
+    }
+
     duelSyncDirtyRef.current = isDuelMode || duelSyncDirtyRef.current;
     if (isDuelMode) pickDuelContent();
     else pickRandomWord(gameMode);
-  }, [boosterActive, currentQuiz, currentScoreDocId, gameMode, isDuelMode, isPracticeMode, myDuelScore, pickDuelContent, pickRandomWord, scores, timeLeft]);
+  }, [boosterActive, correctingQuiz, currentQuiz, currentScoreDocId, gameMode, isDuelMode, isPracticeMode, myDuelScore, pickDuelContent, pickRandomWord, scores, timeLeft]);
+
+  const handleQuizCorrectionComplete = () => {
+    if (!correctingQuiz || timeLeft <= 0) return;
+    setCorrectingQuiz(false);
+    setIsError(false);
+    pickRandomWord(gameMode);
+  };
 
   const activateBooster = useCallback(async () => {
     if (!boosterAvailable || boosterActive || duelBoosterActivationRef.current) return;
@@ -3170,6 +3177,8 @@ export default function App() {
         handleKeyDown={handleKeyDown}
         onInputDelete={() => setCombo(0)}
         handleQuizAnswer={handleQuizAnswer}
+        correctingQuiz={correctingQuiz}
+        onQuizCorrectionComplete={handleQuizCorrectionComplete}
         boosterAvailable={boosterAvailable}
         boosterActive={boosterActive}
         boosterTimeLeft={boosterTimeLeft}

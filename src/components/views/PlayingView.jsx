@@ -26,6 +26,8 @@ export default function PlayingView({
   handleKeyDown = () => {},
   onInputDelete = () => {},
   handleQuizAnswer = () => {},
+  correctingQuiz = false,
+  onQuizCorrectionComplete = () => {},
   boosterAvailable = true,
   boosterActive = false,
   boosterTimeLeft = 0,
@@ -41,7 +43,8 @@ export default function PlayingView({
   const progress = currentWord.length > 0
     ? Math.min((inputValue.length / currentWord.length) * 100, 100)
     : 0;
-  const inputLanguage = currentQuiz ? 'quiz' : getExpectedInputLanguage(currentWord, inputValue.length);
+  let inputLanguage = getExpectedInputLanguage(currentWord, inputValue.length);
+  if (currentQuiz) inputLanguage = correctingQuiz ? 'quiz-correction' : 'quiz';
 
   useEffect(() => {
     setLanguageMismatch(null);
@@ -117,6 +120,8 @@ export default function PlayingView({
           <QuizCard
             currentQuiz={currentQuiz}
             handleQuizAnswer={handleQuizAnswer}
+            correcting={correctingQuiz}
+            onCorrectionComplete={onQuizCorrectionComplete}
             answerPending={quizAnswerPending}
             shieldAvailable={Boolean(practiceGearEffects?.quizShield)}
           />

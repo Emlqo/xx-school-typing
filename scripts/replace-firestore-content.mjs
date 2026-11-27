@@ -57,6 +57,7 @@ quizzes.forEach((quiz, index) => {
     options: quiz.options,
     answer: quiz.answer,
     category: quiz.category,
+    explanation: quiz.explanation,
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
   });

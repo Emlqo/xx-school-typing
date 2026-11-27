@@ -11,10 +11,10 @@ export default function GameStatusBar({
   inputLanguage = 'ko',
   languageMismatch = null,
 }) {
-  const languageStatus = inputLanguage === 'quiz'
+  const languageStatus = (inputLanguage === 'quiz' || inputLanguage === 'quiz-correction')
     ? {
       label: '퀴즈 진행 중',
-      detail: '답을 선택하세요',
+      detail: inputLanguage === 'quiz-correction' ? '정답을 입력하세요' : '답을 선택하세요',
       className: 'bg-amber-50 border-amber-300 text-amber-700',
     }
     : languageMismatch

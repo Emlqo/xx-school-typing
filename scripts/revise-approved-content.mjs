@@ -5,11 +5,9 @@ const writeJson = (path, value) => writeFileSync(path, `${JSON.stringify(value, 
 
 const koreanPath = 'content-drafts/korean-content.json';
 const englishPath = 'content-drafts/english-content.json';
-const quizzesPath = 'content-drafts/quizzes.json';
 
 const korean = readJson(koreanPath);
 const english = readJson(englishPath);
-const quizzes = readJson(quizzesPath);
 
 korean.words = [
   '교실', '계획', '발표', '독서', '탐구', '과제', '수업', '습관', '시간', '목표',
@@ -53,17 +51,5 @@ english.sentences = english.sentences.map((sentence) => {
   return sentence;
 });
 
-quizzes[1] = {
-  ...quizzes[1],
-  question: '처리 중인 자료를 빠르게 읽고 쓰기 위해 사용하는 임시 기억장치는 무엇인가',
-  options: ['프린터', '램', '스캐너', '마이크'],
-  answer: 1,
-};
-quizzes[10] = {
-  ...quizzes[10],
-  options: ['광고주', '판매자', '사용자', '제조사'],
-};
-
 writeJson(koreanPath, korean);
 writeJson(englishPath, english);
-writeJson(quizzesPath, quizzes);
