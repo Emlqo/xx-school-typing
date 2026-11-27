@@ -1,4 +1,5 @@
 import { auth } from './firebaseClient.js';
+import { DUEL_WORD_BANK_VERSION } from '../constants/gameRules.js';
 
 export const getGachaShop = (payload) => call('getGachaShop', payload);
 export const saveGachaShop = (payload) => call('saveGachaShop', payload);
@@ -78,11 +79,11 @@ export const recordPracticeCompletion = (studentId, practiceRunId, durationSec, 
   { studentId, practiceRunId, durationSec, correctChars, cpm },
 );
 export const syncPublicClassRoster = () => call('syncPublicClassRoster');
-export const createDuelChallenge = (targetStudentId) => call('createDuelChallenge', { targetStudentId });
+export const createDuelChallenge = (targetStudentId) => call('createDuelChallenge', { targetStudentId, wordBankVersion: DUEL_WORD_BANK_VERSION });
 export const rejectDuelChallenge = (targetStudentId) => call('rejectDuelChallenge', { targetStudentId });
 export const acceptDuelChallenge = (targetStudentId, quizSequence) => call(
   'acceptDuelChallenge',
-  { targetStudentId, quizSequence },
+  { targetStudentId, quizSequence, wordBankVersion: DUEL_WORD_BANK_VERSION },
 );
 export const getActiveDuel = (studentId) => call('getActiveDuel', { studentId });
 export const getDuelHistory = (studentId, cursorMillis = 0) => call(

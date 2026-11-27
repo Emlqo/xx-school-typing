@@ -15,6 +15,8 @@ import {
 } from '../api/student-security.js';
 import { getCurrentDuelDailyWinPoints, getKoreanDateKey } from '../src/utils/classStudents.js';
 import { DUEL_RULES } from '../src/constants/duelRules.js';
+import { KOREAN_WORDS, ENGLISH_WORDS } from '../src/constants/words.js';
+import { LEGACY_DUEL_WORDS } from '../src/constants/legacyDuelWords.js';
 
 test('duel score synchronization uses a traffic-safe interval', () => {
   assert.equal(DUEL_RULES.scoreSyncIntervalMs, 15_000);
@@ -70,6 +72,19 @@ test('same duel seed produces the same word sequence', () => {
   const second = Array.from({ length: 30 }, (_, index) => getDuelWord(123456, index));
   assert.deepEqual(first, second);
   assert.ok(new Set(first).size > 1);
+});
+
+test('the new word bank replaces both languages and legacy duels keep their original word bank', () => {
+  const legacy = new Set(LEGACY_DUEL_WORDS);
+  for (const words of [KOREAN_WORDS, ENGLISH_WORDS]) {
+    assert.ok(words.filter((word) => word.includes(' ')).length >= 100);
+    assert.ok(words.filter((word) => !word.includes(' ')).length >= 150);
+    assert.ok(words.every((word) => !legacy.has(word)));
+    assert.equal(new Set(words).size, words.length);
+  }
+  const restored = Array.from({ length: 30 }, (_, index) => getDuelWord(123456, index, 1));
+  assert.ok(restored.every((word) => legacy.has(word)));
+  assert.ok(restored.every((word, index) => word !== getDuelWord(123456, index)));
 });
 
 test('duel quiz snapshot keeps only valid four-option quizzes', () => {

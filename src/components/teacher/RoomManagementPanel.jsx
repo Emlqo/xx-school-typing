@@ -1,5 +1,6 @@
 import SubwaySettings from './SubwaySettings.jsx';
 import ElementSettings from './ElementSettings.jsx';
+import RoomQuizToggle from './RoomQuizToggle.jsx';
 import { isElementRoom, memoryRoomLabel } from '../../utils/memoryGame.js';
 
 function toMillis(value) {
@@ -24,7 +25,7 @@ function formatRoomMeta(room) {
   if (room.mode === 'subway') return isElementRoom(room) ? memoryRoomLabel(room) : room.subway?.practice === 'recall' ? '지하철판 · 4호선 전체 많이 맞히기' : `지하철판 · 4호선 ${room.subway?.from} → ${room.subway?.to}`;
   const modeLabel = room.mode === 'ko' ? '한글' : room.mode === 'en' ? '영어' : '혼합';
   const durationLabel = `${Math.floor((room.duration || 300) / 60)}분`;
-  return `${modeLabel} · ${durationLabel}`;
+  return `${modeLabel} · ${durationLabel}${room.quizEnabled === false ? ' · 퀴즈 OFF' : ''}`;
 }
 
 function formatRoomCreatedAt(value) {
@@ -86,6 +87,8 @@ function RoomChoice({
 
 export default function RoomManagementPanel({
   handleCreateRoom = () => {},
+  quizEnabled = true,
+  setQuizEnabled,
   focusGuardEnabled = false,
   setFocusGuardEnabled = () => {},
   newRoomName = '',
@@ -207,6 +210,7 @@ export default function RoomManagementPanel({
           {roomMode === 'subway' && <SubwaySettings value={subwayConfig} onChange={setSubwayConfig} />}
           {roomMode === 'elements' && <ElementSettings value={elementConfig} onChange={setElementConfig} />}
           <label className="flex items-center gap-3 rounded-lg border border-rose-200 bg-rose-50 p-3 font-bold text-rose-900"><input type="checkbox" checked={focusGuardEnabled} onChange={e => setFocusGuardEnabled(e.target.checked)} />화면 이탈 방지 {focusGuardEnabled ? 'ON' : 'OFF'}</label>
+          <RoomQuizToggle mode={roomMode} enabled={quizEnabled} onChange={setQuizEnabled} />
           <button type="submit" className="w-full bg-pink-500 hover:bg-pink-600 py-3 rounded-xl font-bold text-white shadow-md">
             게스트 PIN 방 만들기
           </button>

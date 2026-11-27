@@ -4,6 +4,7 @@ import { APP_ID } from '../constants/gameRules.js';
 import { FIRESTORE_PATHS } from '../constants/firestorePaths.js';
 import { db } from '../services/firebaseClient.js';
 import { getPublicDoc } from '../utils/firestoreRefs.js';
+import { createRoomQuizQueue } from '../utils/roomQuizzes.js';
 
 function resolveGameMode(roomMode, difficulty) {
   if (difficulty === 'hell') return 'en';
@@ -70,7 +71,7 @@ export default function useStudentRoomWatcher({
     const myScore = scores.find((score) => score.id === currentScoreDocId);
     const gameMode = resolveGameMode(room.mode, myScore?.difficulty || 'normal');
     setGameMode(gameMode);
-    if (pendingQuizzesRef) pendingQuizzesRef.current = [...quizzes].sort(() => Math.random() - 0.5);
+    if (pendingQuizzesRef) pendingQuizzesRef.current = createRoomQuizQueue(room, quizzes);
     if (wordCountRef) wordCountRef.current = 0;
     pickRandomWord(gameMode, { practiceMode: false });
     setView('playing');

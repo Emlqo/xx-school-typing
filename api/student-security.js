@@ -12,7 +12,7 @@ import { createShopSeason2Actions } from '../server/shopSeason2.js';
 import { issueTypeforgeAdminEntry, issueTypeforgeEntry, issueTypeforgeProfileGrant, readTypeforgePracticeGear, typeforgeOrigin } from '../server/typeforgeEntry.js';
 import { SHOP_SEASON } from '../src/utils/gacha.js';
 import { isAllowedTeacherUid } from '../src/constants/teacherAccess.js';
-import { CLASS_SCORE_ID_VERSION, GAME_RULES } from '../src/constants/gameRules.js';
+import { CLASS_SCORE_ID_VERSION, DUEL_WORD_BANK_VERSION, GAME_RULES } from '../src/constants/gameRules.js';
 import { getTypeforgePracticeEffects } from '../src/utils/typeforgePractice.js';
 
 const APP_ID = 'xx-school-typing-app';
@@ -788,6 +788,7 @@ async function joinClassGame(uid, body) {
   const scores = publicCollection(PATHS.scores);
   const fixedScoreRef = scores.doc(`class_${roomId}_${studentId}`);
   const fixedScoreIds = room.scoreIdVersion === CLASS_SCORE_ID_VERSION;
+  const quizEnabled = room.quizEnabled !== false;
   let gearRequest;
   const getGearField = async () => {
     if (room.mode === 'subway') return {};
@@ -811,6 +812,7 @@ async function joinClassGame(uid, body) {
     correctChars: 0,
     difficulty: 'normal',
     boosterEnabled: true,
+    quizEnabled,
     pointWeight: 1,
     userId: uid,
     quizCorrectCount: 0,
@@ -834,7 +836,7 @@ async function joinClassGame(uid, body) {
       if (snapshot.exists) {
         const previous = snapshot.data();
         const gearField = Object.hasOwn(previous, 'typeforgeGear') ? {} : await getGearField();
-        const updates = { userId: uid, ...gearField };
+        const updates = { userId: uid, quizEnabled, ...gearField };
         transaction.update(snapshot.ref, { ...updates, updatedAt: FieldValue.serverTimestamp() });
         return { id: snapshot.id, data: { ...previous, ...updates } };
       }
@@ -875,7 +877,7 @@ async function useTypeforgeRoomBenefit(uid, body) {
     }
     const effects = getTypeforgePracticeEffects(score.typeforgeGear);
     if (benefit === 'shield') {
-      if (!effects?.quizShield) return { protected: false };
+      if (score.quizEnabled === false || !effects?.quizShield) return { protected: false };
       if (score.typeforgeShieldAttemptId) return { protected: score.typeforgeShieldAttemptId === attemptId };
     } else {
       if (!effects?.extraBoosterSeconds || score.boosterEnabled === false) {
@@ -1218,7 +1220,8 @@ async function finalizeStudentReward(uid, body) {
       return { reward: score.rewardBreakdown || { totalEarned: Number(score.rewardEarned || 0) }, profile };
     }
 
-    const result = finalScore || score;
+    const scoreUpdates = score.quizEnabled === false ? { ...finalScore, quizCorrectCount: 0 } : finalScore;
+    const result = { ...score, ...scoreUpdates };
     const currentScore = Math.max(0, Number(result.score || 0));
     const quizCount = Math.max(0, Number(result.quizCorrectCount || 0));
     const previousBest = Math.max(0, Number(student.bestScore || 0));
@@ -1247,13 +1250,13 @@ async function finalizeStudentReward(uid, body) {
       });
     }
     transaction.update(scoreRef, {
-      ...finalScore,
+      ...scoreUpdates,
       rewardGranted: true,
       rewardEarned: Number(score.rankRewardPoints || 0) + reward.totalEarned,
       rewardBreakdown: reward,
       updatedAt: FieldValue.serverTimestamp(),
     });
-    updateFinishedClassScoreboard(transaction, summarySnapshot, scoreId, { ...score, ...finalScore });
+    updateFinishedClassScoreboard(transaction, summarySnapshot, scoreId, result);
     return { reward, profile };
   });
 }
@@ -1414,6 +1417,7 @@ async function createDuelChallenge(uid, body) {
       targetClassName: targetProfile.className || target.className || '',
       targetUserId: targetSession.uid,
       participantUids: [uid, targetSession.uid],
+      wordBankVersion: body.wordBankVersion === DUEL_WORD_BANK_VERSION ? DUEL_WORD_BANK_VERSION : 1,
       stakePoints: DUEL_RULES.stakePoints,
       expiresAt,
       createdAt: FieldValue.serverTimestamp(),
@@ -1533,6 +1537,8 @@ async function acceptDuelChallenge(uid, body) {
       mode: 'mixed',
       stakePoints: DUEL_RULES.stakePoints,
       randomSeed,
+      wordBankVersion: challenge.wordBankVersion === DUEL_WORD_BANK_VERSION && body.wordBankVersion === DUEL_WORD_BANK_VERSION
+        ? DUEL_WORD_BANK_VERSION : 1,
       quizSequence,
       participantUids,
       participantStudentIds: [challenge.challengerStudentId, targetStudentId],

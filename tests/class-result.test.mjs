@@ -229,6 +229,20 @@ test('invalid, expired, disqualified, and cross-class requests never save a resu
   assert.deepEqual(f.writes, []);
 });
 
+test('quiz OFF stores zero quiz answers and pays no quiz reward without reading the room', async () => {
+  const f = fixture();
+  const record = f.docs.get('scores/score-0');
+  record.quizEnabled = false;
+  await f.loadScoreboard();
+  f.reads.length = 0;
+  const { reward } = await f.finish(0, finalScore);
+  assert.equal(reward.quizPoints, 0);
+  assert.equal(reward.bestScoreBonus, REWARD_RULES.bestScoreBonus);
+  assert.equal(record.quizCorrectCount, 0);
+  assert.equal(f.docs.get('scoreboards/room').scores[0].quizCorrectCount, 0);
+  assert.equal(f.reads.length, 4);
+});
+
 test('returning home reuses student-scoped data and an explicit refresh coalesces pending reads', async () => {
   const key = 'user:home:student:gear';
   const options = { maxAge: STUDENT_HOME_CACHE_AGE_MS };

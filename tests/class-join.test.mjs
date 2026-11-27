@@ -198,6 +198,17 @@ test('an older room reuses its progressed legacy record even if a newer empty ca
   assert.equal(f.docs.get('scores/class_room_student-0').score, 0);
 });
 
+test('a quiz-disabled classroom stores the setting with the trusted score and retains it on reentry', async () => {
+  const f = fixture(1, { scoreIdVersion: CLASS_SCORE_ID_VERSION, quizEnabled: false });
+  const { score } = await f.join(0);
+  assert.equal(score.quizEnabled, false);
+  assert.equal(f.reads.length, 3);
+  const resumed = await f.join(0, 'user-0', true);
+  assert.equal(resumed.score.id, score.id);
+  assert.equal(resumed.score.quizEnabled, false);
+  assert.equal(f.reads.length, 7);
+});
+
 test('expired or mismatched sessions, inactive students, and closed rooms cannot save scores', async () => {
   const cases = [
     ['sessions/user-0', { expiresAt: now }, 403],

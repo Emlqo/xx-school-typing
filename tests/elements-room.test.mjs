@@ -5,14 +5,17 @@ import { DEFAULT_ELEMENT_CONFIG } from '../src/constants/elements.js';
 import { CLASS_SCORE_ID_VERSION } from '../src/constants/gameRules.js';
 import { isValidElementConfig, memoryPreviewMs } from '../src/utils/memoryGame.js';
 import { subwayRoute } from '../src/utils/subway.js';
+import { createRoomQuizQueue, roomQuizzesEnabled } from '../src/utils/roomQuizzes.js';
 
 const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');
 function roomActions(overrides = {}) {
-  const created = [], updates = [], alerts = [];
+  const created = [], updates = [], alerts = [], quizResets = [];
   const config = { ...DEFAULT_ELEMENT_CONFIG, fromNumber: 21, toNumber: 40, practice: 'recall', previewSeconds: 45 };
   const context = {
     requireTeacherAccess: () => true, newRoomName: '원소 테스트', roomMode: 'elements', classRoomMode: 'elements', roomDuration: '120', classRoomDuration: '180',
     elementConfig: config, classElementConfig: config, roomFocusGuard: false, classFocusGuard: true, user: { uid: 'teacher' },
+    roomQuizEnabled: true, classQuizEnabled: true, roomQuizzesEnabled,
+    setRoomQuizEnabled: (enabled) => quizResets.push(enabled), setClassQuizEnabled: (enabled) => quizResets.push(enabled),
     getPublicCollection: (_, appId, name) => `${appId}/${name}`, getPublicDoc: (_, appId, name, id) => `${appId}/${name}/${id}`,
     db: {}, APP_ID: 'test', CLASS_SCORE_ID_VERSION, FIRESTORE_PATHS: { rooms: 'typing_rooms' },
     addDoc: async (ref, data) => { created.push({ ref, data }); return { id: 'room1' }; },
@@ -26,7 +29,7 @@ function roomActions(overrides = {}) {
     const code = app.slice(start, app.indexOf(`\n  const ${nextName}`, start)).trim().replace(/;$/, '');
     return new Function(...Object.keys(context), `return (${code});`)(...Object.values(context));
   }
-  return { created, updates, alerts, create: get('handleCreateRoom', 'startRoomGame'), open: get('openClassRoom', 'deleteClassRoomSession'), start: get('startRoomGame', 'handleAllowReentry') };
+  return { created, updates, alerts, quizResets, create: get('handleCreateRoom', 'startRoomGame'), open: get('openClassRoom', 'deleteClassRoomSession'), start: get('startRoomGame', 'handleAllowReentry') };
 }
 test('guest and class rooms retain routes/auth compatibility and selected element settings', async () => {
   const actions = roomActions();
@@ -40,6 +43,7 @@ test('guest and class rooms retain routes/auth compatibility and selected elemen
     assert.equal(data.subway.fromNumber, 21);
     assert.equal(data.subway.toNumber, 40);
     assert.equal(data.subway.previewSeconds, 45);
+    assert.equal(data.quizEnabled, false);
     assert.equal(data.createdBy, 'teacher');
   }
   assert.equal(actions.created[1].data.classId, 'c1');
@@ -47,6 +51,23 @@ test('guest and class rooms retain routes/auth compatibility and selected elemen
   assert.equal(actions.created[1].data.scoreIdVersion, CLASS_SCORE_ID_VERSION);
   await actions.start('room1');
   assert.ok(Math.abs(actions.updates[0].data.expiresAt - Date.now() - 165000) < 1000);
+});
+
+test('teacher room creation stores quiz ON by default and applies explicit OFF to both room types', async () => {
+  for (const enabled of [true, false]) {
+    const actions = roomActions({ roomMode: 'mixed', classRoomMode: 'en', roomQuizEnabled: enabled, classQuizEnabled: enabled });
+    await actions.create({ preventDefault() {} });
+    await actions.open({ id: 'c1' });
+    assert.deepEqual(actions.created.map((room) => room.data.quizEnabled), [enabled, enabled]);
+    assert.deepEqual(actions.quizResets, [true, true]);
+  }
+});
+
+test('quiz queues stay active in older typing rooms and empty out for quiz OFF or memory rooms', () => {
+  const quizzes = [{ id: 'quiz-1' }];
+  assert.deepEqual(createRoomQuizQueue({ mode: 'ko' }, quizzes), quizzes);
+  assert.deepEqual(createRoomQuizQueue({ mode: 'en', quizEnabled: false }, quizzes), []);
+  assert.deepEqual(createRoomQuizQueue({ mode: 'subway' }, quizzes), []);
 });
 test('invalid element range and unauthorized teacher cannot create rooms', async () => {
   for (const overrides of [{ requireTeacherAccess: () => false }, { elementConfig: { ...DEFAULT_ELEMENT_CONFIG, toNumber: 119 }, classElementConfig: { ...DEFAULT_ELEMENT_CONFIG, fromNumber: 40, toNumber: 20 } }]) {

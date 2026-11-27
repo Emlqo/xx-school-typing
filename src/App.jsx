@@ -66,6 +66,7 @@ import { clearStudentDirectoryCache } from './services/studentDirectoryCache.js'
 import { getPublicCollection, getPublicDoc } from './utils/firestoreRefs.js';
 import { calculateHallOfFame, getHallOfFameTitleWinners, getMonthKey } from './utils/hallOfFame.js';
 import { calculateCpm, calculateQuizScore, calculateTypingScore, getQuizWrongPenalty } from './utils/scoring.js';
+import { createRoomQuizQueue, roomQuizzesEnabled } from './utils/roomQuizzes.js';
 import { formatTime } from './utils/format.js';
 import { getCurrentDuelDailyWinPoints, normalizeClassStudent } from './utils/classStudents.js';
 import { DUEL_RULES } from './constants/duelRules.js';
@@ -138,6 +139,8 @@ export default function App() {
   const [view, setView] = useState(getInitialView);
   const [roomFocusGuard, setRoomFocusGuard] = useState(false);
   const [classFocusGuard, setClassFocusGuard] = useState(false);
+  const [roomQuizEnabled, setRoomQuizEnabled] = useState(true);
+  const [classQuizEnabled, setClassQuizEnabled] = useState(true);
   const [fullscreenEntryRequest, setFullscreenEntryRequest] = useState(null);
   const [screenExitError, setScreenExitError] = useState('');
   const screenExitRef = useRef('');
@@ -757,7 +760,7 @@ export default function App() {
       return;
     }
 
-    const nextWord = getDuelWord(activeDuel.randomSeed, duelWordIndexRef.current);
+    const nextWord = getDuelWord(activeDuel.randomSeed, duelWordIndexRef.current, activeDuel.wordBankVersion ?? 1);
     duelWordIndexRef.current += 1;
     setCurrentQuiz(null);
     setCurrentWord(nextWord);
@@ -991,7 +994,7 @@ export default function App() {
       if (roomData.status === 'playing') {
         setTimeLeft(remainingSeconds);
         gameInfoRef.current.elapsed = Math.max(0, duration - remainingSeconds);
-        pendingQuizzesRef.current = [...quizzes].sort(() => Math.random() - 0.5);
+        pendingQuizzesRef.current = createRoomQuizQueue(roomData, quizzes);
         wordCountRef.current = 0;
         pickRandomWord(nextGameMode, { practiceMode: false });
         setView('playing');
@@ -1053,7 +1056,7 @@ export default function App() {
       const effects = getTypeforgePracticeEffects(gear);
       const boosterUntil = Number(scoreData.typeforgeBoosterUntil || 0);
       roomResultGear.current = { scoreId: scoreDocId, gear, boosterUntil };
-      quizShieldRef.current = Boolean(effects?.quizShield && !scoreData.typeforgeShieldAttemptId);
+      quizShieldRef.current = Boolean(roomQuizzesEnabled(roomData) && effects?.quizShield && !scoreData.typeforgeShieldAttemptId);
       setPracticeGearEffects(effects && { ...effects, quizShield: quizShieldRef.current });
       if (boosterUntil) {
         const seconds = Math.max(0, Math.ceil((boosterUntil - Date.now()) / 1000));
@@ -1079,7 +1082,7 @@ export default function App() {
         const seconds = getRemainingSeconds(roomData);
         setTimeLeft(seconds);
         gameInfoRef.current.elapsed = Math.max(0, duration - seconds);
-        pendingQuizzesRef.current = [...quizzes].sort(() => Math.random() - 0.5);
+        pendingQuizzesRef.current = createRoomQuizQueue(roomData, quizzes);
         wordCountRef.current = 0;
         pickRandomWord(nextGameMode, { practiceMode: false });
         setView('playing');
@@ -1693,6 +1696,7 @@ export default function App() {
         name: trimmedName,
         mode: roomMode === 'elements' ? 'subway' : roomMode,
         focusGuardEnabled: roomFocusGuard,
+        quizEnabled: roomQuizzesEnabled({ mode: roomMode, quizEnabled: roomQuizEnabled }),
         ...(roomMode === 'subway' ? { subway: { ...subwayConfig, previewEnabled: subwayConfig.practice === 'recall' } } : {}),
         ...(roomMode === 'elements' ? { subway: { ...elementConfig, subject: 'elements' } } : {}),
         duration: durationSec,
@@ -1704,6 +1708,7 @@ export default function App() {
 
       setViewingRoomId(roomRef.id);
       setNewRoomName('');
+      setRoomQuizEnabled(true);
     } catch (error) {
       console.error(error);
       alert('반 생성 중 오류가 발생했습니다.');
@@ -2830,6 +2835,7 @@ export default function App() {
         ...(classRoomMode === 'subway' ? { subway: { ...classSubwayConfig, previewEnabled: classSubwayConfig.practice === 'recall' } } : {}),
         ...(classRoomMode === 'elements' ? { subway: { ...classElementConfig, subject: 'elements' } } : {}),
         focusGuardEnabled: classFocusGuard,
+        quizEnabled: roomQuizzesEnabled({ mode: classRoomMode, quizEnabled: classQuizEnabled }),
         duration: durationSec,
         roomCode: createRoomCode(),
         status: 'waiting',
@@ -2841,6 +2847,7 @@ export default function App() {
         createdAt: serverTimestamp(),
       });
       setViewingRoomId(roomRef.id);
+      setClassQuizEnabled(true);
     } catch (error) {
       console.error(error);
       alert('학급 방 열기 중 오류가 발생했습니다.');
@@ -3234,6 +3241,10 @@ export default function App() {
         setRoomFocusGuard={setRoomFocusGuard}
         classFocusGuard={classFocusGuard}
         setClassFocusGuard={setClassFocusGuard}
+        roomQuizEnabled={roomQuizEnabled}
+        setRoomQuizEnabled={setRoomQuizEnabled}
+        classQuizEnabled={classQuizEnabled}
+        setClassQuizEnabled={setClassQuizEnabled}
         newRoomName={newRoomName}
         setNewRoomName={setNewRoomName}
         roomMode={roomMode}

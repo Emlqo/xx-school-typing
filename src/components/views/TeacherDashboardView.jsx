@@ -26,6 +26,10 @@ export default function TeacherDashboardView({
   setRoomFocusGuard,
   classFocusGuard = false,
   setClassFocusGuard,
+  roomQuizEnabled = true,
+  setRoomQuizEnabled,
+  classQuizEnabled = true,
+  setClassQuizEnabled,
   newRoomName = '',
   setNewRoomName = () => {},
   roomMode = 'ko',
@@ -207,6 +211,8 @@ export default function TeacherDashboardView({
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <RoomManagementPanel
               handleCreateRoom={handleCreateRoom}
+              quizEnabled={roomQuizEnabled}
+              setQuizEnabled={setRoomQuizEnabled}
               focusGuardEnabled={roomFocusGuard}
               setFocusGuardEnabled={setRoomFocusGuard}
               newRoomName={newRoomName}
@@ -263,6 +269,8 @@ export default function TeacherDashboardView({
               setElementConfig={setClassElementConfig}
               focusGuardEnabled={classFocusGuard}
               setFocusGuardEnabled={setClassFocusGuard}
+              quizEnabled={classQuizEnabled}
+              setQuizEnabled={setClassQuizEnabled}
               subwayConfig={classSubwayConfig}
               setSubwayConfig={setClassSubwayConfig}
               setClassRoomMode={setClassRoomMode}

@@ -1,4 +1,6 @@
 import { ENGLISH_WORDS, KOREAN_WORDS } from '../constants/words.js';
+import { LEGACY_DUEL_WORDS } from '../constants/legacyDuelWords.js';
+import { DUEL_WORD_BANK_VERSION } from '../constants/gameRules.js';
 
 const DUEL_WORDS = [...KOREAN_WORDS, ...ENGLISH_WORDS];
 
@@ -10,10 +12,9 @@ function seededIndex(seed, index, length) {
   return ((value ^ (value >>> 16)) >>> 0) % length;
 }
 
-export function getDuelWord(seed, index) {
-  if (!DUEL_WORDS.length) return '풍양중학교';
-  const safeIndex = seededIndex(seed, index, DUEL_WORDS.length);
-  return DUEL_WORDS[safeIndex] || '풍양중학교';
+export function getDuelWord(seed, index, wordBankVersion = DUEL_WORD_BANK_VERSION) {
+  const words = wordBankVersion === DUEL_WORD_BANK_VERSION ? DUEL_WORDS : LEGACY_DUEL_WORDS;
+  return words[seededIndex(seed, index, words.length)] || '풍양중학교';
 }
 
 export function createDuelQuizSequence(quizzes = []) {

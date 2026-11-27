@@ -1,5 +1,6 @@
 import SubwaySettings from './SubwaySettings.jsx';
 import ElementSettings from './ElementSettings.jsx';
+import RoomQuizToggle from './RoomQuizToggle.jsx';
 import { memoryRoomLabel } from '../../utils/memoryGame.js';
 
 function toMillis(value) {
@@ -39,6 +40,8 @@ export default function ClassManagementPanel({
   handleCreateClass = () => {},
   handleDeleteClass = () => {},
   openClassRoom = () => {},
+  quizEnabled = true,
+  setQuizEnabled,
   classRooms = [],
   selectedClassRoomId = '',
   selectClassRoomSession = () => {},
@@ -144,6 +147,7 @@ export default function ClassManagementPanel({
         {classRoomMode === 'subway' && <SubwaySettings value={subwayConfig} onChange={setSubwayConfig} />}
         {classRoomMode === 'elements' && <ElementSettings value={elementConfig} onChange={setElementConfig} />}
         <label className="flex items-center gap-3 rounded-lg border border-rose-200 bg-rose-50 p-3 font-bold text-rose-900"><input type="checkbox" checked={focusGuardEnabled} onChange={e => setFocusGuardEnabled(e.target.checked)} />화면 이탈 방지 {focusGuardEnabled ? 'ON' : 'OFF'}</label>
+        <RoomQuizToggle mode={classRoomMode} enabled={quizEnabled} onChange={setQuizEnabled} />
         <button
           type="button"
           onClick={() => openClassRoom(selectedClass)}
